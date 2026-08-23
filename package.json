@@ -1,0 +1,12 @@
+{
+  "name": "device-management",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
