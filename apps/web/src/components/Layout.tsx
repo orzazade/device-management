@@ -1,5 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
+import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
+import type { RequestRow } from '../lib/requests';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100 ${
@@ -14,8 +17,30 @@ function Section({ label }: { label: string }) {
   );
 }
 
+function Badge({ n }: { n: number | undefined }) {
+  if (!n) return null;
+  return (
+    <span className="ml-auto rounded-full bg-accent px-2 text-[11px] font-semibold leading-[18px] text-white">
+      {n}
+    </span>
+  );
+}
+
 export default function Layout() {
   const { user, loading, logout } = useAuth();
+  const staff = isStaff(user?.role);
+  const handovers = useQuery({
+    queryKey: ['requests', 'pending-handover'],
+    queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+  const approvals = useQuery({
+    queryKey: ['requests', 'pending-approvals'],
+    queryFn: () => api<RequestRow[]>('/requests?scope=all&state=pending'),
+    enabled: !!user && staff,
+    refetchInterval: 30000,
+  });
   if (loading) return <p className="p-10 text-neutral-400">loading…</p>;
   if (!user) return <Navigate to="/login" replace />;
 
@@ -38,9 +63,18 @@ export default function Layout() {
           <Section label="Lab" />
           <NavLink to="/" end className={linkCls}>Dashboard</NavLink>
           <NavLink to="/devices" className={linkCls}>Devices</NavLink>
+          <NavLink to="/requests" className={linkCls}>My requests</NavLink>
+          <NavLink to="/handovers" className={linkCls}>
+            Handovers
+            <Badge n={handovers.data?.length} />
+          </NavLink>
           {isStaff(user.role) && (
             <>
               <Section label="Manage" />
+              <NavLink to="/approvals" className={linkCls}>
+                Approvals
+                <Badge n={approvals.data?.length} />
+              </NavLink>
               <NavLink to="/import" className={linkCls}>Excel import</NavLink>
               <NavLink to="/projects" className={linkCls}>Projects</NavLink>
               <NavLink to="/users" className={linkCls}>Users</NavLink>

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Chip from '../components/Chip';
+import RequestModal from '../components/RequestModal';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { DeviceRow, ProjectRow } from '../lib/types';
@@ -15,6 +16,7 @@ export default function Devices() {
   const [os, setOs] = useState('');
   const [status, setStatus] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [requestFor, setRequestFor] = useState<DeviceRow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const params = new URLSearchParams();
@@ -110,6 +112,7 @@ export default function Devices() {
               <th className="px-4 py-2.5">Status</th>
               <th className="px-4 py-2.5">Holder</th>
               <th className="px-4 py-2.5">Project</th>
+              <th className="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody>
@@ -134,6 +137,16 @@ export default function Devices() {
                 </td>
                 <td className="px-4 py-2.5">{d.holder?.name ?? '—'}</td>
                 <td className="px-4 py-2.5">{d.project?.name ?? '—'}</td>
+                <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                  {(d.status === 'available' || d.status === 'assigned') && (
+                    <button
+                      onClick={() => setRequestFor(d)}
+                      className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white"
+                    >
+                      Request
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -143,6 +156,8 @@ export default function Devices() {
           <p className="p-6 text-neutral-400">No devices match. Clear a filter?</p>
         )}
       </div>
+
+      {requestFor && <RequestModal device={requestFor} onClose={() => setRequestFor(null)} />}
 
       {showCreate && (
         <div

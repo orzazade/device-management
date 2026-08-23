@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Chip from '../components/Chip';
+import RequestModal from '../components/RequestModal';
 import { api } from '../lib/api';
 import type { AuditRow, DeviceRow } from '../lib/types';
 
@@ -10,6 +11,7 @@ const short = (v: unknown) => (v == null ? '—' : JSON.stringify(v));
 export default function DeviceDetail() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<'specs' | 'history' | 'repairs'>('specs');
+  const [showRequest, setShowRequest] = useState(false);
   const device = useQuery({
     queryKey: ['device', id],
     queryFn: () => api<DeviceRow>(`/devices/${id}`),
@@ -45,7 +47,17 @@ export default function DeviceDetail() {
           {d.brand} {d.model}
         </h1>
         <Chip status={d.status} />
+        <div className="flex-1" />
+        {(d.status === 'available' || d.status === 'assigned') && (
+          <button
+            onClick={() => setShowRequest(true)}
+            className="rounded-lg bg-accent px-4 py-2 font-semibold text-white hover:brightness-110"
+          >
+            Request this device
+          </button>
+        )}
       </div>
+      {showRequest && <RequestModal device={d} onClose={() => setShowRequest(false)} />}
 
       {d.damageNote && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5">
