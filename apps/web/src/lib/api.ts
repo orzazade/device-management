@@ -17,15 +17,15 @@ export const tokenStore = {
 
 export async function api<T>(
   path: string,
-  opts: { method?: string; body?: unknown } = {},
+  opts: { method?: string; body?: unknown; formData?: FormData } = {},
 ): Promise<T> {
   const res = await fetch(`/api/v1${path}`, {
-    method: opts.method ?? 'GET',
+    method: opts.method ?? (opts.formData ? 'POST' : 'GET'),
     headers: {
       ...(opts.body !== undefined ? { 'content-type': 'application/json' } : {}),
       ...(tokenStore.get() ? { authorization: `Bearer ${tokenStore.get()}` } : {}),
     },
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    body: opts.formData ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {

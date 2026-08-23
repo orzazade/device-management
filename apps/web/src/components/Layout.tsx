@@ -37,9 +37,12 @@ export default function Layout() {
         <nav className="flex-1 overflow-y-auto p-2">
           <Section label="Lab" />
           <NavLink to="/" end className={linkCls}>Dashboard</NavLink>
+          <NavLink to="/devices" className={linkCls}>Devices</NavLink>
           {isStaff(user.role) && (
             <>
               <Section label="Manage" />
+              <NavLink to="/import" className={linkCls}>Excel import</NavLink>
+              <NavLink to="/projects" className={linkCls}>Projects</NavLink>
               <NavLink to="/users" className={linkCls}>Users</NavLink>
             </>
           )}

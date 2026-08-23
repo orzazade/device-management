@@ -4,7 +4,11 @@ import Layout from './components/Layout';
 import { AuthProvider } from './lib/auth';
 import Audit from './pages/Audit';
 import Dashboard from './pages/Dashboard';
+import DeviceDetail from './pages/DeviceDetail';
+import Devices from './pages/Devices';
+import Import from './pages/Import';
 import Login from './pages/Login';
+import Projects from './pages/Projects';
 import Users from './pages/Users';
 
 const qc = new QueryClient({
@@ -20,6 +24,10 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/devices" element={<Devices />} />
+              <Route path="/devices/:id" element={<DeviceDetail />} />
+              <Route path="/import" element={<Import />} />
+              <Route path="/projects" element={<Projects />} />
               <Route path="/users" element={<Users />} />
               <Route path="/audit" element={<Audit />} />
             </Route>

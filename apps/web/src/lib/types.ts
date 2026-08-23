@@ -1,0 +1,36 @@
+export type DeviceStatus = 'available' | 'assigned' | 'in_repair' | 'retired';
+
+export interface DeviceRow {
+  id: string;
+  brand: string;
+  model: string;
+  os: string;
+  osVersion: string;
+  specs: string;
+  serial: string;
+  imei: string;
+  status: DeviceStatus;
+  damageNote: string | null;
+  accessories: string[];
+  holder: { id: string; name: string } | null;
+  project: { id: string; name: string } | null;
+  createdAt: string;
+}
+
+export interface ProjectRow {
+  id: string;
+  name: string;
+  description: string;
+  deviceCount: number;
+}
+
+export interface AuditRow {
+  id: string;
+  actorName: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  oldValue: unknown;
+  newValue: unknown;
+  createdAt: string;
+}
