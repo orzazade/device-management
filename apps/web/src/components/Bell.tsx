@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
+import { useClickOutside } from '../lib/useClickOutside';
 
 interface NotifRow {
   id: string;
@@ -29,6 +30,7 @@ export default function Bell() {
   const qc = useQueryClient();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
+  const wrapRef = useClickOutside<HTMLDivElement>(open, () => setOpen(false));
   const data = useQuery({
     queryKey: ['notifications'],
     queryFn: () => api<{ items: NotifRow[]; unread: number }>('/notifications'),
@@ -56,7 +58,7 @@ export default function Bell() {
   const unread = data.data?.unread ?? 0;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <button
         onClick={() => setOpen(!open)}
         aria-label="Notifications"

@@ -4,6 +4,7 @@ import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
+import { useClickOutside } from '../lib/useClickOutside';
 import Bell from './Bell';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
@@ -40,6 +41,7 @@ export default function Layout() {
   const staff = isStaff(user?.role);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const userMenuRef = useClickOutside<HTMLDivElement>(userOpen, () => setUserOpen(false));
   const [search, setSearch] = useState('');
   const handovers = useQuery({
     queryKey: ['requests', 'pending-handover'],
@@ -139,7 +141,7 @@ export default function Layout() {
           </form>
           <div className="flex-1" />
           <Bell />
-          <div className="relative">
+          <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserOpen(!userOpen)}
               className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white py-1.5 pl-1.5 pr-3 shadow-sm hover:bg-neutral-50"
