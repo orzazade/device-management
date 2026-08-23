@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { collectSpecs } from '../lib/specs';
+import { imei, required } from '../lib/validate';
+import { VForm, VField } from './VForm';
 import type { DeviceRow, ProjectRow } from '../lib/types';
 import SpecFields from './SpecFields';
 import ConfirmModal from './ConfirmModal';
@@ -69,11 +71,9 @@ export default function DeviceEditModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <form
+      <VForm
         className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
+        onValidSubmit={(f) => {
           save.mutate({
             brand: f.get('brand'),
             model: f.get('model'),
@@ -97,11 +97,14 @@ export default function DeviceEditModal({
           identifies the physical device. Every change lands in the audit log.
         </p>
         <div className="grid grid-cols-2 gap-3">
-          {field('brand', 'Brand *', device.brand, true)}
-          {field('model', 'Model *', device.model, true)}
-          {field('os', 'OS *', device.os, true)}
-          {field('osVersion', 'OS version', device.osVersion)}
-          {field('imei', 'IMEI', device.imei)}
+          <VField name="brand" label="Brand *" defaultValue={device.brand}
+            rules={[required('Brand is required')]} />
+          <VField name="model" label="Model *" defaultValue={device.model}
+            rules={[required('Model is required')]} />
+          <VField name="os" label="OS *" defaultValue={device.os}
+            rules={[required('OS is required')]} />
+          <VField name="osVersion" label="OS version" defaultValue={device.osVersion} />
+          <VField name="imei" label="IMEI" defaultValue={device.imei} rules={[imei()]} />
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-neutral-500">Project</span>
             <select
@@ -155,7 +158,7 @@ export default function DeviceEditModal({
             onClose={() => setConfirmDelete(false)}
           />
         )}
-      </form>
+      </VForm>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import ImportModal from '../components/ImportModal';
 import RequestModal from '../components/RequestModal';
 import SpecFields from '../components/SpecFields';
 import { collectSpecs } from '../lib/specs';
+import { VForm, VField } from '../components/VForm';
+import { imei, required, serial } from '../lib/validate';
 import { useToast } from '../components/Toasts';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
@@ -196,11 +198,9 @@ export default function Devices() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
           onClick={(e) => e.target === e.currentTarget && setShowCreate(false)}
         >
-          <form
+          <VForm
             className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
+            onValidSubmit={(f) => {
               create.mutate({
                 brand: f.get('brand'),
                 model: f.get('model'),
@@ -219,25 +219,17 @@ export default function Devices() {
           >
             <h2 className="mb-4 text-lg font-bold">Add device</h2>
             <div className="grid grid-cols-2 gap-3">
-              {(
-                [
-                  ['brand', 'Brand *'],
-                  ['model', 'Model *'],
-                  ['os', 'OS *'],
-                  ['osVersion', 'OS version'],
-                  ['serial', 'Serial *'],
-                  ['imei', 'IMEI'],
-                ] as const
-              ).map(([name, label]) => (
-                <label key={name} className="block">
-                  <span className="mb-1 block text-xs font-semibold text-neutral-500">{label}</span>
-                  <input
-                    name={name}
-                    required={label.endsWith('*')}
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-                  />
-                </label>
-              ))}
+              <VField name="brand" label="Brand *" autoFocus placeholder="Samsung"
+                rules={[required('Brand is required')]} />
+              <VField name="model" label="Model *" placeholder="Galaxy S24"
+                rules={[required('Model is required')]} />
+              <VField name="os" label="OS *" placeholder="Android"
+                rules={[required('OS is required')]} />
+              <VField name="osVersion" label="OS version" placeholder="14" />
+              <VField name="serial" label="Serial *" placeholder="RF8T2001"
+                rules={[required('Serial is required'), serial()]} />
+              <VField name="imei" label="IMEI" placeholder="353912100000001"
+                rules={[imei()]} />
             </div>
             <SpecFields />
             <label className="mt-3 block">
@@ -276,7 +268,7 @@ export default function Devices() {
                 Create
               </button>
             </div>
-          </form>
+          </VForm>
         </div>
       )}
     </div>

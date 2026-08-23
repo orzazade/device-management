@@ -3,6 +3,8 @@ import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
+import { VForm, VField } from '../components/VForm';
+import { minLen, required } from '../lib/validate';
 import type { ProjectRow } from '../lib/types';
 
 export default function Projects() {
@@ -122,11 +124,9 @@ export default function Projects() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
           onClick={(e) => e.target === e.currentTarget && setEditFor(null)}
         >
-          <form
+          <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
+            onValidSubmit={(f) => {
               update.mutate({
                 id: editFor.id,
                 name: String(f.get('name')),
@@ -135,24 +135,10 @@ export default function Projects() {
             }}
           >
             <h2 className="mb-4 text-lg font-bold">Edit project</h2>
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Name</span>
-              <input
-                name="name"
-                required
-                minLength={2}
-                defaultValue={editFor.name}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              />
-            </label>
-            <label className="mb-4 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Description</span>
-              <input
-                name="description"
-                defaultValue={editFor.description}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              />
-            </label>
+            <VField name="name" label="Name" className="mb-3" defaultValue={editFor.name}
+              rules={[required('Project name is required'), minLen(2)]} />
+            <VField name="description" label="Description" className="mb-4"
+              defaultValue={editFor.description} />
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -176,7 +162,7 @@ export default function Projects() {
                 Save
               </button>
             </div>
-          </form>
+          </VForm>
         </div>
       )}
 
@@ -195,11 +181,9 @@ export default function Projects() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
           onClick={(e) => e.target === e.currentTarget && setShow(false)}
         >
-          <form
+          <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
+            onValidSubmit={(f) => {
               create.mutate({
                 name: String(f.get('name')),
                 description: String(f.get('description') || ''),
@@ -207,14 +191,10 @@ export default function Projects() {
             }}
           >
             <h2 className="mb-4 text-lg font-bold">New project</h2>
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Name</span>
-              <input name="name" required minLength={2} className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
-            </label>
-            <label className="mb-4 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Description</span>
-              <input name="description" className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
-            </label>
+            <VField name="name" label="Name" className="mb-3" autoFocus placeholder="MyApp Mobile"
+              rules={[required('Project name is required'), minLen(2)]} />
+            <VField name="description" label="Description" className="mb-4"
+              placeholder="What this project tests" />
             <div className="flex justify-end gap-2">
               <button
                 type="button"
@@ -230,7 +210,7 @@ export default function Projects() {
                 Create
               </button>
             </div>
-          </form>
+          </VForm>
         </div>
       )}
     </div>

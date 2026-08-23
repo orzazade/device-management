@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
+import { minLen, required } from '../lib/validate';
+import { VForm, VField } from './VForm';
 import type { RequestRow } from '../lib/requests';
 
 export default function ReturnModal({
@@ -37,11 +39,9 @@ export default function ReturnModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <form
+      <VForm
         className="w-full max-w-md rounded-2xl bg-white p-6"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
+        onValidSubmit={(f) => {
           ret.mutate({
             missingAccessories: accessories.filter((a) => !present[a]),
             damaged,
@@ -81,17 +81,18 @@ export default function ReturnModal({
           Device has new damage
         </label>
         {damaged && (
-          <label className="mt-3 block">
-            <span className="mb-1 block text-xs font-semibold text-neutral-500">
-              What happened?
-            </span>
-            <textarea
+          <div className="mt-3">
+            <VField
               name="damageNote"
+              label="What happened?"
+              textarea
               rows={2}
-              required
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              maxLength={300}
+              autoFocus
+              placeholder="Describe the damage"
+              rules={[required('Describe the damage'), minLen(5)]}
             />
-          </label>
+          </div>
         )}
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
         <div className="mt-5 flex justify-end gap-2">
@@ -109,7 +110,7 @@ export default function ReturnModal({
             Accept return
           </button>
         </div>
-      </form>
+      </VForm>
     </div>
   );
 }

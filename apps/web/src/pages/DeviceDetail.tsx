@@ -3,6 +3,8 @@ import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ChangeDiff from '../components/ChangeDiff';
+import { VForm, VField } from '../components/VForm';
+import { minLen, required } from '../lib/validate';
 import { SPEC_FIELDS, SPEC_SECTIONS } from '../lib/specs';
 import Chip from '../components/Chip';
 import DeviceEditModal from '../components/DeviceEditModal';
@@ -257,29 +259,25 @@ export default function DeviceDetail() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
           onClick={(e) => e.target === e.currentTarget && setShowDamage(false)}
         >
-          <form
+          <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              report.mutate(String(new FormData(e.currentTarget).get('issue')));
-            }}
+            onValidSubmit={(f) => report.mutate(String(f.get('issue')))}
           >
             <h2 className="mb-4 text-lg font-bold">
               Report damage — {d.brand} {d.model}
             </h2>
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">
-                What happened?
-              </span>
-              <textarea
+            <div className="mb-3">
+              <VField
                 name="issue"
-                required
-                minLength={5}
+                label="What happened?"
+                textarea
                 rows={3}
+                maxLength={300}
+                autoFocus
                 placeholder="Describe the damage"
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+                rules={[required('Describe the damage'), minLen(5)]}
               />
-            </label>
+            </div>
             {damageError && (
               <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{damageError}</p>
             )}
@@ -298,7 +296,7 @@ export default function DeviceDetail() {
                 Report
               </button>
             </div>
-          </form>
+          </VForm>
         </div>
       )}
     </div>

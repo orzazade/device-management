@@ -1,4 +1,8 @@
 import { SPEC_FIELDS, SPEC_SECTIONS } from '../lib/specs';
+import { year, type Rule } from '../lib/validate';
+import { VField } from './VForm';
+
+const SPEC_RULES: Record<string, Rule[]> = { releaseYear: [year()] };
 
 /** The spec form block — same fields in Add device and Edit device. */
 export default function SpecFields({ specs = {} }: { specs?: Record<string, unknown> }) {
@@ -16,17 +20,15 @@ export default function SpecFields({ specs = {} }: { specs?: Record<string, unkn
               {fields
                 .filter((d) => d.type === 'text')
                 .map((d) => (
-                  <label key={d.key} className={`block ${d.key === 'notes' ? 'col-span-2' : ''}`}>
-                    <span className="mb-0.5 block text-[11px] font-semibold text-neutral-500">
-                      {d.label}
-                    </span>
-                    <input
-                      name={`spec_${d.key}`}
-                      defaultValue={specs[d.key] == null ? '' : String(specs[d.key])}
-                      placeholder={d.placeholder}
-                      className="w-full rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5"
-                    />
-                  </label>
+                  <VField
+                    key={d.key}
+                    name={`spec_${d.key}`}
+                    label={d.label}
+                    defaultValue={specs[d.key] == null ? '' : String(specs[d.key])}
+                    placeholder={d.placeholder}
+                    rules={SPEC_RULES[d.key] ?? []}
+                    className={d.key === 'notes' ? 'col-span-2' : ''}
+                  />
                 ))}
             </div>
             {fields.some((d) => d.type === 'bool') && (

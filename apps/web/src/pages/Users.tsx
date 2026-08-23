@@ -3,6 +3,8 @@ import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
+import { VForm, VField } from '../components/VForm';
+import { email, minLen, password, required } from '../lib/validate';
 import { useAuth, type Role } from '../lib/auth';
 
 interface UserRow {
@@ -190,11 +192,9 @@ export default function Users() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
           onClick={(e) => e.target === e.currentTarget && setEditFor(null)}
         >
-          <form
+          <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
+            onValidSubmit={(f) => {
               update.mutate({
                 id: editFor.id,
                 name: String(f.get('name')),
@@ -209,39 +209,30 @@ export default function Users() {
             }}
           >
             <h2 className="mb-4 text-lg font-bold">Edit {editFor.name}</h2>
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Name</span>
-              <input
-                name="name"
-                required
-                minLength={2}
-                defaultValue={editFor.name}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              />
-            </label>
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Email</span>
-              <input
-                name="email"
-                type="email"
-                required
-                defaultValue={editFor.email}
-                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-              />
-            </label>
+            <VField
+              name="name"
+              label="Name"
+              className="mb-3"
+              defaultValue={editFor.name}
+              rules={[required('Name is required'), minLen(2)]}
+            />
+            <VField
+              name="email"
+              label="Email"
+              type="email"
+              className="mb-3"
+              defaultValue={editFor.email}
+              rules={[required('Email is required'), email()]}
+            />
             {me?.role === 'admin' && (
               <>
-                <label className="mb-3 block">
-                  <span className="mb-1 block text-xs font-semibold text-neutral-500">
-                    New password (leave empty to keep current)
-                  </span>
-                  <input
-                    name="newPassword"
-                    type="password"
-                    minLength={8}
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-                  />
-                </label>
+                <VField
+                  name="newPassword"
+                  label="New password (leave empty to keep current)"
+                  type="password"
+                  className="mb-3"
+                  rules={[password()]}
+                />
                 {editFor.id !== me.id && (
                   <label className="mb-3 flex items-center gap-2.5">
                     <input type="checkbox" name="active" defaultChecked={editFor.active} />
@@ -277,7 +268,7 @@ export default function Users() {
                 Save
               </button>
             </div>
-          </form>
+          </VForm>
         </div>
       )}
 
@@ -296,11 +287,9 @@ export default function Users() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
           onClick={(e) => e.target === e.currentTarget && setShowCreate(false)}
         >
-          <form
+          <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
+            onValidSubmit={(f) => {
               create.mutate({
                 name: String(f.get('name')),
                 email: String(f.get('email')),
@@ -310,20 +299,12 @@ export default function Users() {
             }}
           >
             <h2 className="mb-4 text-lg font-bold">Add user</h2>
-            {(['name', 'email', 'password'] as const).map((field) => (
-              <label key={field} className="mb-3 block">
-                <span className="mb-1 block text-xs font-semibold text-neutral-500 capitalize">
-                  {field}
-                </span>
-                <input
-                  name={field}
-                  required
-                  minLength={field === 'password' ? 8 : 2}
-                  type={field === 'name' ? 'text' : field}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-                />
-              </label>
-            ))}
+            <VField name="name" label="Name" className="mb-3" autoFocus
+              rules={[required('Name is required'), minLen(2)]} placeholder="Aysel Aliyeva" />
+            <VField name="email" label="Email" type="email" className="mb-3"
+              rules={[required('Email is required'), email()]} placeholder="name@company.com" />
+            <VField name="password" label="Password" type="password" className="mb-3"
+              rules={[required('Password is required'), password()]} />
             <label className="mb-4 block">
               <span className="mb-1 block text-xs font-semibold text-neutral-500">Role</span>
               <select name="role" defaultValue="tester" className="w-full rounded-lg border border-neutral-300 px-3 py-2">
@@ -349,7 +330,7 @@ export default function Users() {
                 Create
               </button>
             </div>
-          </form>
+          </VForm>
         </div>
       )}
     </div>

@@ -6,6 +6,8 @@ import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { DeviceRow } from '../lib/types';
 import RangeCalendar, { type BookingRange, type DateRange } from './RangeCalendar';
+import { VForm, VField } from './VForm';
+import { minLen, required } from '../lib/validate';
 
 interface UserRow {
   id: string;
@@ -52,12 +54,13 @@ export default function RequestModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <form
+      <VForm
         className="w-full max-w-lg rounded-2xl bg-white p-6"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!range.from || !range.to) return;
-          const f = new FormData(e.currentTarget);
+        onValidSubmit={(f) => {
+          if (!range.from || !range.to) {
+            setError('Pick a free time range in the calendar');
+            return;
+          }
           create.mutate({
             deviceId: device.id,
             reason: String(f.get('reason')),
@@ -76,19 +79,18 @@ export default function RequestModal({
             over.
           </div>
         )}
-        <label className="mb-3 block">
-          <span className="mb-1 block text-xs font-semibold text-neutral-500">
-            Reason (required)
-          </span>
-          <textarea
+        <div className="mb-3">
+          <VField
             name="reason"
-            required
-            minLength={5}
+            label="Reason"
+            textarea
             rows={3}
+            maxLength={500}
+            autoFocus
             placeholder="What will you test and why this device?"
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+            rules={[required('Tell the approver why you need it'), minLen(10)]}
           />
-        </label>
+        </div>
         <div className="mb-3">
           <span className="mb-1 block text-xs font-semibold text-neutral-500">
             Time range — taken days are blocked
@@ -135,7 +137,7 @@ export default function RequestModal({
             Submit request
           </button>
         </div>
-      </form>
+      </VForm>
     </div>
   );
 }
