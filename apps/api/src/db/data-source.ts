@@ -20,6 +20,7 @@ import { Requests1724800000000 } from '../migrations/1724800000000-requests';
 import { Notifications1724900000000 } from '../migrations/1724900000000-notifications';
 import { Repairs1725000000000 } from '../migrations/1725000000000-repairs';
 import { SoftDelete1725100000000 } from '../migrations/1725100000000-soft-delete';
+import { SpecsJson1725200000000 } from '../migrations/1725200000000-specs-json';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -46,6 +47,7 @@ export const dataSourceOptions: DataSourceOptions = {
     Notifications1724900000000,
     Repairs1725000000000,
     SoftDelete1725100000000,
+    SpecsJson1725200000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

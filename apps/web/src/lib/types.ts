@@ -6,7 +6,7 @@ export interface DeviceRow {
   model: string;
   os: string;
   osVersion: string;
-  specs: string;
+  specs: Record<string, unknown>;
   serial: string;
   imei: string;
   status: DeviceStatus;

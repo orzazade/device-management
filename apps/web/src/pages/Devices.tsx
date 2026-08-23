@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Chip from '../components/Chip';
 import ImportModal from '../components/ImportModal';
 import RequestModal from '../components/RequestModal';
+import SpecFields from '../components/SpecFields';
+import { collectSpecs } from '../lib/specs';
 import { useToast } from '../components/Toasts';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
@@ -204,7 +206,7 @@ export default function Devices() {
                 model: f.get('model'),
                 os: f.get('os'),
                 osVersion: f.get('osVersion') || undefined,
-                specs: f.get('specs') || undefined,
+                specs: collectSpecs(f),
                 serial: f.get('serial'),
                 imei: f.get('imei') || undefined,
                 accessories: String(f.get('accessories') || '')
@@ -237,10 +239,7 @@ export default function Devices() {
                 </label>
               ))}
             </div>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Specs</span>
-              <input name="specs" className="w-full rounded-lg border border-neutral-300 px-3 py-2" />
-            </label>
+            <SpecFields />
             <label className="mt-3 block">
               <span className="mb-1 block text-xs font-semibold text-neutral-500">
                 Accessories (comma-separated)

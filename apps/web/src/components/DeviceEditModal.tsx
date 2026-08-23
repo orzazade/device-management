@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { collectSpecs } from '../lib/specs';
 import type { DeviceRow, ProjectRow } from '../lib/types';
+import SpecFields from './SpecFields';
 import ConfirmModal from './ConfirmModal';
 import { useToast } from './Toasts';
 
@@ -77,7 +79,7 @@ export default function DeviceEditModal({
             model: f.get('model'),
             os: f.get('os'),
             osVersion: f.get('osVersion') || '',
-            specs: f.get('specs') || '',
+            specs: collectSpecs(f),
             imei: f.get('imei') || '',
             accessories: String(f.get('accessories') || '')
               .split(',')
@@ -116,7 +118,7 @@ export default function DeviceEditModal({
             </select>
           </label>
         </div>
-        <div className="mt-3">{field('specs', 'Specs', device.specs)}</div>
+        <SpecFields specs={device.specs} />
         <div className="mt-3">
           {field('accessories', 'Accessories (comma-separated)', device.accessories.join(', '))}
         </div>

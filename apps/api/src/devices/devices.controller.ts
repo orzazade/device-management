@@ -18,6 +18,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import {
   IsArray,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -51,8 +52,8 @@ class DeviceDto implements DeviceInput {
   osVersion?: string;
 
   @IsOptional()
-  @IsString()
-  specs?: string;
+  @IsObject()
+  specs?: Record<string, unknown>;
 
   @IsString()
   @MinLength(1)
@@ -76,7 +77,7 @@ class DevicePatchDto {
   @IsOptional() @IsString() @MinLength(1) model?: string;
   @IsOptional() @IsString() @MinLength(1) os?: string;
   @IsOptional() @IsString() osVersion?: string;
-  @IsOptional() @IsString() specs?: string;
+  @IsOptional() @IsObject() specs?: Record<string, unknown>;
   @IsOptional() @IsString() imei?: string;
   @IsOptional() @IsArray() accessories?: string[];
   @IsOptional() @IsUUID() projectId?: string | null;
@@ -136,7 +137,7 @@ export class DevicesController {
     }
     if (q) {
       qb.andWhere(
-        '(d.brand ILIKE :q OR d.model ILIKE :q OR d.os ILIKE :q OR d.serial ILIKE :q OR holder.name ILIKE :q)',
+        '(d.brand ILIKE :q OR d.model ILIKE :q OR d.os ILIKE :q OR d.serial ILIKE :q OR holder.name ILIKE :q OR d.specs::text ILIKE :q)',
         { q: `%${q}%` },
       );
     }

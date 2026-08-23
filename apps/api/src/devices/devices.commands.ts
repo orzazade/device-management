@@ -9,7 +9,7 @@ export interface DeviceInput {
   model: string;
   os: string;
   osVersion?: string;
-  specs?: string;
+  specs?: Record<string, unknown>;
   serial: string;
   imei?: string;
   accessories?: string[];
@@ -43,7 +43,7 @@ export class CreateDeviceHandler implements ICommandHandler<CreateDeviceCommand>
       const device = await ctx.devices.save({
         ...data,
         osVersion: data.osVersion ?? '',
-        specs: data.specs ?? '',
+        specs: data.specs ?? {},
         imei: data.imei ?? '',
         accessories: data.accessories ?? [],
         projectId: data.projectId ?? null,

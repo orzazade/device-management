@@ -92,12 +92,26 @@ export class ImportService {
         return;
       }
       seenSerials.add(serial);
+      const specs: Record<string, unknown> = {};
+      for (const [col, key] of [
+        ['chipset', 'chipset'],
+        ['ram', 'ram'],
+        ['storage', 'storage'],
+        ['battery', 'battery'],
+        ['screen', 'screenSize'],
+        ['color', 'color'],
+        ['year', 'releaseYear'],
+        ['specs', 'notes'],
+      ] as const) {
+        const v = cellStr(row, col);
+        if (v) specs[key] = v;
+      }
       valid.push({
         brand,
         model,
         os,
         osVersion: cellStr(row, 'os_version'),
-        specs: cellStr(row, 'specs'),
+        specs,
         serial,
         imei,
         accessories: cellStr(row, 'accessories')

@@ -3,6 +3,7 @@ import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ChangeDiff from '../components/ChangeDiff';
+import { SPEC_FIELDS, SPEC_SECTIONS } from '../lib/specs';
 import Chip from '../components/Chip';
 import DeviceEditModal from '../components/DeviceEditModal';
 import RequestModal from '../components/RequestModal';
@@ -127,8 +128,6 @@ export default function DeviceDetail() {
             <dd>
               {d.os} {d.osVersion}
             </dd>
-            <dt className="text-neutral-500">Specs</dt>
-            <dd>{d.specs || '—'}</dd>
             <dt className="text-neutral-500">Serial</dt>
             <dd className="font-mono text-xs">{d.serial}</dd>
             <dt className="text-neutral-500">IMEI</dt>
@@ -140,6 +139,48 @@ export default function DeviceDetail() {
             <dt className="text-neutral-500">Accessories</dt>
             <dd>{d.accessories.length ? d.accessories.join(' · ') : 'none'}</dd>
           </dl>
+        )}
+        {tab === 'specs' && (
+          <div className="border-t border-neutral-100 p-4 pt-3">
+            {SPEC_SECTIONS.map((section) => {
+              const filled = SPEC_FIELDS.filter(
+                (def) => def.section === section && d.specs?.[def.key] != null,
+              );
+              if (!filled.length) return null;
+              return (
+                <div key={section} className="mb-3 last:mb-0">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                    {section}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {filled.map((def) =>
+                      def.type === 'bool' ? (
+                        <span
+                          key={def.key}
+                          className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800"
+                        >
+                          ✓ {def.label}
+                        </span>
+                      ) : (
+                        <span
+                          key={def.key}
+                          className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs"
+                        >
+                          <span className="text-neutral-500">{def.label}:</span>{' '}
+                          <b>{String(d.specs[def.key])}</b>
+                        </span>
+                      ),
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {!SPEC_FIELDS.some((def) => d.specs?.[def.key] != null) && (
+              <p className="text-neutral-400">
+                No specs recorded yet — add them via Edit so testers can find this device.
+              </p>
+            )}
+          </div>
         )}
 
         {tab === 'history' &&

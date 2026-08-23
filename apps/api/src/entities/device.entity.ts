@@ -35,8 +35,8 @@ export class Device {
   @Column({ default: '' })
   osVersion: string;
 
-  @Column({ default: '' })
-  specs: string;
+  @Column({ type: 'jsonb', default: () => `'{}'` })
+  specs: Record<string, unknown>;
 
   @Column({ unique: true })
   serial: string;
