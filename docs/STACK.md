@@ -17,6 +17,19 @@ Decided 2026-08-24 with the user. TypeScript everywhere.
   `IdentityProvider` interface
 - Excel parsing: **exceljs** (server-side)
 
+### Data access conventions (EF Core style — decided 2026-08-24)
+
+- **`AppDbContext`**: one injectable class holding every repository
+  (`ctx.devices`, `ctx.requests`, `ctx.auditLog`, ...) — the EF DbContext
+  shape. Handlers depend on it, never on scattered `@InjectRepository`.
+- **`ctx.withTransaction(fn)`**: yields a transaction-scoped context; all
+  writes in a command handler go through it, so state change + audit row +
+  outbox rows commit atomically. TypeORM has no EF change tracker — the
+  transaction wrapper is the discipline that replaces SaveChanges.
+- **Naming**: camelCase properties in code, snake_case in the database, via
+  `SnakeNamingStrategy` (typeorm-naming-strategies). Column names are never
+  hand-typed in entities; raw SQL (migrations, constraints) uses snake_case.
+
 ## Frontend
 
 - **React (latest) + Vite (latest)**, TypeScript
