@@ -16,6 +16,7 @@ import { createRedis, REDIS } from './redis';
 import { CreateDeviceHandler, UpdateDeviceHandler } from './devices/devices.commands';
 import { DevicesController } from './devices/devices.controller';
 import { ImportService } from './devices/import.service';
+import { JobsService } from './jobs/jobs.service';
 import { ProjectsController } from './projects/projects.controller';
 import {
   CancelRequestHandler,
@@ -23,6 +24,7 @@ import {
   CreateRequestHandler,
   DecideRequestHandler,
   OverrideTimeHandler,
+  ReturnRequestHandler,
 } from './requests/requests.commands';
 import { RequestsController } from './requests/requests.controller';
 import { ChangeUserRoleHandler, CreateUserHandler } from './users/users.commands';
@@ -62,6 +64,8 @@ import { UsersController } from './users/users.controller';
     OverrideTimeHandler,
     ConfirmHandoverHandler,
     CancelRequestHandler,
+    ReturnRequestHandler,
+    JobsService,
   ],
 })
 export class AppModule {}

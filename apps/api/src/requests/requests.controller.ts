@@ -9,16 +9,26 @@ import {
   Req,
 } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { IsDateString, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+} from 'class-validator';
 import { AuthUser, Roles } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { DeviceRequest } from '../entities/device-request.entity';
+import { JobsService } from '../jobs/jobs.service';
 import {
   CancelRequestCommand,
   ConfirmHandoverCommand,
   CreateRequestCommand,
   DecideRequestCommand,
   OverrideTimeCommand,
+  ReturnRequestCommand,
 } from './requests.commands';
 
 class CreateRequestDto {
@@ -49,6 +59,18 @@ class TimeDto {
   toDate: string;
 }
 
+class ReturnDto {
+  @IsArray()
+  missingAccessories: string[];
+
+  @IsBoolean()
+  damaged: boolean;
+
+  @IsOptional()
+  @IsString()
+  damageNote?: string;
+}
+
 const actor = (req: { user: AuthUser }) => ({ id: req.user.sub, name: req.user.name });
 const staff = (u: AuthUser) => u.role === 'admin' || u.role === 'manager';
 
@@ -77,6 +99,7 @@ export class RequestsController {
   constructor(
     private readonly db: AppDbContext,
     private readonly bus: CommandBus,
+    private readonly jobs: JobsService,
   ) {}
 
   @Post()
@@ -165,6 +188,26 @@ export class RequestsController {
       new ConfirmHandoverCommand(actor(req), id, req.user.sub, staff(req.user)),
     );
     return this.reload(id);
+  }
+
+  @Post(':id/return')
+  async returnDevice(
+    @Param('id') id: string,
+    @Body() dto: ReturnDto,
+    @Req() req: { user: AuthUser },
+  ) {
+    await this.bus.execute(
+      new ReturnRequestCommand(actor(req), id, req.user.sub, staff(req.user), dto),
+    );
+    return this.reload(id);
+  }
+
+  /** Manual overdue scan — same code the hourly job runs, for ops and tests. */
+  @Post('scan-overdue')
+  @Roles('admin', 'manager')
+  async scanOverdue() {
+    const marked = await this.jobs.scanOverdue();
+    return { marked };
   }
 
   @Post(':id/cancel')

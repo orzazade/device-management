@@ -248,6 +248,69 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
   }
 }
 
+export class ReturnRequestCommand {
+  constructor(
+    readonly actor: Actor,
+    readonly requestId: string,
+    readonly byUserId: string,
+    readonly byStaff: boolean,
+    readonly data: {
+      missingAccessories: string[];
+      damaged: boolean;
+      damageNote?: string;
+    },
+  ) {}
+}
+
+@CommandHandler(ReturnRequestCommand)
+export class ReturnRequestHandler implements ICommandHandler<ReturnRequestCommand> {
+  constructor(private readonly db: AppDbContext) {}
+
+  async execute(cmd: ReturnRequestCommand): Promise<DeviceRequest> {
+    const { actor, requestId, byUserId, byStaff, data } = cmd;
+    return this.db.withTransaction(async (ctx) => {
+      const request = await loadRequest(ctx, requestId);
+      if (request.requesterId !== byUserId && !byStaff) {
+        throw new ForbiddenException('Only the holder (or staff) can check in this return');
+      }
+      const old = transition(request, 'returned');
+
+      const device = request.device;
+      device.holderId = null;
+      if (data.damaged) {
+        device.status = 'in_repair';
+        device.damageNote = data.damageNote?.trim() || 'Damage found at return check-in';
+      } else {
+        device.status = 'available';
+      }
+      await ctx.devices.save(device);
+      await ctx.requests.save(request);
+      await writeAudit(ctx.manager, actor, {
+        entityType: 'request',
+        entityId: request.id,
+        action: 'returned',
+        oldValue: { state: old },
+        newValue: {
+          state: 'returned',
+          missingAccessories: data.missingAccessories,
+          damaged: data.damaged,
+          ...(data.damaged ? { damageNote: device.damageNote } : {}),
+        },
+      });
+      if (data.missingAccessories.length) {
+        // Loud: missing accessories get their own audit row on the device.
+        await writeAudit(ctx.manager, actor, {
+          entityType: 'device',
+          entityId: device.id,
+          action: 'accessories_missing_at_return',
+          newValue: { missing: data.missingAccessories },
+        });
+      }
+      return request;
+    });
+  }
+}
+
 export class CancelRequestCommand {
   constructor(
     readonly actor: Actor,

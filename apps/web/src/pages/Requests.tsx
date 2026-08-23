@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import RequestTable from '../components/RequestTable';
+import ReturnModal from '../components/ReturnModal';
 import { api } from '../lib/api';
 import type { RequestRow } from '../lib/requests';
 
 export default function Requests() {
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [returnFor, setReturnFor] = useState<RequestRow | null>(null);
   const rows = useQuery({
     queryKey: ['requests', 'mine'],
     queryFn: () => api<RequestRow[]>('/requests'),
@@ -43,9 +45,17 @@ export default function Requests() {
             >
               Cancel
             </button>
+          ) : r.state === 'active' || r.state === 'overdue' ? (
+            <button
+              onClick={() => setReturnFor(r)}
+              className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white"
+            >
+              Return
+            </button>
           ) : null
         }
       />
+      {returnFor && <ReturnModal request={returnFor} onClose={() => setReturnFor(null)} />}
     </div>
   );
 }
