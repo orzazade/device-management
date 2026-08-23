@@ -1,10 +1,21 @@
 import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { IsEmail, IsIn, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { AuthUser, Roles } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { Role, ROLES, User } from '../entities/user.entity';
-import { ChangeUserRoleCommand, CreateUserCommand } from './users.commands';
+import {
+  ChangeUserRoleCommand,
+  CreateUserCommand,
+  UpdateUserCommand,
+} from './users.commands';
 
 class CreateUserDto {
   @IsString()
@@ -25,6 +36,26 @@ class CreateUserDto {
 class ChangeRoleDto {
   @IsIn(ROLES)
   role: Role;
+}
+
+class UpdateUserDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  newPassword?: string;
 }
 
 const pub = (u: User) => ({
@@ -56,6 +87,22 @@ export class UsersController {
   @Roles('admin', 'manager')
   async create(@Body() dto: CreateUserDto, @Req() req: { user: AuthUser }) {
     const user: User = await this.bus.execute(new CreateUserCommand(actor(req), dto));
+    return pub(user);
+  }
+
+  @Patch(':id')
+  @Roles('admin', 'manager')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @Req() req: { user: AuthUser },
+  ) {
+    // Deactivating or resetting passwords is the Admin's call alone.
+    if ((dto.active !== undefined || dto.newPassword) && req.user.role !== 'admin') {
+      dto.active = undefined;
+      dto.newPassword = undefined;
+    }
+    const user: User = await this.bus.execute(new UpdateUserCommand(actor(req), id, dto));
     return pub(user);
   }
 

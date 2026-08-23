@@ -30,7 +30,11 @@ import {
   ReturnRequestHandler,
 } from './requests/requests.commands';
 import { RequestsController } from './requests/requests.controller';
-import { ChangeUserRoleHandler, CreateUserHandler } from './users/users.commands';
+import {
+  ChangeUserRoleHandler,
+  CreateUserHandler,
+  UpdateUserHandler,
+} from './users/users.commands';
 import { UsersController } from './users/users.controller';
 
 @Module({
@@ -62,6 +66,7 @@ import { UsersController } from './users/users.controller';
     { provide: APP_GUARD, useClass: AuthGuard },
     CreateUserHandler,
     ChangeUserRoleHandler,
+    UpdateUserHandler,
     CreateDeviceHandler,
     UpdateDeviceHandler,
     ImportService,

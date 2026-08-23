@@ -1,4 +1,14 @@
-import { Body, Controller, ConflictException, Get, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ConflictException,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Req,
+} from '@nestjs/common';
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { writeAudit } from '../audit/audit';
 import { AuthUser, Roles } from '../auth/auth.guard';
@@ -31,6 +41,33 @@ export class ProjectsController {
       .getRawMany<{ projectId: string; n: string }>();
     const byId = new Map(counts.map((c) => [c.projectId, parseInt(c.n, 10)]));
     return projects.map((p) => ({ ...p, deviceCount: byId.get(p.id) ?? 0 }));
+  }
+
+  @Patch(':id')
+  @Roles('admin', 'manager')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: ProjectDto,
+    @Req() req: { user: AuthUser },
+  ) {
+    return this.db.withTransaction(async (ctx) => {
+      const project = await ctx.projects.findOne({ where: { id } });
+      if (!project) throw new NotFoundException('Project not found');
+      const dup = await ctx.projects.findOne({ where: { name: dto.name } });
+      if (dup && dup.id !== id) throw new ConflictException(`Project "${dto.name}" already exists`);
+      const before = { name: project.name, description: project.description };
+      project.name = dto.name;
+      project.description = dto.description ?? '';
+      await ctx.projects.save(project);
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'project',
+        entityId: project.id,
+        action: 'updated',
+        oldValue: before,
+        newValue: { name: project.name, description: project.description },
+      });
+      return project;
+    });
   }
 
   @Post()

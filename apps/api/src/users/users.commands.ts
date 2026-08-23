@@ -38,6 +38,67 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
   }
 }
 
+export class UpdateUserCommand {
+  constructor(
+    readonly actor: Actor,
+    readonly userId: string,
+    readonly data: {
+      name?: string;
+      email?: string;
+      active?: boolean;
+      newPassword?: string;
+    },
+  ) {}
+}
+
+@CommandHandler(UpdateUserCommand)
+export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
+  constructor(private readonly db: AppDbContext) {}
+
+  async execute({ actor, userId, data }: UpdateUserCommand): Promise<User> {
+    return this.db.withTransaction(async (ctx) => {
+      const user = await ctx.users.findOne({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+      const before: Record<string, unknown> = {};
+      const after: Record<string, unknown> = {};
+      if (data.name !== undefined && data.name !== user.name) {
+        before.name = user.name;
+        after.name = data.name;
+        user.name = data.name;
+      }
+      if (data.email !== undefined) {
+        const email = data.email.toLowerCase().trim();
+        if (email !== user.email) {
+          const dup = await ctx.users.findOne({ where: { email } });
+          if (dup) throw new ConflictException(`User ${email} already exists`);
+          before.email = user.email;
+          after.email = email;
+          user.email = email;
+        }
+      }
+      if (data.active !== undefined && data.active !== user.active) {
+        before.active = user.active;
+        after.active = data.active;
+        user.active = data.active;
+      }
+      if (data.newPassword) {
+        user.passwordHash = bcrypt.hashSync(data.newPassword, 10);
+        after.password = 'changed';
+      }
+      if (Object.keys(after).length === 0) return user;
+      await ctx.users.save(user);
+      await writeAudit(ctx.manager, actor, {
+        entityType: 'user',
+        entityId: user.id,
+        action: 'updated',
+        oldValue: before,
+        newValue: after,
+      });
+      return user;
+    });
+  }
+}
+
 export class ChangeUserRoleCommand {
   constructor(
     readonly actor: Actor,

@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ChangeDiff from '../components/ChangeDiff';
 import Chip from '../components/Chip';
+import DeviceEditModal from '../components/DeviceEditModal';
 import RequestModal from '../components/RequestModal';
+import { isStaff, useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 import type { AuditRow, DeviceRow } from '../lib/types';
 
@@ -12,6 +14,8 @@ export default function DeviceDetail() {
   const { id } = useParams<{ id: string }>();
   const [tab, setTab] = useState<'specs' | 'history' | 'repairs'>('specs');
   const [showRequest, setShowRequest] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const { user } = useAuth();
   const device = useQuery({
     queryKey: ['device', id],
     queryFn: () => api<DeviceRow>(`/devices/${id}`),
@@ -92,8 +96,17 @@ export default function DeviceDetail() {
             Report damage
           </button>
         )}
+        {isStaff(user?.role) && (
+          <button
+            onClick={() => setShowEdit(true)}
+            className="rounded-lg border border-neutral-300 bg-white px-4 py-2 font-semibold"
+          >
+            Edit
+          </button>
+        )}
       </div>
       {showRequest && <RequestModal device={d} onClose={() => setShowRequest(false)} />}
+      {showEdit && <DeviceEditModal device={d} onClose={() => setShowEdit(false)} />}
 
       {d.damageNote && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5">
