@@ -51,6 +51,7 @@ export default function Settings() {
         <label className="mb-2 flex items-start gap-2.5">
           <input
             type="radio"
+            name="approvalMode"
             checked={mode === 'all'}
             disabled={user?.role !== 'admin'}
             onChange={() => setMode.mutate('all')}
@@ -63,6 +64,7 @@ export default function Settings() {
         <label className="flex items-start gap-2.5">
           <input
             type="radio"
+            name="approvalMode"
             checked={mode === 'busy_only'}
             disabled={user?.role !== 'admin'}
             onChange={() => setMode.mutate('busy_only')}

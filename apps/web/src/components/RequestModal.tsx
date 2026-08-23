@@ -4,15 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { DeviceRow } from '../lib/types';
+import RangeCalendar, { type BookingRange, type DateRange } from './RangeCalendar';
 
 interface UserRow {
   id: string;
   name: string;
   role: string;
 }
-
-const today = () => new Date().toISOString().slice(0, 10);
-const plusDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
 export default function RequestModal({
   device,
@@ -25,10 +23,15 @@ export default function RequestModal({
   const qc = useQueryClient();
   const nav = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [range, setRange] = useState<DateRange>({ from: null, to: null });
   const users = useQuery({
     queryKey: ['users'],
     queryFn: () => api<UserRow[]>('/users'),
     enabled: isStaff(user?.role),
+  });
+  const bookings = useQuery({
+    queryKey: ['device-bookings', device.id],
+    queryFn: () => api<BookingRange[]>(`/devices/${device.id}/bookings`),
   });
 
   const create = useMutation({
@@ -50,12 +53,13 @@ export default function RequestModal({
         className="w-full max-w-lg rounded-2xl bg-white p-6"
         onSubmit={(e) => {
           e.preventDefault();
+          if (!range.from || !range.to) return;
           const f = new FormData(e.currentTarget);
           create.mutate({
             deviceId: device.id,
             reason: String(f.get('reason')),
-            fromDate: String(f.get('fromDate')),
-            toDate: String(f.get('toDate')),
+            fromDate: range.from,
+            toDate: range.to,
             onBehalfOfId: f.get('onBehalfOfId') || undefined,
           });
         }}
@@ -82,27 +86,15 @@ export default function RequestModal({
             className="w-full rounded-lg border border-neutral-300 px-3 py-2"
           />
         </label>
-        <div className="mb-3 flex gap-3">
-          <label className="block flex-1">
-            <span className="mb-1 block text-xs font-semibold text-neutral-500">From</span>
-            <input
-              type="date"
-              name="fromDate"
-              required
-              defaultValue={today()}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-            />
-          </label>
-          <label className="block flex-1">
-            <span className="mb-1 block text-xs font-semibold text-neutral-500">To</span>
-            <input
-              type="date"
-              name="toDate"
-              required
-              defaultValue={plusDays(3)}
-              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-            />
-          </label>
+        <div className="mb-3">
+          <span className="mb-1 block text-xs font-semibold text-neutral-500">
+            Time range — taken days are blocked
+          </span>
+          {bookings.isLoading ? (
+            <p className="p-4 text-neutral-400">loading calendar…</p>
+          ) : (
+            <RangeCalendar bookings={bookings.data ?? []} value={range} onChange={setRange} />
+          )}
         </div>
         {isStaff(user?.role) && (
           <label className="mb-3 block">
@@ -134,7 +126,7 @@ export default function RequestModal({
             Cancel
           </button>
           <button
-            disabled={create.isPending}
+            disabled={create.isPending || !range.from || !range.to}
             className="rounded-lg bg-accent px-4 py-2 font-semibold text-white disabled:opacity-50"
           >
             Submit request

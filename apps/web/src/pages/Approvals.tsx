@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import RangeCalendar, { type BookingRange, type DateRange } from '../components/RangeCalendar';
 import RequestTable from '../components/RequestTable';
 import { api } from '../lib/api';
 import type { RequestRow } from '../lib/requests';
@@ -8,6 +9,15 @@ export default function Approvals() {
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [timeFor, setTimeFor] = useState<RequestRow | null>(null);
+  const [overrideRange, setOverrideRange] = useState<DateRange>({ from: null, to: null });
+  const overrideBookings = useQuery({
+    queryKey: ['device-bookings', timeFor?.device.id, timeFor?.id],
+    queryFn: () =>
+      api<BookingRange[]>(
+        `/devices/${timeFor!.device.id}/bookings?excludeRequestId=${timeFor!.id}`,
+      ),
+    enabled: !!timeFor,
+  });
 
   const rows = useQuery({
     queryKey: ['requests', 'pending-approvals'],
@@ -64,7 +74,10 @@ export default function Approvals() {
               Reject
             </button>
             <button
-              onClick={() => setTimeFor(r)}
+              onClick={() => {
+                setTimeFor(r);
+                setOverrideRange({ from: r.fromDate, to: r.toDate });
+              }}
               className={`${btn} border border-neutral-300`}
             >
               Time…
@@ -82,35 +95,29 @@ export default function Approvals() {
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onSubmit={(e) => {
               e.preventDefault();
-              const f = new FormData(e.currentTarget);
+              if (!overrideRange.from || !overrideRange.to) return;
               override.mutate({
                 id: timeFor.id,
-                fromDate: String(f.get('fromDate')),
-                toDate: String(f.get('toDate')),
+                fromDate: overrideRange.from,
+                toDate: overrideRange.to,
               });
             }}
           >
             <h2 className="mb-2 text-lg font-bold">Override time range</h2>
-            <p className="mb-4 text-neutral-500">Every change here is written to the audit log.</p>
-            <div className="mb-4 flex gap-3">
-              <label className="block flex-1">
-                <span className="mb-1 block text-xs font-semibold text-neutral-500">From</span>
-                <input
-                  type="date"
-                  name="fromDate"
-                  defaultValue={timeFor.fromDate}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+            <p className="mb-4 text-neutral-500">
+              Every change here is written to the audit log. Other bookings on this device are
+              blocked in the calendar.
+            </p>
+            <div className="mb-4">
+              {overrideBookings.isLoading ? (
+                <p className="p-4 text-neutral-400">loading calendar…</p>
+              ) : (
+                <RangeCalendar
+                  bookings={overrideBookings.data ?? []}
+                  value={overrideRange}
+                  onChange={setOverrideRange}
                 />
-              </label>
-              <label className="block flex-1">
-                <span className="mb-1 block text-xs font-semibold text-neutral-500">To</span>
-                <input
-                  type="date"
-                  name="toDate"
-                  defaultValue={timeFor.toDate}
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2"
-                />
-              </label>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -120,7 +127,10 @@ export default function Approvals() {
               >
                 Cancel
               </button>
-              <button className="rounded-lg bg-accent px-4 py-2 font-semibold text-white">
+              <button
+                disabled={!overrideRange.from || !overrideRange.to}
+                className="rounded-lg bg-accent px-4 py-2 font-semibold text-white disabled:opacity-50"
+              >
                 Save override
               </button>
             </div>

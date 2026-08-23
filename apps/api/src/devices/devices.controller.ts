@@ -142,6 +142,30 @@ export class DevicesController {
     return pub(d);
   }
 
+  /**
+   * Date ranges the request calendar must block: approved/active/overdue are
+   * hard bookings, pending are "requested" (picking them invites a conflict).
+   * excludeRequestId lets the time-override modal ignore its own range.
+   */
+  @Get(':id/bookings')
+  async bookings(
+    @Param('id') id: string,
+    @Query('excludeRequestId') excludeRequestId?: string,
+  ) {
+    const rows = await this.db.requests().find({
+      where: { deviceId: id },
+      select: { id: true, fromDate: true, toDate: true, state: true },
+    });
+    return rows
+      .filter((r) => r.id !== excludeRequestId)
+      .filter((r) => ['pending', 'approved', 'active', 'overdue'].includes(r.state))
+      .map((r) => ({
+        fromDate: r.fromDate,
+        toDate: r.toDate,
+        kind: r.state === 'pending' ? 'requested' : 'booked',
+      }));
+  }
+
   @Get(':id/repairs')
   async repairs(@Param('id') id: string) {
     const rows = await this.db.repairs().find({
