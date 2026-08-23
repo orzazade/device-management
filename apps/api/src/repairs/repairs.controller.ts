@@ -82,7 +82,7 @@ export class RepairsController {
       });
       await notify(ctx.manager, 'repair_update', await staffIds(ctx.manager),
         `Damage reported: ${device.brand} ${device.model} — ${dto.issue}`,
-        { repairId: repair.id });
+        { repairId: repair.id }, '/repairs');
       return pub({ ...repair, device } as Repair);
     });
   }
@@ -141,7 +141,7 @@ export class RepairsController {
       });
       await notify(ctx.manager, 'repair_update', [repair.reportedById],
         `Repair update: ${device.brand} ${device.model} → ${next.replace(/_/g, ' ')}`,
-        { repairId: repair.id });
+        { repairId: repair.id }, '/repairs');
       return pub(repair);
     });
   }

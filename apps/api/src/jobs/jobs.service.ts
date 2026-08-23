@@ -83,9 +83,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         });
         const name = `${r.device.brand} ${r.device.model}`;
         await notify(ctx.manager, 'overdue', [r.requesterId],
-          `${name} is overdue — it was due back ${r.toDate}`, { requestId: r.id });
+          `${name} is overdue — it was due back ${r.toDate}`, { requestId: r.id }, '/requests');
         await notify(ctx.manager, 'overdue', await staffIds(ctx.manager),
-          `${name} is overdue (due ${r.toDate})`, { requestId: r.id });
+          `${name} is overdue (due ${r.toDate})`, { requestId: r.id }, `/devices/${r.deviceId}`);
       });
     }
     if (late.length) this.log.warn(`overdue scan: ${late.length} request(s) marked overdue`);
@@ -115,7 +115,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       await this.db.withTransaction(async (ctx) => {
         await notify(ctx.manager, 'due_soon', [r.requesterId],
           `${r.device.brand} ${r.device.model} is due back ${r.toDate} — plan the return`,
-          { requestId: r.id });
+          { requestId: r.id }, '/requests');
       });
       sent++;
     }

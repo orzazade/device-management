@@ -48,6 +48,15 @@ export class NotificationsController {
     return { items, unread };
   }
 
+  @Post('notifications/:id/read')
+  async readOne(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    // Scoped to the caller: nobody can mark someone else's notification.
+    await this.db
+      .notifications()
+      .update({ id, userId: req.user.sub, readAt: IsNull() }, { readAt: new Date() });
+    return { ok: true };
+  }
+
   @Post('notifications/read-all')
   async readAll(@Req() req: { user: AuthUser }) {
     await this.db

@@ -87,6 +87,7 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         await staffIds(ctx.manager),
         `${requesterName} requested ${device.brand} ${device.model} (${data.fromDate} – ${data.toDate})`,
         { requestId: request.id },
+        '/approvals',
       );
 
       // Config flag (GOALS.md): 'all' = everything needs approval (launch),
@@ -149,19 +150,19 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
       if (decision === 'approved') {
         await notify(ctx.manager, 'request_approved', [request.requesterId],
           `Your request for ${name} was approved (${request.fromDate} – ${request.toDate})`,
-          { requestId: request.id });
+          { requestId: request.id }, '/requests');
         if (device.holderId) {
           await notify(ctx.manager, 'handover_pending', [device.holderId],
             `Handover needed: give ${name} to ${request.requester?.name ?? 'the requester'}`,
-            { requestId: request.id });
+            { requestId: request.id }, '/handovers');
         } else {
           await notify(ctx.manager, 'handover_pending', await staffIds(ctx.manager),
             `Hand ${name} from the lab desk to ${request.requester?.name ?? 'the requester'}`,
-            { requestId: request.id });
+            { requestId: request.id }, '/handovers');
         }
       } else {
         await notify(ctx.manager, 'request_rejected', [request.requesterId],
-          `Your request for ${name} was rejected`, { requestId: request.id });
+          `Your request for ${name} was rejected`, { requestId: request.id }, '/requests');
       }
       return request;
     });
@@ -276,7 +277,7 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
       });
       await notify(ctx.manager, 'request_approved', [request.requesterId],
         `${device.brand} ${device.model} is now assigned to you — return by ${request.toDate}`,
-        { requestId: request.id });
+        { requestId: request.id }, '/requests');
       return request;
     });
   }
@@ -349,7 +350,7 @@ export class ReturnRequestHandler implements ICommandHandler<ReturnRequestComman
       if (data.damaged) {
         await notify(ctx.manager, 'repair_update', await staffIds(ctx.manager),
           `${device.brand} ${device.model} came back damaged: ${device.damageNote}`,
-          { deviceId: device.id });
+          { deviceId: device.id }, '/repairs');
       }
       return request;
     });

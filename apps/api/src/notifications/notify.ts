@@ -14,7 +14,10 @@ export async function notify(
   userIds: string[],
   text: string,
   meta: Record<string, string> = {},
+  /** In-app deeplink: where clicking this notification should take the user. */
+  link?: string,
 ): Promise<void> {
+  if (link) meta = { ...meta, link };
   const ids = [...new Set(userIds)].filter(Boolean);
   if (!ids.length) return;
   const rule = await manager.getRepository(NotificationRule).findOne({ where: { event } });
