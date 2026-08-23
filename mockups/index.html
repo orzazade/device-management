@@ -1,0 +1,697 @@
+<title>DeviceDesk</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#F6F5F8; --surface:#FFFFFF; --surface2:#EFEDF4; --ink:#241F2C;
+    --muted:#6F6880; --line:#E4E1EA; --accent:#7A2E8F; --accent-ink:#FFFFFF;
+    --ok:#1B7F4B; --warn:#A26400; --crit:#C03418; --shadow:0 1px 3px rgba(36,31,44,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#16131D; --surface:#201C2A; --surface2:#2A2537; --ink:#ECE8F3;
+      --muted:#A29AB3; --line:#373047; --accent:#C983DB; --accent-ink:#241F2C;
+      --ok:#5BBF8A; --warn:#D9A23F; --crit:#E5765C; --shadow:0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#16131D; --surface:#201C2A; --surface2:#2A2537; --ink:#ECE8F3;
+    --muted:#A29AB3; --line:#373047; --accent:#C983DB; --accent-ink:#241F2C;
+    --ok:#5BBF8A; --warn:#D9A23F; --crit:#E5765C; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px}
+  button{font:inherit;cursor:pointer}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  a{color:var(--accent)}
+
+  .app{display:flex;min-height:100vh}
+  .side{width:216px;flex-shrink:0;border-right:1px solid var(--line);background:var(--surface);
+    display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .brand{padding:18px 16px 14px;border-bottom:1px solid var(--line)}
+  .brand b{font-size:16px;letter-spacing:.2px}
+  .brand small{display:block;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;font-size:10.5px;margin-top:2px}
+  .nav{padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto}
+  .nav a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;
+    color:var(--ink);text-decoration:none}
+  .nav a.on{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);font-weight:600}
+  .nav a:hover{background:var(--surface2)}
+  .nav .sec{margin:12px 10px 4px;font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+  .badge{margin-left:auto;background:var(--accent);color:var(--accent-ink);border-radius:99px;
+    font-size:11px;font-weight:600;padding:0 7px;line-height:18px}
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .top{display:flex;align-items:center;gap:14px;padding:12px 24px;border-bottom:1px solid var(--line);
+    background:var(--surface);position:sticky;top:0;z-index:5}
+  .top input[type=search]{flex:1;max-width:420px;padding:8px 12px;border:1px solid var(--line);
+    border-radius:8px;background:var(--bg);color:var(--ink)}
+  .roleSwitch{display:flex;gap:4px;background:var(--surface2);border-radius:9px;padding:3px}
+  .roleSwitch button{border:0;background:transparent;color:var(--muted);padding:5px 10px;border-radius:7px;font-weight:500}
+  .roleSwitch button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
+  .bellWrap{position:relative}
+  .bell{position:relative;border:1px solid var(--line);background:var(--surface);border-radius:8px;
+    width:36px;height:36px;font-size:16px}
+  .bell .dot{position:absolute;top:-5px;right:-5px;background:var(--crit);color:#fff;font-size:10.5px;
+    font-weight:700;border-radius:99px;padding:0 5px;line-height:16px}
+  .drop{position:absolute;right:0;top:44px;width:340px;background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);z-index:20;overflow:hidden}
+  .drop .n{padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+  .drop .n.unread{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  .drop .n small{color:var(--muted)}
+  .content{padding:24px;max-width:1100px;width:100%;margin:0 auto}
+  .pageHead{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .pageHead h1{font-size:20px}
+  .pageHead .sub{color:var(--muted)}
+  .spacer{flex:1}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-bottom:20px}
+  .stat{padding:16px}
+  .stat .k{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat .l{color:var(--muted)}
+  .tableWrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);text-align:left;
+    padding:10px 14px;border-bottom:1px solid var(--line)}
+  td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  tr.rowLink:hover{background:var(--surface2);cursor:pointer}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:99px;
+    font-size:12px;font-weight:600;white-space:nowrap}
+  .chip::before{content:"";width:7px;height:7px;border-radius:99px;background:currentColor}
+  .c-ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 13%,transparent)}
+  .c-warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+  .c-crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 13%,transparent)}
+  .c-mut{color:var(--muted);background:var(--surface2)}
+  .c-acc{color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent)}
+
+  .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    padding:7px 14px;border-radius:8px;font-weight:600}
+  .btn:hover{background:var(--surface2)}
+  .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .btn.pri:hover{filter:brightness(1.08)}
+  .btn.danger{color:var(--crit)}
+  .btn.sm{padding:4px 10px;font-size:12.5px}
+  .btn:focus-visible,.nav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  select,input[type=text],input[type=date],input[type=email],input[type=password],textarea{
+    padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);
+    color:var(--ink);font:inherit}
+  textarea{width:100%;resize:vertical}
+  label.f{display:block;margin-bottom:12px}
+  label.f span{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,16,28,.5);display:flex;align-items:center;
+    justify-content:center;z-index:50;padding:20px}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;max-width:520px;
+    width:100%;max-height:88vh;overflow-y:auto;padding:22px}
+  .modal h2{font-size:17px;margin-bottom:14px}
+  .modalFoot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);
+    color:var(--bg);padding:10px 18px;border-radius:10px;font-weight:600;z-index:99;box-shadow:var(--shadow)}
+
+  .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;padding:16px}
+  .kv dt{color:var(--muted)}
+  .kv dd{margin:0}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:0;padding:0 14px}
+  .tabs button{border:0;background:none;color:var(--muted);padding:10px 12px;font-weight:600;
+    border-bottom:2px solid transparent}
+  .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .two{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+  @media (max-width:900px){.two{grid-template-columns:1fr}.side{display:none}}
+  .checkRow{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .matrix td:not(:first-child),.matrix th:not(:first-child){text-align:center}
+  .login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+  .loginBox{width:360px;padding:30px}
+  .loginBox .brandBig{margin-bottom:22px}
+  .loginBox .brandBig b{font-size:22px}
+  .empty{padding:40px;text-align:center;color:var(--muted)}
+  .note{background:color-mix(in srgb,var(--warn) 10%,transparent);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);
+    color:var(--ink);padding:10px 14px;border-radius:10px;margin-bottom:14px}
+  .avatar{width:26px;height:26px;border-radius:99px;background:var(--surface2);color:var(--muted);
+    display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:7px}
+</style>
+<div id="root"></div>
+<div id="modalHost"></div>
+<div id="toastHost"></div>
+
+<script>
+/* ================= fake data ================= */
+const S = {
+  me: 'u2', loggedIn: false, tab: 'specs', q: '',
+  filters: { brand:'', os:'', status:'' },
+  bellOpen: false,
+  users: [
+    {id:'u1', name:'Leyla Qasimova', role:'owner',   email:'leyla.q@corp.local'},
+    {id:'u2', name:'Rashad Aliyev',  role:'admin',   email:'rashad.a@corp.local'},
+    {id:'u3', name:'Nigar Mammadova',role:'requester',email:'nigar.m@corp.local'},
+    {id:'u4', name:'Tural Hasanov',  role:'requester',email:'tural.h@corp.local'},
+    {id:'u5', name:'Aynur Karimli',  role:'requester',email:'aynur.k@corp.local'},
+  ],
+  projects: [
+    {id:'p1', name:'MyApp Mobile',  desc:'Customer self-service app'},
+    {id:'p2', name:'USSD Portal',   desc:'USSD menus & billing flows'},
+    {id:'p3', name:'5G Field Trials',desc:'Radio + device compatibility'},
+  ],
+  devices: [
+    {id:'d1', brand:'Apple', model:'iPhone 15 Pro', os:'iOS', osv:'17.5', specs:'A17 Pro · 256 GB', serial:'F2LX3A7Q', imei:'353912100000001', status:'assigned', holder:'u3', project:'p1', damage:null, acc:['Box','USB-C cable']},
+    {id:'d2', brand:'Samsung', model:'Galaxy S24', os:'Android', osv:'14', specs:'Exynos 2400 · 128 GB', serial:'RF8T2001', imei:'353912100000002', status:'available', holder:null, project:null, damage:null, acc:['Box','Cable','Charger']},
+    {id:'d3', brand:'Honor', model:'Magic6 Pro', os:'Android', osv:'14', specs:'SD 8 Gen 3 · 512 GB', serial:'HNR66201', imei:'353912100000003', status:'assigned', holder:'u4', project:'p2', damage:null, acc:['Box','Cable']},
+    {id:'d4', brand:'Google', model:'Pixel 8', os:'Android', osv:'15 beta', specs:'Tensor G3 · 128 GB', serial:'GP8B4412', imei:'353912100000004', status:'available', holder:null, project:null, damage:null, acc:['Cable']},
+    {id:'d5', brand:'Apple', model:'iPad Air 5', os:'iPadOS', osv:'17.5', specs:'M1 · 64 GB', serial:'DMPX55A1', imei:'—', status:'assigned', holder:'u3', project:'p1', damage:null, acc:['Box','Cable','Charger']},
+    {id:'d6', brand:'Xiaomi', model:'Redmi Note 13', os:'Android', osv:'13', specs:'SD 685 · 128 GB', serial:'XM13R881', imei:'353912100000006', status:'in_repair', holder:null, project:null, damage:'Cracked screen', acc:['Box']},
+    {id:'d7', brand:'Apple', model:'iPhone SE 2022', os:'iOS', osv:'16.7', specs:'A15 · 64 GB', serial:'C7GQSE22', imei:'353912100000007', status:'assigned', holder:'u5', project:'p3', damage:null, acc:['Cable']},
+    {id:'d8', brand:'Samsung', model:'Galaxy A55', os:'Android', osv:'14', specs:'Exynos 1480 · 128 GB', serial:'RFA55090', imei:'353912100000008', status:'available', holder:null, project:null, damage:null, acc:['Box','Cable','Charger']},
+    {id:'d9', brand:'Huawei', model:'P60 (no GMS)', os:'EMUI', osv:'14', specs:'SD 8+ Gen 1 · 256 GB', serial:'HWP60113', imei:'353912100000009', status:'available', holder:null, project:null, damage:'Battery drains fast', acc:['Box','Cable']},
+    {id:'d10',brand:'OnePlus', model:'12', os:'Android', osv:'14', specs:'SD 8 Gen 3 · 256 GB', serial:'OP12C555', imei:'353912100000010', status:'assigned', holder:'u2', project:null, damage:null, acc:['Box','Cable','Charger']},
+    {id:'d11',brand:'Apple', model:'iPhone 12', os:'iOS', osv:'15.8', specs:'A14 · 64 GB', serial:'G0NDQ122', imei:'353912100000011', status:'retired', holder:null, project:null, damage:'Won’t hold charge', acc:[]},
+    {id:'d12',brand:'Samsung', model:'Galaxy Tab S9', os:'Android', osv:'14', specs:'SD 8 Gen 2 · 256 GB', serial:'RFTS9007', imei:'—', status:'available', holder:null, project:'p1', damage:null, acc:['Box','Charger']},
+  ],
+  requests: [
+    {id:'r1', device:'d3', by:'u3', onBehalf:null, reason:'Need to test USSD flows on Honor — customer bug only reproduces there.', from:'2026-08-26', to:'2026-08-29', state:'pending'},
+    {id:'r2', device:'d2', by:'u4', onBehalf:null, reason:'Regression pass for MyApp release 4.2 on Samsung.', from:'2026-08-25', to:'2026-08-28', state:'approved'},
+    {id:'r3', device:'d1', by:'u5', onBehalf:null, reason:'Camera permissions testing.', from:'2026-08-22', to:'2026-08-30', state:'rejected'},
+    {id:'r4', device:'d5', by:'u3', onBehalf:null, reason:'Tablet layout QA for MyApp.', from:'2026-08-18', to:'2026-08-26', state:'active'},
+    {id:'r5', device:'d7', by:'u5', onBehalf:'u2', reason:'5G handover field test,老 device baseline.', from:'2026-08-10', to:'2026-08-23', state:'overdue'},
+  ],
+  repairs: [
+    {id:'rp1', device:'d6', by:'u4', issue:'Cracked screen after drop test', state:'in_repair', opened:'2026-08-14'},
+    {id:'rp2', device:'d9', by:'u3', issue:'Battery drains 40%/hour on idle', state:'reported', opened:'2026-08-23'},
+  ],
+  notifs: [
+    {id:'n1', text:'Nigar requested Honor Magic6 Pro (Aug 26 – Aug 29)', time:'2h ago', unread:true, event:'request_created'},
+    {id:'n2', text:'iPhone SE 2022 is overdue — due Aug 23 (Aynur)', time:'1d ago', unread:true, event:'overdue'},
+    {id:'n3', text:'Repair reported: Huawei P60 battery drain', time:'1d ago', unread:false, event:'repair_update'},
+  ],
+  audit: [
+    {t:'2026-08-24 10:12', who:'Rashad Aliyev', what:'request r2 → approved', old:'pending', nw:'approved'},
+    {t:'2026-08-23 16:40', who:'Nigar Mammadova', what:'repair rp2 → reported (Huawei P60)', old:'—', nw:'reported'},
+    {t:'2026-08-22 09:05', who:'Rashad Aliyev', what:'request r3 → rejected', old:'pending', nw:'rejected'},
+    {t:'2026-08-21 14:30', who:'Leyla Qasimova', what:'request r5 time range override', old:'to 2026-08-20', nw:'to 2026-08-23'},
+    {t:'2026-08-18 11:00', who:'Rashad Aliyev', what:'device d12 imported from Excel', old:'—', nw:'available'},
+  ],
+  settings: { approvalMode:'all' },
+  rules: [
+    {ev:'request_created',  label:'Request created',        inapp:true,  email:true},
+    {ev:'request_approved', label:'Request approved',       inapp:true,  email:true},
+    {ev:'request_rejected', label:'Request rejected',       inapp:true,  email:false},
+    {ev:'handover_pending', label:'Handover awaiting you',  inapp:true,  email:true},
+    {ev:'due_soon',         label:'Return due soon',        inapp:true,  email:false},
+    {ev:'overdue',          label:'Return overdue',         inapp:true,  email:true},
+    {ev:'repair_update',    label:'Repair status changed',  inapp:true,  email:false},
+  ],
+};
+/* fix seed typo */
+S.requests[4].reason = '5G handover field test, older-device baseline.';
+
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+const user  = id => S.users.find(u=>u.id===id);
+const dev   = id => S.devices.find(d=>d.id===id);
+const proj  = id => S.projects.find(p=>p.id===id);
+const me    = () => user(S.me);
+const isAdmin = () => ['admin','owner'].includes(me().role);
+const roleName = r => ({owner:'Lab Owner', admin:'Admin', requester:'Requester'})[r];
+const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const initials = n => n.split(' ').map(w=>w[0]).join('').slice(0,2);
+function toast(msg){ $('#toastHost').innerHTML = `<div class="toast">${esc(msg)}</div>`;
+  clearTimeout(toast.t); toast.t = setTimeout(()=> $('#toastHost').innerHTML='', 2600); }
+function audit(what, old, nw){ S.audit.unshift({t:'2026-08-24 '+new Date().toTimeString().slice(0,5), who:me().name, what, old, nw}); }
+function notify(text, event){ S.notifs.unshift({id:'n'+Math.floor(performance.now()), text, time:'now', unread:true, event}); }
+function go(h){ location.hash = h; }
+function closeModal(){ $('#modalHost').innerHTML=''; }
+function modal(html){ $('#modalHost').innerHTML =
+  `<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="modal">${html}</div></div>`; }
+
+const stChip = {
+  available:['Available','c-ok'], assigned:['Assigned','c-acc'], in_repair:['In repair','c-warn'],
+  retired:['Retired','c-mut'], pending:['Pending','c-warn'], approved:['Awaiting handover','c-acc'],
+  active:['Active','c-ok'], rejected:['Rejected','c-mut'], returned:['Returned','c-mut'],
+  overdue:['Overdue','c-crit'], cancelled:['Cancelled','c-mut'],
+  reported:['Reported','c-warn'], repair_requested:['Repair requested','c-warn'],
+  fixed:['Fixed','c-ok'], written_off:['Written off','c-mut'],
+};
+const chip = st => { const [l,c]=stChip[st]||[st,'c-mut']; return `<span class="chip ${c}">${l}</span>`; };
+
+/* ================= actions ================= */
+window.actions = {
+  login(){ S.loggedIn = true; go('#/dashboard'); },
+  setRole(id){ S.me = id; S.bellOpen=false; render(); },
+  requestDevice(id){
+    const d = dev(id); const holder = d.holder ? user(d.holder).name : null;
+    modal(`<h2>Request ${esc(d.brand+' '+d.model)}</h2>
+      ${holder?`<div class="note">Held by <b>${esc(holder)}</b> now. If approved, they’ll be asked to hand it over.</div>`:''}
+      <label class="f"><span>Reason (required)</span><textarea id="f_reason" rows="3" placeholder="What will you test and why this device?"></textarea></label>
+      <div style="display:flex;gap:10px">
+        <label class="f" style="flex:1"><span>From</span><input type="date" id="f_from" value="2026-08-25" style="width:100%"></label>
+        <label class="f" style="flex:1"><span>To</span><input type="date" id="f_to" value="2026-08-28" style="width:100%"></label>
+      </div>
+      ${isAdmin()?`<label class="f"><span>On behalf of</span><select id="f_behalf" style="width:100%">
+        <option value="">Myself</option>${S.users.filter(u=>u.role==='requester').map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')}
+      </select></label>`:''}
+      <div class="modalFoot"><button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="actions.submitRequest('${id}')">Submit request</button></div>`);
+  },
+  submitRequest(id){
+    const reason = $('#f_reason').value.trim();
+    if(!reason){ toast('Reason is required'); return; }
+    const behalf = $('#f_behalf') ? $('#f_behalf').value : '';
+    const r = {id:'r'+(S.requests.length+1), device:id, by: behalf || S.me,
+      onBehalf: behalf ? S.me : null, reason, from:$('#f_from').value, to:$('#f_to').value, state:'pending'};
+    S.requests.unshift(r);
+    audit(`request ${r.id} created for ${dev(id).model}`, '—', 'pending');
+    notify(`${user(r.by).name} requested ${dev(id).brand} ${dev(id).model} (${r.from} – ${r.to})`, 'request_created');
+    closeModal(); toast('Request submitted — waiting for approval'); go('#/requests');
+  },
+  approve(rid){
+    const r = S.requests.find(x=>x.id===rid); r.state='approved';
+    audit(`request ${rid} → approved`, 'pending', 'approved');
+    const d = dev(r.device);
+    notify(d.holder ? `Handover needed: give ${d.model} to ${user(r.by).name}` : `Pick up ${d.model} from the lab desk`, 'handover_pending');
+    toast('Approved — handover pending'); render();
+  },
+  reject(rid){
+    const r = S.requests.find(x=>x.id===rid); r.state='rejected';
+    audit(`request ${rid} → rejected`, 'pending', 'rejected');
+    notify(`Request for ${dev(r.device).model} was rejected`, 'request_rejected');
+    toast('Request rejected'); render();
+  },
+  overrideTime(rid){
+    const r = S.requests.find(x=>x.id===rid);
+    modal(`<h2>Override time range</h2>
+      <p style="color:var(--muted);margin-top:0">Every change here is written to the audit log.</p>
+      <div style="display:flex;gap:10px">
+        <label class="f" style="flex:1"><span>From</span><input type="date" id="f_from" value="${r.from}" style="width:100%"></label>
+        <label class="f" style="flex:1"><span>To</span><input type="date" id="f_to" value="${r.to}" style="width:100%"></label>
+      </div>
+      <div class="modalFoot"><button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="actions.saveOverride('${rid}')">Save override</button></div>`);
+  },
+  saveOverride(rid){
+    const r = S.requests.find(x=>x.id===rid);
+    const old = `${r.from} – ${r.to}`;
+    r.from = $('#f_from').value; r.to = $('#f_to').value;
+    audit(`request ${rid} time range override`, old, `${r.from} – ${r.to}`);
+    closeModal(); toast('Time range updated (audited)'); render();
+  },
+  confirmHandover(rid){
+    const r = S.requests.find(x=>x.id===rid); const d = dev(r.device);
+    const oldHolder = d.holder ? user(d.holder).name : 'lab desk';
+    r.state='active'; d.holder = r.by; d.status='assigned';
+    audit(`handover ${d.model}: ${oldHolder} → ${user(r.by).name}`, oldHolder, user(r.by).name);
+    notify(`${d.model} handed to ${user(r.by).name}`, 'request_approved');
+    toast('Handover confirmed — device assigned'); render();
+  },
+  startReturn(rid){
+    const r = S.requests.find(x=>x.id===rid); const d = dev(r.device);
+    modal(`<h2>Return ${esc(d.brand+' '+d.model)}</h2>
+      <p style="color:var(--muted);margin-top:0">Check every accessory against the list before accepting.</p>
+      ${d.acc.length ? d.acc.map((a,i)=>`<div class="checkRow"><input type="checkbox" id="acc${i}" checked><label for="acc${i}">${esc(a)}</label></div>`).join('') : '<p class="empty">No accessories registered.</p>'}
+      <div class="checkRow"><input type="checkbox" id="accDmg"><label for="accDmg">Device has new damage</label></div>
+      <div class="modalFoot"><button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="actions.finishReturn('${rid}')">Accept return</button></div>`);
+  },
+  finishReturn(rid){
+    const r = S.requests.find(x=>x.id===rid); const d = dev(r.device);
+    const damaged = $('#accDmg').checked;
+    r.state='returned'; d.holder=null; d.status = damaged ? 'in_repair' : 'available';
+    if(damaged){ S.repairs.unshift({id:'rp'+(S.repairs.length+1), device:d.id, by:S.me, issue:'Damage found at return check-in', state:'reported', opened:'2026-08-24'});
+      d.damage='Damage found at return check-in'; }
+    audit(`return ${d.model} checked in${damaged?' — damage found':''}`, 'active', damaged?'in_repair':'available');
+    toast(damaged ? 'Returned — sent to repair flow' : 'Returned — device available again'); render();
+  },
+  reportDamage(id){
+    const d = dev(id);
+    modal(`<h2>Report damage — ${esc(d.model)}</h2>
+      <label class="f"><span>What happened?</span><textarea id="f_issue" rows="3" placeholder="Describe the damage"></textarea></label>
+      <div class="modalFoot"><button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="actions.saveDamage('${id}')">Report</button></div>`);
+  },
+  saveDamage(id){
+    const issue = $('#f_issue').value.trim() || 'Unspecified damage';
+    const d = dev(id); d.damage = issue;
+    S.repairs.unshift({id:'rp'+(S.repairs.length+1), device:id, by:S.me, issue, state:'reported', opened:'2026-08-24'});
+    audit(`repair reported for ${d.model}`, '—', 'reported');
+    notify(`Damage reported: ${d.model} — ${issue}`, 'repair_update');
+    closeModal(); toast('Damage reported'); go('#/repairs');
+  },
+  advanceRepair(rpId){
+    const rp = S.repairs.find(x=>x.id===rpId);
+    const next = {reported:'repair_requested', repair_requested:'in_repair', in_repair:'fixed'}[rp.state];
+    if(!next) return;
+    const d = dev(rp.device); const old = rp.state; rp.state = next;
+    if(next==='in_repair'){ d.status='in_repair'; d.holder=null; }
+    if(next==='fixed'){ d.status='available'; d.damage=null; }
+    audit(`repair ${rpId} (${d.model}) → ${next}`, old, next);
+    notify(`Repair update: ${d.model} → ${next.replace('_',' ')}`, 'repair_update');
+    toast('Repair moved to “'+next.replace(/_/g,' ')+'”'); render();
+  },
+  writeOff(rpId){
+    const rp = S.repairs.find(x=>x.id===rpId); const d = dev(rp.device);
+    rp.state='written_off'; d.status='retired';
+    audit(`repair ${rpId} (${d.model}) → written off; device retired`, 'in_repair', 'written_off');
+    toast('Device written off & retired'); render();
+  },
+  toggleRule(ev, ch){
+    const r = S.rules.find(x=>x.ev===ev); r[ch] = !r[ch];
+    toast(`${r.label}: ${ch==='inapp'?'in-app':'email'} ${r[ch]?'on':'off'}`); render();
+  },
+  setApproval(m){ S.settings.approvalMode = m;
+    audit('approval mode changed', m==='all'?'busy_only':'all', m);
+    toast(m==='all' ? 'Every request now needs approval' : 'Free devices now auto-approve'); render(); },
+  toggleBell(){ S.bellOpen = !S.bellOpen; if(!S.bellOpen) S.notifs.forEach(n=>n.unread=false); render(); },
+  runImport(){
+    modal(`<h2>Import result — dry run</h2>
+      <p style="margin-top:0"><span class="chip c-ok">9 rows OK</span> &nbsp; <span class="chip c-crit">3 rows broken</span></p>
+      <div class="tableWrap card" style="margin-bottom:6px"><table>
+        <tr><th>Row</th><th>Problem</th></tr>
+        <tr><td class="mono">12</td><td>Brand is empty</td></tr>
+        <tr><td class="mono">17</td><td>IMEI “35391abc” is not a number</td></tr>
+        <tr><td class="mono">23</td><td>Duplicate serial RF8T2001 (already exists)</td></tr>
+      </table></div>
+      <p style="color:var(--muted)">Nothing is saved yet. Import the 9 valid rows, or fix the file and retry.</p>
+      <div class="modalFoot"><button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn pri" onclick="actions.commitImport()">Import 9 valid rows</button></div>`);
+  },
+  commitImport(){ audit('Excel import: 9 devices added, 3 rows rejected', '—', '9 rows');
+    closeModal(); toast('9 devices imported — 3 rejected rows reported'); },
+  search(v){ S.q = v; render(); },
+  filter(k,v){ S.filters[k]=v; render(); },
+  setTab(t){ S.tab=t; render(); },
+};
+
+/* ================= views ================= */
+function loginView(){
+  return `<div class="login"><div class="card loginBox">
+    <div class="brandBig"><b>DeviceDesk</b><small style="display:block;color:var(--muted);
+      letter-spacing:.6px;text-transform:uppercase;font-size:10.5px">QA Device Lab</small></div>
+    <label class="f"><span>Work email</span><input type="email" value="rashad.a@corp.local" style="width:100%"></label>
+    <label class="f"><span>Password</span><input type="password" value="••••••••" style="width:100%"></label>
+    <button class="btn pri" style="width:100%" onclick="actions.login()">Sign in</button>
+    <p style="color:var(--muted);font-size:12.5px;text-align:center;margin-bottom:0">
+      Corporate LDAP sign-in arrives when hosted on company infra.</p>
+  </div></div>`;
+}
+
+function counts(){
+  return {
+    approvals: S.requests.filter(r=>r.state==='pending').length,
+    handovers: S.requests.filter(r=>r.state==='approved' && (dev(r.device).holder===S.me || (isAdmin() && !dev(r.device).holder))).length,
+    unread: S.notifs.filter(n=>n.unread).length,
+    myActive: S.requests.filter(r=>['active','overdue'].includes(r.state) && r.by===S.me).length,
+  };
+}
+
+function nav(route){
+  const c = counts();
+  const item = (h,l,badge)=>`<a href="${h}" class="${route.startsWith(h.slice(1))?'on':''}">${l}${badge?`<span class="badge">${badge}</span>`:''}</a>`;
+  let html = `<div class="sec">Lab</div>`
+    + item('#/dashboard','Dashboard')
+    + item('#/devices','Devices')
+    + item('#/requests','My requests', c.myActive||'')
+    + item('#/handovers','Handovers', c.handovers||'')
+    + item('#/repairs','Repairs');
+  if(isAdmin()) html += `<div class="sec">Manage</div>`
+    + item('#/approvals','Approvals', c.approvals||'')
+    + item('#/import','Excel import')
+    + item('#/users','Users')
+    + item('#/projects','Projects')
+    + item('#/settings','Settings');
+  if(me().role==='owner') html += item('#/audit','Audit log');
+  return html;
+}
+
+function shell(route, inner){
+  const c = counts();
+  return `<div class="app">
+    <aside class="side">
+      <div class="brand"><b>DeviceDesk</b><small>QA Device Lab</small></div>
+      <nav class="nav">${nav(route)}</nav>
+      <div style="padding:12px 16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px">
+        <span class="avatar">${initials(me().name)}</span>${esc(me().name)}<br>
+        <span style="margin-left:33px">${roleName(me().role)}</span></div>
+    </aside>
+    <div class="main">
+      <div class="top">
+        <input type="search" placeholder="Search devices — brand, model, OS, holder…" value="${esc(S.q)}"
+          oninput="actions.search(this.value)" onfocus="if(location.hash!=='#/devices')location.hash='#/devices'">
+        <div class="spacer"></div>
+        <div class="roleSwitch" title="Mockup only: view as…">
+          ${[['u1','Owner'],['u2','Admin'],['u3','Requester']].map(([id,l])=>
+            `<button class="${S.me===id?'on':''}" onclick="actions.setRole('${id}')">${l}</button>`).join('')}
+        </div>
+        <div class="bellWrap">
+          <button class="bell" onclick="actions.toggleBell()" aria-label="Notifications">🔔
+            ${c.unread?`<span class="dot">${c.unread}</span>`:''}</button>
+          ${S.bellOpen?`<div class="drop">
+            ${S.notifs.slice(0,6).map(n=>`<div class="n ${n.unread?'unread':''}"><div>${esc(n.text)}<br><small>${n.time} · ${n.event.replace(/_/g,' ')}</small></div></div>`).join('')}
+            <div style="padding:9px 14px;text-align:center"><a href="#/settings/notifications" onclick="S.bellOpen=false">Notification settings</a></div>
+          </div>`:''}
+        </div>
+      </div>
+      <div class="content">${inner}</div>
+    </div></div>`;
+}
+
+function dashView(){
+  const mine = S.devices.filter(d=>d.holder===S.me);
+  const myReqs = S.requests.filter(r=>r.by===S.me && !['returned','rejected','cancelled'].includes(r.state));
+  const overdue = S.requests.filter(r=>r.state==='overdue');
+  const c = counts();
+  return `<div class="pageHead"><h1>Hi, ${esc(me().name.split(' ')[0])}</h1>
+      <span class="sub">Here’s the lab right now.</span></div>
+    ${overdue.length && isAdmin() ? `<div class="note">⚠ <b>${overdue.length} device overdue:</b> ${overdue.map(r=>`${dev(r.device).model} — ${esc(user(r.by).name)}, due ${r.to}`).join('; ')}</div>`:''}
+    <div class="cards">
+      <div class="card stat"><div class="k">${S.devices.filter(d=>d.status==='available').length}</div><div class="l">Devices available now</div></div>
+      <div class="card stat"><div class="k">${mine.length}</div><div class="l">In my hands</div></div>
+      ${isAdmin()?`<div class="card stat"><div class="k">${c.approvals}</div><div class="l">Waiting for approval</div></div>`:''}
+      <div class="card stat"><div class="k">${S.repairs.filter(r=>!['fixed','written_off'].includes(r.state)).length}</div><div class="l">In repair flow</div></div>
+    </div>
+    <div class="two">
+      <div class="card"><div style="padding:14px 14px 0"><h2 style="font-size:15px">My requests</h2></div>
+        ${myReqs.length? reqTable(myReqs) : '<p class="empty">No open requests. Find a device and ask for it.</p>'}</div>
+      <div class="card"><div style="padding:14px 14px 0"><h2 style="font-size:15px">Devices I hold</h2></div>
+        ${mine.length? `<div class="tableWrap"><table>${mine.map(d=>`<tr class="rowLink" onclick="go('#/devices/${d.id}')">
+          <td><b>${esc(d.brand)} ${esc(d.model)}</b><br><small style="color:var(--muted)">${esc(d.os)} ${esc(d.osv)}</small></td>
+          <td style="text-align:right">${chip(d.status)}</td></tr>`).join('')}</table></div>` : '<p class="empty">Nothing checked out.</p>'}</div>
+    </div>`;
+}
+
+function devicesView(){
+  const f = S.filters, q = S.q.toLowerCase();
+  const brands=[...new Set(S.devices.map(d=>d.brand))], oses=[...new Set(S.devices.map(d=>d.os))];
+  const list = S.devices.filter(d =>
+    (!q || (d.brand+' '+d.model+' '+d.os+' '+d.osv+' '+(d.holder?user(d.holder).name:'')).toLowerCase().includes(q))
+    && (!f.brand || d.brand===f.brand) && (!f.os || d.os===f.os) && (!f.status || d.status===f.status));
+  return `<div class="pageHead"><h1>Devices</h1><span class="sub">${list.length} of ${S.devices.length}</span>
+      <div class="spacer"></div>
+      ${isAdmin()?`<button class="btn" onclick="go('#/import')">Import Excel</button>
+      <button class="btn pri" onclick="toast('Add-device form — same fields as import columns')">Add device</button>`:''}</div>
+    <div class="filters">
+      <select onchange="actions.filter('brand',this.value)"><option value="">All brands</option>
+        ${brands.map(b=>`<option ${f.brand===b?'selected':''}>${b}</option>`).join('')}</select>
+      <select onchange="actions.filter('os',this.value)"><option value="">All OS</option>
+        ${oses.map(o=>`<option ${f.os===o?'selected':''}>${o}</option>`).join('')}</select>
+      <select onchange="actions.filter('status',this.value)"><option value="">Any status</option>
+        ${['available','assigned','in_repair','retired'].map(s=>`<option value="${s}" ${f.status===s?'selected':''}>${stChip[s][0]}</option>`).join('')}</select>
+    </div>
+    <div class="card tableWrap"><table>
+      <tr><th>Device</th><th>OS</th><th>Status</th><th>Holder</th><th>Project</th><th></th></tr>
+      ${list.map(d=>`<tr class="rowLink" onclick="go('#/devices/${d.id}')">
+        <td><b>${esc(d.brand)} ${esc(d.model)}</b><br><small class="mono" style="color:var(--muted)">${esc(d.serial)}</small></td>
+        <td>${esc(d.os)} ${esc(d.osv)}</td>
+        <td>${chip(d.status)}</td>
+        <td>${d.holder?`<span class="avatar">${initials(user(d.holder).name)}</span>${esc(user(d.holder).name)}`:'—'}</td>
+        <td>${d.project?esc(proj(d.project).name):'—'}</td>
+        <td onclick="event.stopPropagation()">${['available','assigned'].includes(d.status)?
+          `<button class="btn sm pri" onclick="actions.requestDevice('${d.id}')">Request</button>`:''}</td>
+      </tr>`).join('')}
+    </table>${list.length?'':'<p class="empty">No devices match. Clear a filter?</p>'}</div>`;
+}
+
+function deviceView(id){
+  const d = dev(id); if(!d) return '<p class="empty">Device not found.</p>';
+  const hist = S.audit.filter(a=>a.what.includes(d.model));
+  const reps = S.repairs.filter(r=>r.device===id);
+  const tab = S.tab;
+  return `<div class="pageHead"><a href="#/devices" style="text-decoration:none">←</a>
+      <h1>${esc(d.brand)} ${esc(d.model)}</h1>${chip(d.status)}
+      <div class="spacer"></div>
+      ${['available','assigned'].includes(d.status)?`<button class="btn pri" onclick="actions.requestDevice('${id}')">Request this device</button>`:''}
+      ${d.status!=='retired'?`<button class="btn danger" onclick="actions.reportDamage('${id}')">Report damage</button>`:''}</div>
+    ${d.damage?`<div class="note">🛠 Known damage: <b>${esc(d.damage)}</b></div>`:''}
+    <div class="card">
+      <div class="tabs">${[['specs','Specs'],['history','History'],['repairs','Repairs ('+reps.length+')']].map(([k,l])=>
+        `<button class="${tab===k?'on':''}" onclick="actions.setTab('${k}')">${l}</button>`).join('')}</div>
+      ${tab==='specs'?`<dl class="kv">
+        <dt>OS</dt><dd>${esc(d.os)} ${esc(d.osv)}</dd>
+        <dt>Specs</dt><dd>${esc(d.specs)}</dd>
+        <dt>Serial</dt><dd class="mono">${esc(d.serial)}</dd>
+        <dt>IMEI</dt><dd class="mono">${esc(d.imei)}</dd>
+        <dt>Current holder</dt><dd>${d.holder?esc(user(d.holder).name):'— (lab desk)'}</dd>
+        <dt>Project</dt><dd>${d.project?esc(proj(d.project).name):'—'}</dd>
+        <dt>Accessories</dt><dd>${d.acc.length?d.acc.map(esc).join(' · '):'none'}</dd>
+      </dl>`:''}
+      ${tab==='history'?(hist.length?`<div class="tableWrap"><table><tr><th>When</th><th>Who</th><th>What</th></tr>
+        ${hist.map(a=>`<tr><td class="mono">${a.t}</td><td>${esc(a.who)}</td><td>${esc(a.what)}</td></tr>`).join('')}</table></div>`
+        :'<p class="empty">No history yet.</p>'):''}
+      ${tab==='repairs'?(reps.length?`<div class="tableWrap"><table><tr><th>Opened</th><th>Issue</th><th>State</th></tr>
+        ${reps.map(r=>`<tr><td class="mono">${r.opened}</td><td>${esc(r.issue)}</td><td>${chip(r.state)}</td></tr>`).join('')}</table></div>`
+        :'<p class="empty">No repairs. Long may it last.</p>'):''}
+    </div>`;
+}
+
+function reqTable(list, opts={}){
+  return `<div class="tableWrap"><table>
+    <tr><th>Device</th><th>Requester</th><th>When</th><th>Reason</th><th>State</th>${opts.actions?'<th></th>':''}</tr>
+    ${list.map(r=>{const d=dev(r.device);return `<tr>
+      <td><b>${esc(d.brand)} ${esc(d.model)}</b>${d.holder&&r.state==='pending'?`<br><small style="color:var(--muted)">held by ${esc(user(d.holder).name)}</small>`:''}</td>
+      <td>${esc(user(r.by).name)}${r.onBehalf?`<br><small style="color:var(--muted)">by ${esc(user(r.onBehalf).name)}</small>`:''}</td>
+      <td class="mono">${r.from}<br>${r.to}</td>
+      <td style="max-width:260px">${esc(r.reason)}</td>
+      <td>${chip(r.state)}</td>
+      ${opts.actions?`<td style="white-space:nowrap">${opts.actions(r)}</td>`:''}
+    </tr>`;}).join('')}
+  </table>${list.length?'':'<p class="empty">Nothing here.</p>'}</div>`;
+}
+
+function requestsView(){
+  const mine = S.requests.filter(r=>r.by===S.me || r.onBehalf===S.me);
+  return `<div class="pageHead"><h1>My requests</h1><div class="spacer"></div>
+      <button class="btn pri" onclick="go('#/devices')">Find a device</button></div>
+    <div class="card">${reqTable(mine,{actions:r=>
+      r.state==='active'||r.state==='overdue' ? `<button class="btn sm" onclick="actions.startReturn('${r.id}')">Return</button>`
+      : r.state==='pending' ? `<button class="btn sm" onclick="toast('Cancelled (mockup)')">Cancel</button>` : ''})}</div>`;
+}
+
+function approvalsView(){
+  const pend = S.requests.filter(r=>r.state==='pending');
+  return `<div class="pageHead"><h1>Approvals</h1>
+      <span class="sub">Policy: <b>${S.settings.approvalMode==='all'?'every request needs approval':'only busy devices need approval'}</b> — change in Settings</span></div>
+    <div class="card">${reqTable(pend,{actions:r=>`
+      <button class="btn sm pri" onclick="actions.approve('${r.id}')">Approve</button>
+      <button class="btn sm danger" onclick="actions.reject('${r.id}')">Reject</button>
+      <button class="btn sm" onclick="actions.overrideTime('${r.id}')">Time…</button>`})}</div>
+    ${me().role==='owner'?'<p style="color:var(--muted);margin-top:10px">As Lab Owner you are the final gate — your approval closes the request.</p>':''}`;
+}
+
+function handoversView(){
+  const list = S.requests.filter(r=>r.state==='approved' && (dev(r.device).holder===S.me || (isAdmin() && !dev(r.device).holder)));
+  const all  = S.requests.filter(r=>r.state==='approved');
+  return `<div class="pageHead"><h1>Handovers</h1><span class="sub">Physically hand the device over, then confirm here.</span></div>
+    <div class="card">${reqTable(list.length?list:all,{actions:r=>
+      `<button class="btn sm pri" onclick="actions.confirmHandover('${r.id}')">Confirm handover</button>`})}</div>
+    <p style="color:var(--muted);margin-top:10px">The assignment only changes after the current holder (or the lab desk) confirms — the system never pretends a phone moved when it didn’t.</p>`;
+}
+
+function repairsView(){
+  return `<div class="pageHead"><h1>Repairs</h1><span class="sub">reported → repair requested → in repair → fixed / written off</span></div>
+    <div class="card tableWrap"><table>
+      <tr><th>Device</th><th>Issue</th><th>Opened</th><th>By</th><th>State</th>${isAdmin()?'<th></th>':''}</tr>
+      ${S.repairs.map(r=>{const d=dev(r.device);return `<tr>
+        <td><b>${esc(d.brand)} ${esc(d.model)}</b></td><td>${esc(r.issue)}</td>
+        <td class="mono">${r.opened}</td><td>${esc(user(r.by).name)}</td><td>${chip(r.state)}</td>
+        ${isAdmin()?`<td style="white-space:nowrap">
+          ${!['fixed','written_off'].includes(r.state)?`<button class="btn sm" onclick="actions.advanceRepair('${r.id}')">Advance →</button>`:''}
+          ${r.state==='in_repair'?`<button class="btn sm danger" onclick="actions.writeOff('${r.id}')">Write off</button>`:''}</td>`:''}
+      </tr>`;}).join('')}
+    </table></div>`;
+}
+
+function importView(){
+  return `<div class="pageHead"><h1>Excel import</h1></div>
+    <div class="card" style="padding:22px;max-width:640px">
+      <p style="margin-top:0">Columns: <code>brand, model, os, os_version, specs, serial, imei, accessories</code>.
+        The file is checked first — nothing is saved until you confirm the report.</p>
+      <div style="border:2px dashed var(--line);border-radius:12px;padding:36px;text-align:center;color:var(--muted)">
+        Drop .xlsx here or <a href="#/import" onclick="event.preventDefault();actions.runImport()">browse…</a><br>
+        <small>(mockup: click to see the dry-run report for <span class="mono">devices_batch3.xlsx</span>)</small></div>
+      <div class="modalFoot"><button class="btn pri" onclick="actions.runImport()">Run dry-run check</button></div>
+    </div>`;
+}
+
+function usersView(){
+  return `<div class="pageHead"><h1>Users</h1><div class="spacer"></div>
+      <button class="btn pri" onclick="toast('New-user form (mockup) — LDAP sync replaces this later')">Add user</button></div>
+    <div class="card tableWrap"><table>
+      <tr><th>Name</th><th>Email</th><th>Role</th><th>Holds</th></tr>
+      ${S.users.map(u=>`<tr>
+        <td><span class="avatar">${initials(u.name)}</span><b>${esc(u.name)}</b></td>
+        <td class="mono">${esc(u.email)}</td>
+        <td><select onchange="toast('Role change is audited (mockup)')">
+          ${['owner','admin','requester'].map(r=>`<option ${u.role===r?'selected':''}>${roleName(r)}</option>`).join('')}</select></td>
+        <td>${S.devices.filter(d=>d.holder===u.id).length}</td></tr>`).join('')}
+    </table></div>`;
+}
+
+function projectsView(){
+  return `<div class="pageHead"><h1>Projects</h1><div class="spacer"></div>
+      <button class="btn pri" onclick="toast('New-project form (mockup)')">New project</button></div>
+    <div class="cards">${S.projects.map(p=>`<div class="card stat">
+      <div style="font-weight:700">${esc(p.name)}</div>
+      <div style="color:var(--muted);margin:4px 0 10px">${esc(p.desc)}</div>
+      <div class="l">${S.devices.filter(d=>d.project===p.id).length} devices attached</div></div>`).join('')}</div>`;
+}
+
+function settingsView(sub){
+  if(sub==='notifications') return `
+    <div class="pageHead"><h1>Notification settings</h1><span class="sub">Which channel fires for which event.</span></div>
+    <div class="card tableWrap"><table class="matrix">
+      <tr><th>Event</th><th>In-app</th><th>Email</th></tr>
+      ${S.rules.map(r=>`<tr><td>${esc(r.label)}</td>
+        <td><input type="checkbox" ${r.inapp?'checked':''} onchange="actions.toggleRule('${r.ev}','inapp')"></td>
+        <td><input type="checkbox" ${r.email?'checked':''} onchange="actions.toggleRule('${r.ev}','email')"></td></tr>`).join('')}
+    </table></div>
+    <p style="color:var(--muted);margin-top:10px">Email goes through corporate SMTP. Failed sends stay visible in an outbox with the error — they are never silently dropped.</p>`;
+  return `<div class="pageHead"><h1>Settings</h1></div>
+    <div class="card" style="padding:20px;max-width:640px">
+      <h2 style="font-size:15px;margin-bottom:6px">Approval policy</h2>
+      <p style="color:var(--muted);margin-top:0">A config switch, not code — flip it any time.</p>
+      <label style="display:block;margin-bottom:8px"><input type="radio" name="ap" ${S.settings.approvalMode==='all'?'checked':''}
+        onchange="actions.setApproval('all')"> <b>Every request needs approval</b> (current launch policy)</label>
+      <label style="display:block"><input type="radio" name="ap" ${S.settings.approvalMode==='busy_only'?'checked':''}
+        onchange="actions.setApproval('busy_only')"> <b>Free devices auto-approve</b> — approval only when the device is in someone’s hands</label>
+    </div>
+    <div class="card" style="padding:20px;max-width:640px;margin-top:14px">
+      <h2 style="font-size:15px;margin-bottom:6px">Notifications</h2>
+      <p style="color:var(--muted);margin:0">Per-event channel matrix → <a href="#/settings/notifications">configure</a></p>
+    </div>`;
+}
+
+function auditView(){
+  return `<div class="pageHead"><h1>Audit log</h1><span class="sub">Append-only. Every change: who, what, old → new.</span></div>
+    <div class="card tableWrap"><table>
+      <tr><th>When</th><th>Who</th><th>What</th><th>Old → New</th></tr>
+      ${S.audit.map(a=>`<tr><td class="mono">${a.t}</td><td>${esc(a.who)}</td><td>${esc(a.what)}</td>
+        <td class="mono">${esc(a.old)} → ${esc(a.nw)}</td></tr>`).join('')}
+    </table></div>`;
+}
+
+/* ================= router ================= */
+function render(){
+  const h = location.hash || '#/login';
+  if(!S.loggedIn && h!=='#/login'){ /* auto-login for direct links */ S.loggedIn = true; }
+  if(h==='#/login'){ $('#root').innerHTML = loginView(); return; }
+  const route = h.slice(2);
+  let inner;
+  if(route==='dashboard') inner = dashView();
+  else if(route==='devices') inner = devicesView();
+  else if(route.startsWith('devices/')) inner = deviceView(route.split('/')[1]);
+  else if(route==='requests') inner = requestsView();
+  else if(route==='approvals') inner = approvalsView();
+  else if(route==='handovers') inner = handoversView();
+  else if(route==='repairs') inner = repairsView();
+  else if(route==='import') inner = importView();
+  else if(route==='users') inner = usersView();
+  else if(route==='projects') inner = projectsView();
+  else if(route==='settings/notifications') inner = settingsView('notifications');
+  else if(route==='settings') inner = settingsView();
+  else if(route==='audit') inner = auditView();
+  else inner = dashView();
+  $('#root').innerHTML = shell(route, inner);
+}
+window.addEventListener('hashchange', ()=>{ S.tab='specs'; S.bellOpen=false; render(); });
+render();
+</script>
