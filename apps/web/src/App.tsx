@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toasts';
-import { AuthProvider } from './lib/auth';
+import { AuthProvider, useAuth, type Role } from './lib/auth';
 import Approvals from './pages/Approvals';
 import Audit from './pages/Audit';
 import Dashboard from './pages/Dashboard';
@@ -16,6 +16,14 @@ import Repairs from './pages/Repairs';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
+
+/** Blocks a route group by role. The API refuses anyway (403) — this keeps
+ * testers from ever landing on staff pages via a typed URL. */
+function RequireRole({ roles }: { roles: Role[] }) {
+  const { user } = useAuth();
+  if (user && !roles.includes(user.role)) return <Navigate to="/" replace />;
+  return <Outlet />;
+}
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -34,14 +42,18 @@ export default function App() {
               <Route path="/devices" element={<Devices />} />
               <Route path="/devices/:id" element={<DeviceDetail />} />
               <Route path="/requests" element={<Requests />} />
-              <Route path="/approvals" element={<Approvals />} />
               <Route path="/handovers" element={<Handovers />} />
               <Route path="/repairs" element={<Repairs />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/users" element={<Users />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/audit" element={<Audit />} />
+              <Route element={<RequireRole roles={['admin', 'manager']} />}>
+                <Route path="/approvals" element={<Approvals />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/projects" element={<Projects />} />
+                <Route path="/users" element={<Users />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+              <Route element={<RequireRole roles={['admin']} />}>
+                <Route path="/audit" element={<Audit />} />
+              </Route>
             </Route>
           </Routes>
         </BrowserRouter>

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -175,10 +176,12 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @Req() req: { user: AuthUser },
   ) {
-    // Deactivating or resetting passwords is the Admin's call alone.
+    // Deactivating or resetting passwords is the Admin's call alone —
+    // refuse loudly instead of silently dropping the fields.
     if ((dto.active !== undefined || dto.newPassword) && req.user.role !== 'admin') {
-      dto.active = undefined;
-      dto.newPassword = undefined;
+      throw new ForbiddenException(
+        'Only an Admin can deactivate users or reset passwords',
+      );
     }
     const user: User = await this.bus.execute(new UpdateUserCommand(actor(req), id, dto));
     return pub(user);
