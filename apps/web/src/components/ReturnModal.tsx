@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useToast } from './Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import type { RequestRow } from '../lib/requests';
@@ -11,6 +12,7 @@ export default function ReturnModal({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [damaged, setDamaged] = useState(false);
   const accessories = request.device.accessories ?? [];
@@ -24,6 +26,7 @@ export default function ReturnModal({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requests'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
+      toast(damaged ? 'Returned — sent to repairs' : 'Returned — device is available again');
       onClose();
     },
     onError: (e) => setError(e.message),

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import Chip from '../components/Chip';
 import { api } from '../lib/api';
@@ -16,16 +17,18 @@ interface RepairRow {
 export default function Repairs() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const rows = useQuery({ queryKey: ['repairs'], queryFn: () => api<RepairRow[]>('/repairs') });
 
   const act = useMutation({
     mutationFn: ({ id, verb }: { id: string; verb: 'advance' | 'write-off' }) =>
       api(`/repairs/${id}/${verb}`, { method: 'POST' }),
-    onSuccess: () => {
+    onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['repairs'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
       setError(null);
+      toast(v.verb === 'advance' ? 'Repair moved forward' : 'Device written off and retired');
     },
     onError: (e) => setError(e.message),
   });

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import RequestTable from '../components/RequestTable';
 import { api } from '../lib/api';
@@ -6,6 +7,7 @@ import type { RequestRow } from '../lib/requests';
 
 export default function Handovers() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const rows = useQuery({
     queryKey: ['requests', 'pending-handover'],
@@ -18,6 +20,7 @@ export default function Handovers() {
       qc.invalidateQueries({ queryKey: ['requests'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
       setError(null);
+      toast('Handover confirmed — device assigned');
     },
     onError: (e) => setError(e.message),
   });

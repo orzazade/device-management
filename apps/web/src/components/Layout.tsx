@@ -77,7 +77,6 @@ export default function Layout() {
                 Approvals
                 <Badge n={approvals.data?.length} />
               </NavLink>
-              <NavLink to="/import" className={linkCls}>Excel import</NavLink>
               <NavLink to="/projects" className={linkCls}>Projects</NavLink>
               <NavLink to="/users" className={linkCls}>Users</NavLink>
               <NavLink to="/reports" className={linkCls}>Idle devices</NavLink>

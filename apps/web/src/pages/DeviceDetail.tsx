@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Chip from '../components/Chip';
@@ -17,6 +18,7 @@ export default function DeviceDetail() {
     queryFn: () => api<DeviceRow>(`/devices/${id}`),
   });
   const qc = useQueryClient();
+  const toast = useToast();
   const [showDamage, setShowDamage] = useState(false);
   const [damageError, setDamageError] = useState<string | null>(null);
   const history = useQuery({
@@ -44,6 +46,7 @@ export default function DeviceDetail() {
       qc.invalidateQueries({ queryKey: ['device-repairs', id] });
       setShowDamage(false);
       setDamageError(null);
+      toast('Damage reported');
     },
     onError: (e) => setDamageError(e.message),
   });

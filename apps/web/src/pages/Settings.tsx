@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -13,6 +14,7 @@ interface Rule {
 export default function Settings() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
 
   const settings = useQuery({
@@ -27,14 +29,20 @@ export default function Settings() {
   const setMode = useMutation({
     mutationFn: (mode: string) =>
       api('/settings/approval-mode', { method: 'PATCH', body: { mode } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] });
+      toast('Approval policy saved');
+    },
     onError: (e) => setError(e.message),
   });
 
   const patchRule = useMutation({
     mutationFn: ({ event, field, value }: { event: string; field: string; value: boolean }) =>
       api(`/notification-rules/${event}`, { method: 'PATCH', body: { [field]: value } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notification-rules'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notification-rules'] });
+      toast('Notification rule saved');
+    },
     onError: (e) => setError(e.message),
   });
 

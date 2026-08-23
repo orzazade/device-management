@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Chip from '../components/Chip';
+import ImportModal from '../components/ImportModal';
 import RequestModal from '../components/RequestModal';
+import { useToast } from '../components/Toasts';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { DeviceRow, ProjectRow } from '../lib/types';
@@ -15,7 +17,9 @@ export default function Devices() {
   const [brand, setBrand] = useState('');
   const [os, setOs] = useState('');
   const [status, setStatus] = useState('');
+  const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [requestFor, setRequestFor] = useState<DeviceRow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,10 +40,11 @@ export default function Devices() {
 
   const create = useMutation({
     mutationFn: (body: Record<string, unknown>) => api('/devices', { method: 'POST', body }),
-    onSuccess: () => {
+    onSuccess: (_d, body) => {
       qc.invalidateQueries({ queryKey: ['devices'] });
       setShowCreate(false);
       setError(null);
+      toast(`Device "${body.brand} ${body.model}" added`);
     },
     onError: (e) => setError(e.message),
   });
@@ -56,12 +61,12 @@ export default function Devices() {
         <div className="flex-1" />
         {isStaff(user?.role) && (
           <>
-            <Link
-              to="/import"
+            <button
+              onClick={() => setShowImport(true)}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2 font-semibold"
             >
               Import Excel
-            </Link>
+            </button>
             <button
               onClick={() => setShowCreate(true)}
               className="rounded-lg bg-accent px-4 py-2 font-semibold text-white hover:brightness-110"
@@ -158,6 +163,7 @@ export default function Devices() {
       </div>
 
       {requestFor && <RequestModal device={requestFor} onClose={() => setRequestFor(null)} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
 
       {showCreate && (
         <div

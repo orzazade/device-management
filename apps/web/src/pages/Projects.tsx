@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import type { ProjectRow } from '../lib/types';
 
 export default function Projects() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api<ProjectRow[]>('/projects') });
@@ -16,6 +18,7 @@ export default function Projects() {
       qc.invalidateQueries({ queryKey: ['projects'] });
       setShow(false);
       setError(null);
+      toast('Project created');
     },
     onError: (e) => setError(e.message),
   });

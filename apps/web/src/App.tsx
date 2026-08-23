@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
+import { ToastProvider } from './components/Toasts';
 import { AuthProvider } from './lib/auth';
 import Approvals from './pages/Approvals';
 import Audit from './pages/Audit';
@@ -9,7 +10,6 @@ import Handovers from './pages/Handovers';
 import Requests from './pages/Requests';
 import DeviceDetail from './pages/DeviceDetail';
 import Devices from './pages/Devices';
-import Import from './pages/Import';
 import Login from './pages/Login';
 import Projects from './pages/Projects';
 import Repairs from './pages/Repairs';
@@ -24,6 +24,7 @@ const qc = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
+      <ToastProvider>
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -37,7 +38,6 @@ export default function App() {
               <Route path="/handovers" element={<Handovers />} />
               <Route path="/repairs" element={<Repairs />} />
               <Route path="/reports" element={<Reports />} />
-              <Route path="/import" element={<Import />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/users" element={<Users />} />
               <Route path="/settings" element={<Settings />} />
@@ -46,6 +46,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

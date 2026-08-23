@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import RequestTable from '../components/RequestTable';
@@ -8,6 +9,7 @@ import type { RequestRow } from '../lib/requests';
 
 export default function Requests() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [returnFor, setReturnFor] = useState<RequestRow | null>(null);
   const rows = useQuery({
@@ -17,7 +19,10 @@ export default function Requests() {
 
   const cancel = useMutation({
     mutationFn: (id: string) => api(`/requests/${id}/cancel`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['requests'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requests'] });
+      toast('Request cancelled');
+    },
     onError: (e) => setError(e.message),
   });
 

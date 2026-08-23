@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth, type Role } from '../lib/auth';
@@ -18,6 +19,7 @@ const roleLabel: Record<Role, string> = { admin: 'Admin', manager: 'Manager', te
 export default function Users() {
   const { user: me } = useAuth();
   const qc = useQueryClient();
+  const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +28,10 @@ export default function Users() {
   const changeRole = useMutation({
     mutationFn: ({ id, role }: { id: string; role: Role }) =>
       api(`/users/${id}/role`, { method: 'PATCH', body: { role } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      toast('Role updated');
+    },
     onError: (e) => setError(e.message),
   });
 
@@ -37,6 +42,7 @@ export default function Users() {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowCreate(false);
       setError(null);
+      toast('User created');
     },
     onError: (e) => setError(e.message),
   });

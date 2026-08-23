@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from './Toasts';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -21,6 +22,7 @@ export default function RequestModal({
 }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const toast = useToast();
   const nav = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange>({ from: null, to: null });
@@ -38,6 +40,7 @@ export default function RequestModal({
     mutationFn: (body: Record<string, unknown>) => api('/requests', { method: 'POST', body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requests'] });
+      toast('Request submitted — waiting for approval');
       onClose();
       nav('/requests');
     },

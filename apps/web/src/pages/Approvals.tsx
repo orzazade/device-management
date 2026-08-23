@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import RangeCalendar, { type BookingRange, type DateRange } from '../components/RangeCalendar';
 import RequestTable from '../components/RequestTable';
@@ -7,6 +8,7 @@ import type { RequestRow } from '../lib/requests';
 
 export default function Approvals() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [timeFor, setTimeFor] = useState<RequestRow | null>(null);
   const [overrideRange, setOverrideRange] = useState<DateRange>({ from: null, to: null });
@@ -27,9 +29,10 @@ export default function Approvals() {
   const act = useMutation({
     mutationFn: ({ id, verb }: { id: string; verb: 'approve' | 'reject' }) =>
       api(`/requests/${id}/${verb}`, { method: 'POST' }),
-    onSuccess: () => {
+    onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['requests'] });
       setError(null);
+      toast(v.verb === 'approve' ? 'Approved — handover pending' : 'Request rejected');
     },
     onError: (e) => setError(e.message),
   });
@@ -41,6 +44,7 @@ export default function Approvals() {
       qc.invalidateQueries({ queryKey: ['requests'] });
       setTimeFor(null);
       setError(null);
+      toast('Time range updated — audited');
     },
     onError: (e) => setError(e.message),
   });
