@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { DeviceRow, ProjectRow } from '../lib/types';
+import ConfirmModal from './ConfirmModal';
 import { useToast } from './Toasts';
 
 export default function DeviceEditModal({
@@ -13,7 +15,9 @@ export default function DeviceEditModal({
 }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const nav = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const projects = useQuery({
     queryKey: ['projects'],
     queryFn: () => api<ProjectRow[]>('/projects'),
@@ -30,6 +34,20 @@ export default function DeviceEditModal({
       onClose();
     },
     onError: (e) => setError(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: () => api(`/devices/${device.id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      toast('Device deleted — restorable from the Deleted view');
+      onClose();
+      nav('/devices');
+    },
+    onError: (e) => {
+      setConfirmDelete(false);
+      setError(e.message);
+    },
   });
 
   const field = (name: string, label: string, value: string, required = false) => (
@@ -103,7 +121,15 @@ export default function DeviceEditModal({
           {field('accessories', 'Accessories (comma-separated)', device.accessories.join(', '))}
         </div>
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="rounded-lg border border-red-200 px-4 py-2 font-semibold text-red-700 hover:bg-red-50"
+          >
+            Delete…
+          </button>
+          <div className="flex-1" />
           <button
             type="button"
             onClick={onClose}
@@ -118,6 +144,15 @@ export default function DeviceEditModal({
             Save changes
           </button>
         </div>
+        {confirmDelete && (
+          <ConfirmModal
+            title={`Delete ${device.brand} ${device.model}?`}
+            body="The device disappears from all lists but its history stays. A Manager or Admin can restore it from the Deleted view anytime."
+            busy={remove.isPending}
+            onConfirm={() => remove.mutate()}
+            onClose={() => setConfirmDelete(false)}
+          />
+        )}
       </form>
     </div>
   );

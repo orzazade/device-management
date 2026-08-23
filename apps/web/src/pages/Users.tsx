@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
+import ConfirmModal from '../components/ConfirmModal';
 import { useAuth, type Role } from '../lib/auth';
 
 interface UserRow {
@@ -22,9 +23,14 @@ export default function Users() {
   const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [editFor, setEditFor] = useState<UserRow | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<UserRow | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const users = useQuery({ queryKey: ['users'], queryFn: () => api<UserRow[]>('/users') });
+  const users = useQuery({
+    queryKey: ['users', showDeleted],
+    queryFn: () => api<UserRow[]>(showDeleted ? '/users?deleted=true' : '/users'),
+  });
 
   const changeRole = useMutation({
     mutationFn: ({ id, role }: { id: string; role: Role }) =>
@@ -32,6 +38,30 @@ export default function Users() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       toast('Role updated');
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/users/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setConfirmDelete(null);
+      setEditFor(null);
+      setError(null);
+      toast('User deleted — restorable from "Show deleted"');
+    },
+    onError: (e) => {
+      setConfirmDelete(null);
+      setError(e.message);
+    },
+  });
+
+  const restore = useMutation({
+    mutationFn: (id: string) => api(`/users/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      toast('User restored');
     },
     onError: (e) => setError(e.message),
   });
@@ -65,6 +95,14 @@ export default function Users() {
       <div className="mb-4 flex items-center gap-3">
         <h1 className="text-xl font-bold">Users</h1>
         <div className="flex-1" />
+        <label className="flex items-center gap-1.5 text-neutral-500">
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={(e) => setShowDeleted(e.target.checked)}
+          />
+          Show deleted
+        </label>
         <button
           onClick={() => setShowCreate(true)}
           className="rounded-lg bg-accent px-4 py-2 font-semibold text-white hover:brightness-110"
@@ -122,12 +160,23 @@ export default function Users() {
                   )}
                 </td>
                 <td className="px-4 py-2.5">
-                  <button
-                    onClick={() => setEditFor(u)}
-                    className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
-                  >
-                    Edit
-                  </button>
+                  {showDeleted ? (
+                    me?.role === 'admin' && (
+                      <button
+                        onClick={() => restore.mutate(u.id)}
+                        className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
+                      >
+                        Restore
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      onClick={() => setEditFor(u)}
+                      className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
+                    >
+                      Edit
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -203,7 +252,17 @@ export default function Users() {
                 )}
               </>
             )}
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex items-center gap-2">
+              {me?.role === 'admin' && editFor.id !== me.id && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(editFor)}
+                  className="rounded-lg border border-red-200 px-4 py-2 font-semibold text-red-700 hover:bg-red-50"
+                >
+                  Delete…
+                </button>
+              )}
+              <div className="flex-1" />
               <button
                 type="button"
                 onClick={() => setEditFor(null)}
@@ -220,6 +279,16 @@ export default function Users() {
             </div>
           </form>
         </div>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete ${confirmDelete.name}?`}
+          body="They disappear from lists and cannot sign in. History stays, and an Admin can restore them anytime."
+          busy={remove.isPending}
+          onConfirm={() => remove.mutate(confirmDelete.id)}
+          onClose={() => setConfirmDelete(null)}
+        />
       )}
 
       {showCreate && (

@@ -20,7 +20,7 @@ export class ReportsController {
              GREATEST(d.created_at, COALESCE(MAX(r.created_at), d.created_at)) AS last_activity
       FROM devices d
       LEFT JOIN requests r ON r.device_id = d.id
-      WHERE d.status != 'retired'
+      WHERE d.status != 'retired' AND d.deleted_at IS NULL
       GROUP BY d.id
       HAVING GREATEST(d.created_at, COALESCE(MAX(r.created_at), d.created_at))
              < now() - ($1 || ' days')::interval

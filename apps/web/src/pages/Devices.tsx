@@ -41,6 +41,15 @@ export default function Devices() {
   const brands = useMemo(() => [...new Set(all.data?.map((d) => d.brand) ?? [])].sort(), [all.data]);
   const oses = useMemo(() => [...new Set(all.data?.map((d) => d.os) ?? [])].sort(), [all.data]);
 
+  const restore = useMutation({
+    mutationFn: (id: string) => api(`/devices/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      toast('Device restored');
+    },
+    onError: (e) => setError(e.message),
+  });
+
   const create = useMutation({
     mutationFn: (body: Record<string, unknown>) => api('/devices', { method: 'POST', body }),
     onSuccess: (_d, body) => {
@@ -106,6 +115,7 @@ export default function Devices() {
           <option value="assigned">Assigned</option>
           <option value="in_repair">In repair</option>
           <option value="retired">Retired</option>
+          {isStaff(user?.role) && <option value="deleted">Deleted 🗑</option>}
         </select>
       </div>
 
@@ -127,8 +137,10 @@ export default function Devices() {
             {devices.data?.map((d) => (
               <tr
                 key={d.id}
-                onClick={() => nav(`/devices/${d.id}`)}
-                className="cursor-pointer border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                onClick={() => status !== 'deleted' && nav(`/devices/${d.id}`)}
+                className={`border-b border-neutral-100 last:border-0 ${
+                  status === 'deleted' ? 'opacity-60' : 'cursor-pointer hover:bg-neutral-50'
+                }`}
               >
                 <td className="px-4 py-2.5">
                   <b>
@@ -146,13 +158,22 @@ export default function Devices() {
                 <td className="px-4 py-2.5">{d.holder?.name ?? '—'}</td>
                 <td className="px-4 py-2.5">{d.project?.name ?? '—'}</td>
                 <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                  {(d.status === 'available' || d.status === 'assigned') && (
+                  {status === 'deleted' ? (
                     <button
-                      onClick={() => setRequestFor(d)}
-                      className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white"
+                      onClick={() => restore.mutate(d.id)}
+                      className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
                     >
-                      Request
+                      Restore
                     </button>
+                  ) : (
+                    (d.status === 'available' || d.status === 'assigned') && (
+                      <button
+                        onClick={() => setRequestFor(d)}
+                        className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white"
+                      >
+                        Request
+                      </button>
+                    )
                   )}
                 </td>
               </tr>

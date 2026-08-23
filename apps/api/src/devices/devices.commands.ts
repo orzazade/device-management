@@ -29,8 +29,17 @@ export class CreateDeviceHandler implements ICommandHandler<CreateDeviceCommand>
 
   async execute({ actor, data }: CreateDeviceCommand): Promise<Device> {
     return this.db.withTransaction(async (ctx) => {
-      const dup = await ctx.devices.findOne({ where: { serial: data.serial } });
-      if (dup) throw new ConflictException(`Serial ${data.serial} already exists`);
+      const dup = await ctx.devices.findOne({
+        where: { serial: data.serial },
+        withDeleted: true,
+      });
+      if (dup) {
+        throw new ConflictException(
+          dup.deletedAt
+            ? `Serial ${data.serial} belongs to a deleted device — restore it instead`
+            : `Serial ${data.serial} already exists`,
+        );
+      }
       const device = await ctx.devices.save({
         ...data,
         osVersion: data.osVersion ?? '',

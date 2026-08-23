@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -10,6 +12,8 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { In } from 'typeorm';
+import { writeAudit } from '../audit/audit';
 import { CommandBus } from '@nestjs/cqrs';
 import {
   IsArray,
@@ -109,6 +113,7 @@ export class DevicesController {
 
   @Get()
   async list(
+    @Req() req: { user: AuthUser },
     @Query('q') q?: string,
     @Query('brand') brand?: string,
     @Query('os') os?: string,
@@ -117,10 +122,18 @@ export class DevicesController {
     const qb = this.db
       .devices()
       .createQueryBuilder('d')
+      .withDeleted()
       .leftJoinAndSelect('d.holder', 'holder')
       .leftJoinAndSelect('d.project', 'project')
       .orderBy('d.brand')
       .addOrderBy('d.model');
+    const staffUser = req.user.role === 'admin' || req.user.role === 'manager';
+    if (status === 'deleted' && staffUser) {
+      qb.andWhere('d.deletedAt IS NOT NULL');
+    } else {
+      qb.andWhere('d.deletedAt IS NULL');
+      if (status) qb.andWhere('d.status = :status', { status });
+    }
     if (q) {
       qb.andWhere(
         '(d.brand ILIKE :q OR d.model ILIKE :q OR d.os ILIKE :q OR d.serial ILIKE :q OR holder.name ILIKE :q)',
@@ -129,8 +142,52 @@ export class DevicesController {
     }
     if (brand) qb.andWhere('d.brand = :brand', { brand });
     if (os) qb.andWhere('d.os = :os', { os });
-    if (status) qb.andWhere('d.status = :status', { status });
     return (await qb.getMany()).map(pub);
+  }
+
+  @Delete(':id')
+  @Roles('admin', 'manager')
+  async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const device = await ctx.devices.findOne({ where: { id } });
+      if (!device) throw new NotFoundException('Device not found');
+      if (device.holderId) {
+        throw new ConflictException('Device is in someone’s hands — take it back first');
+      }
+      const open = await ctx.requests.count({
+        where: { deviceId: id, state: In(['pending', 'approved', 'active', 'overdue']) },
+      });
+      if (open > 0) {
+        throw new ConflictException(
+          `Device has ${open} open request(s) — resolve them first`,
+        );
+      }
+      await ctx.devices.softDelete(id);
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'device',
+        entityId: id,
+        action: 'deleted',
+        oldValue: { device: `${device.brand} ${device.model}`, serial: device.serial },
+      });
+      return { ok: true };
+    });
+  }
+
+  @Post(':id/restore')
+  @Roles('admin', 'manager')
+  async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const device = await ctx.devices.findOne({ where: { id }, withDeleted: true });
+      if (!device || !device.deletedAt) throw new NotFoundException('No deleted device with this id');
+      await ctx.devices.restore(id);
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'device',
+        entityId: id,
+        action: 'restored',
+        newValue: { device: `${device.brand} ${device.model}`, serial: device.serial },
+      });
+      return { ok: true };
+    });
   }
 
   @Get(':id')

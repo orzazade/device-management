@@ -1,5 +1,19 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
+import { In } from 'typeorm';
+import { writeAudit } from '../audit/audit';
 import {
   IsBoolean,
   IsEmail,
@@ -78,9 +92,73 @@ export class UsersController {
 
   @Get()
   @Roles('admin', 'manager')
-  async list() {
+  async list(@Query('deleted') deleted?: string) {
+    if (deleted === 'true') {
+      const gone = await this.db
+        .users()
+        .createQueryBuilder('u')
+        .withDeleted()
+        .where('u.deletedAt IS NOT NULL')
+        .orderBy('u.name')
+        .getMany();
+      return gone.map(pub);
+    }
     const users = await this.db.users().find({ order: { createdAt: 'ASC' } });
     return users.map(pub);
+  }
+
+  @Delete(':id')
+  @Roles('admin')
+  async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      if (id === req.user.sub) throw new ConflictException('You cannot delete yourself');
+      const user = await ctx.users.findOne({ where: { id } });
+      if (!user) throw new NotFoundException('User not found');
+      if (user.role === 'admin') {
+        const admins = await ctx.users.count({ where: { role: 'admin', active: true } });
+        if (admins <= 1) throw new ConflictException('Cannot delete the last Admin');
+      }
+      const holds = await ctx.devices.count({ where: { holderId: id } });
+      if (holds > 0) {
+        throw new ConflictException(`User still holds ${holds} device(s) — take them back first`);
+      }
+      const open = await ctx.requests.count({
+        where: { requesterId: id, state: In(['pending', 'approved', 'active', 'overdue']) },
+      });
+      if (open > 0) {
+        throw new ConflictException(`User has ${open} open request(s) — resolve them first`);
+      }
+      user.active = false;
+      await ctx.users.save(user);
+      await ctx.users.softDelete(id);
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'user',
+        entityId: id,
+        action: 'deleted',
+        oldValue: { name: user.name, email: user.email },
+      });
+      return { ok: true };
+    });
+  }
+
+  @Post(':id/restore')
+  @Roles('admin')
+  async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const user = await ctx.users.findOne({ where: { id }, withDeleted: true });
+      if (!user || !user.deletedAt) throw new NotFoundException('No deleted user with this id');
+      await ctx.users.restore(id);
+      user.deletedAt = null;
+      user.active = true;
+      await ctx.users.save(user);
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'user',
+        entityId: id,
+        action: 'restored',
+        newValue: { name: user.name, email: user.email },
+      });
+      return { ok: true };
+    });
   }
 
   @Post()

@@ -47,7 +47,9 @@ export class ImportService {
     const projects = await this.db.projects().find();
     const projectByName = new Map(projects.map((p) => [p.name.toLowerCase(), p.id]));
     const existingSerials = new Set(
-      (await this.db.devices().find({ select: { serial: true } })).map((d) => d.serial),
+      (
+        await this.db.devices().find({ select: { serial: true }, withDeleted: true })
+      ).map((d) => d.serial),
     );
 
     const cellStr = (row: ExcelJS.Row, name: string): string => {

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
+import ConfirmModal from '../components/ConfirmModal';
 import type { ProjectRow } from '../lib/types';
 
 export default function Projects() {
@@ -9,8 +10,13 @@ export default function Projects() {
   const toast = useToast();
   const [show, setShow] = useState(false);
   const [editFor, setEditFor] = useState<ProjectRow | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<ProjectRow | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const projects = useQuery({ queryKey: ['projects'], queryFn: () => api<ProjectRow[]>('/projects') });
+  const projects = useQuery({
+    queryKey: ['projects', showDeleted],
+    queryFn: () => api<ProjectRow[]>(showDeleted ? '/projects?deleted=true' : '/projects'),
+  });
 
   const create = useMutation({
     mutationFn: (body: { name: string; description: string }) =>
@@ -20,6 +26,30 @@ export default function Projects() {
       setShow(false);
       setError(null);
       toast('Project created');
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/projects/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      setConfirmDelete(null);
+      setEditFor(null);
+      toast('Project deleted — its devices lost the tag');
+    },
+    onError: (e) => {
+      setConfirmDelete(null);
+      setError(e.message);
+    },
+  });
+
+  const restoreProject = useMutation({
+    mutationFn: (id: string) => api(`/projects/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast('Project restored');
     },
     onError: (e) => setError(e.message),
   });
@@ -41,6 +71,14 @@ export default function Projects() {
       <div className="mb-4 flex items-center gap-3">
         <h1 className="text-xl font-bold">Projects</h1>
         <div className="flex-1" />
+        <label className="flex items-center gap-1.5 text-neutral-500">
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={(e) => setShowDeleted(e.target.checked)}
+          />
+          Show deleted
+        </label>
         <button
           onClick={() => setShow(true)}
           className="rounded-lg bg-accent px-4 py-2 font-semibold text-white hover:brightness-110"
@@ -54,12 +92,21 @@ export default function Projects() {
           <div key={p.id} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
               <div className="font-bold">{p.name}</div>
-              <button
-                onClick={() => setEditFor(p)}
-                className="rounded-lg border border-neutral-200 px-2.5 py-0.5 text-xs font-semibold text-neutral-600 hover:border-accent hover:text-accent"
-              >
-                Edit
-              </button>
+              {showDeleted ? (
+                <button
+                  onClick={() => restoreProject.mutate(p.id)}
+                  className="rounded-lg border border-neutral-200 px-2.5 py-0.5 text-xs font-semibold text-neutral-600 hover:border-accent hover:text-accent"
+                >
+                  Restore
+                </button>
+              ) : (
+                <button
+                  onClick={() => setEditFor(p)}
+                  className="rounded-lg border border-neutral-200 px-2.5 py-0.5 text-xs font-semibold text-neutral-600 hover:border-accent hover:text-accent"
+                >
+                  Edit
+                </button>
+              )}
             </div>
             <div className="mb-3 mt-1 text-neutral-500">{p.description || '—'}</div>
             <div className="text-neutral-500">{p.deviceCount} devices attached</div>
@@ -106,7 +153,15 @@ export default function Projects() {
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2"
               />
             </label>
-            <div className="flex justify-end gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(editFor)}
+                className="rounded-lg border border-red-200 px-4 py-2 font-semibold text-red-700 hover:bg-red-50"
+              >
+                Delete…
+              </button>
+              <div className="flex-1" />
               <button
                 type="button"
                 onClick={() => setEditFor(null)}
@@ -123,6 +178,16 @@ export default function Projects() {
             </div>
           </form>
         </div>
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete project "${confirmDelete.name}"?`}
+          body={`${confirmDelete.deviceCount} attached device(s) keep living — they just lose the project tag. Restorable from "Show deleted".`}
+          busy={remove.isPending}
+          onConfirm={() => remove.mutate(confirmDelete.id)}
+          onClose={() => setConfirmDelete(null)}
+        />
       )}
 
       {show && (

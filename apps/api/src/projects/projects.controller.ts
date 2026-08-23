@@ -2,11 +2,13 @@ import {
   Body,
   Controller,
   ConflictException,
+  Delete,
   Get,
   NotFoundException,
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { IsOptional, IsString, MinLength } from 'class-validator';
@@ -29,7 +31,17 @@ export class ProjectsController {
   constructor(private readonly db: AppDbContext) {}
 
   @Get()
-  async list() {
+  async list(@Req() req: { user: AuthUser }, @Query('deleted') deleted?: string) {
+    if (deleted === 'true' && ['admin', 'manager'].includes(req.user.role)) {
+      const gone = await this.db
+        .projects()
+        .createQueryBuilder('p')
+        .withDeleted()
+        .where('p.deletedAt IS NOT NULL')
+        .orderBy('p.name')
+        .getMany();
+      return gone.map((p) => ({ ...p, deviceCount: 0 }));
+    }
     const projects = await this.db.projects().find({ order: { name: 'ASC' } });
     const counts = await this.db
       .devices()
@@ -41,6 +53,47 @@ export class ProjectsController {
       .getRawMany<{ projectId: string; n: string }>();
     const byId = new Map(counts.map((c) => [c.projectId, parseInt(c.n, 10)]));
     return projects.map((p) => ({ ...p, deviceCount: byId.get(p.id) ?? 0 }));
+  }
+
+  @Delete(':id')
+  @Roles('admin', 'manager')
+  async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const project = await ctx.projects.findOne({ where: { id } });
+      if (!project) throw new NotFoundException('Project not found');
+      // Devices keep living — they just lose the project tag.
+      const detached = await ctx.devices
+        .createQueryBuilder()
+        .update()
+        .set({ projectId: null })
+        .where('project_id = :id', { id })
+        .execute();
+      await ctx.projects.softDelete(id);
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'project',
+        entityId: id,
+        action: 'deleted',
+        oldValue: { name: project.name, devicesDetached: detached.affected ?? 0 },
+      });
+      return { ok: true };
+    });
+  }
+
+  @Post(':id/restore')
+  @Roles('admin', 'manager')
+  async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const project = await ctx.projects.findOne({ where: { id }, withDeleted: true });
+      if (!project || !project.deletedAt) throw new NotFoundException('No deleted project with this id');
+      await ctx.projects.restore(id);
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'project',
+        entityId: id,
+        action: 'restored',
+        newValue: { name: project.name },
+      });
+      return { ok: true };
+    });
   }
 
   @Patch(':id')
