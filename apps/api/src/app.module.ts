@@ -17,6 +17,14 @@ import { CreateDeviceHandler, UpdateDeviceHandler } from './devices/devices.comm
 import { DevicesController } from './devices/devices.controller';
 import { ImportService } from './devices/import.service';
 import { ProjectsController } from './projects/projects.controller';
+import {
+  CancelRequestHandler,
+  ConfirmHandoverHandler,
+  CreateRequestHandler,
+  DecideRequestHandler,
+  OverrideTimeHandler,
+} from './requests/requests.commands';
+import { RequestsController } from './requests/requests.controller';
 import { ChangeUserRoleHandler, CreateUserHandler } from './users/users.commands';
 import { UsersController } from './users/users.controller';
 
@@ -37,6 +45,7 @@ import { UsersController } from './users/users.controller';
     AuditController,
     DevicesController,
     ProjectsController,
+    RequestsController,
   ],
   providers: [
     AppDbContext,
@@ -48,6 +57,11 @@ import { UsersController } from './users/users.controller';
     CreateDeviceHandler,
     UpdateDeviceHandler,
     ImportService,
+    CreateRequestHandler,
+    DecideRequestHandler,
+    OverrideTimeHandler,
+    ConfirmHandoverHandler,
+    CancelRequestHandler,
   ],
 })
 export class AppModule {}
