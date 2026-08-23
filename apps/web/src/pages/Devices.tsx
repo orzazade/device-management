@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Chip from '../components/Chip';
 import ImportModal from '../components/ImportModal';
 import RequestModal from '../components/RequestModal';
@@ -13,7 +13,10 @@ export default function Devices() {
   const { user } = useAuth();
   const nav = useNavigate();
   const qc = useQueryClient();
-  const [q, setQ] = useState('');
+  const [urlParams] = useSearchParams();
+  const [q, setQ] = useState(urlParams.get('q') ?? '');
+  // The header's global search lands here as ?q=… — keep the box in sync.
+  useEffect(() => setQ(urlParams.get('q') ?? ''), [urlParams]);
   const [brand, setBrand] = useState('');
   const [os, setOs] = useState('');
   const [status, setStatus] = useState('');
