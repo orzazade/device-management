@@ -4,6 +4,11 @@ import { AppSetting } from '../entities/app-setting.entity';
 import { AuditLog } from '../entities/audit-log.entity';
 import { Device } from '../entities/device.entity';
 import { DeviceRequest } from '../entities/device-request.entity';
+import {
+  EmailOutbox,
+  Notification,
+  NotificationRule,
+} from '../entities/notification.entity';
 import { Project } from '../entities/project.entity';
 import { User } from '../entities/user.entity';
 
@@ -45,6 +50,18 @@ export class AppDbContext {
 
   requests(manager?: EntityManager): Repository<DeviceRequest> {
     return this.m(manager).getRepository(DeviceRequest);
+  }
+
+  notifications(manager?: EntityManager): Repository<Notification> {
+    return this.m(manager).getRepository(Notification);
+  }
+
+  notificationRules(manager?: EntityManager): Repository<NotificationRule> {
+    return this.m(manager).getRepository(NotificationRule);
+  }
+
+  emailOutbox(manager?: EntityManager): Repository<EmailOutbox> {
+    return this.m(manager).getRepository(EmailOutbox);
   }
 
   withTransaction<T>(fn: (ctx: TransactionalContext) => Promise<T>): Promise<T> {

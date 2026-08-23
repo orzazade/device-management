@@ -12,6 +12,7 @@ import Devices from './pages/Devices';
 import Import from './pages/Import';
 import Login from './pages/Login';
 import Projects from './pages/Projects';
+import Settings from './pages/Settings';
 import Users from './pages/Users';
 
 const qc = new QueryClient({
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/import" element={<Import />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/audit" element={<Audit />} />
             </Route>
           </Routes>

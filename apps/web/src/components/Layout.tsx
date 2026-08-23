@@ -3,6 +3,7 @@ import { NavLink, Navigate, Outlet } from 'react-router-dom';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
+import Bell from './Bell';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100 ${
@@ -78,6 +79,7 @@ export default function Layout() {
               <NavLink to="/import" className={linkCls}>Excel import</NavLink>
               <NavLink to="/projects" className={linkCls}>Projects</NavLink>
               <NavLink to="/users" className={linkCls}>Users</NavLink>
+              <NavLink to="/settings" className={linkCls}>Settings</NavLink>
             </>
           )}
           {user.role === 'admin' && (
@@ -99,6 +101,9 @@ export default function Layout() {
       </aside>
       <main className="min-w-0 flex-1">
         <div className="mx-auto w-full max-w-5xl p-6">
+          <div className="mb-2 flex justify-end">
+            <Bell />
+          </div>
           <Outlet />
         </div>
       </main>

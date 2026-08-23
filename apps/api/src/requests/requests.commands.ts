@@ -8,6 +8,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Actor, writeAudit } from '../audit/audit';
 import { AppDbContext, TransactionalContext } from '../db/app-db-context';
 import { DeviceRequest } from '../entities/device-request.entity';
+import { notify, staffIds } from '../notifications/notify';
 import { transition } from './request-machine';
 
 const EXCLUSION_VIOLATION = '23P01';
@@ -78,6 +79,16 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         },
       });
 
+      const requesterName =
+        (await ctx.users.findOne({ where: { id: data.requesterId } }))?.name ?? 'someone';
+      await notify(
+        ctx.manager,
+        'request_created',
+        await staffIds(ctx.manager),
+        `${requesterName} requested ${device.brand} ${device.model} (${data.fromDate} – ${data.toDate})`,
+        { requestId: request.id },
+      );
+
       // Config flag (GOALS.md): 'all' = everything needs approval (launch),
       // 'busy_only' = a free device auto-approves.
       const mode = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
@@ -132,6 +143,26 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
         oldValue: { state: old },
         newValue: { state: decision },
       });
+
+      const device = request.device;
+      const name = `${device.brand} ${device.model}`;
+      if (decision === 'approved') {
+        await notify(ctx.manager, 'request_approved', [request.requesterId],
+          `Your request for ${name} was approved (${request.fromDate} – ${request.toDate})`,
+          { requestId: request.id });
+        if (device.holderId) {
+          await notify(ctx.manager, 'handover_pending', [device.holderId],
+            `Handover needed: give ${name} to ${request.requester?.name ?? 'the requester'}`,
+            { requestId: request.id });
+        } else {
+          await notify(ctx.manager, 'handover_pending', await staffIds(ctx.manager),
+            `Hand ${name} from the lab desk to ${request.requester?.name ?? 'the requester'}`,
+            { requestId: request.id });
+        }
+      } else {
+        await notify(ctx.manager, 'request_rejected', [request.requesterId],
+          `Your request for ${name} was rejected`, { requestId: request.id });
+      }
       return request;
     });
   }
@@ -243,6 +274,9 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
         oldValue: { state: old, holderId: previousHolder },
         newValue: { state: 'active', holderId: request.requesterId },
       });
+      await notify(ctx.manager, 'request_approved', [request.requesterId],
+        `${device.brand} ${device.model} is now assigned to you — return by ${request.toDate}`,
+        { requestId: request.id });
       return request;
     });
   }
@@ -305,6 +339,11 @@ export class ReturnRequestHandler implements ICommandHandler<ReturnRequestComman
           action: 'accessories_missing_at_return',
           newValue: { missing: data.missingAccessories },
         });
+      }
+      if (data.damaged) {
+        await notify(ctx.manager, 'repair_update', await staffIds(ctx.manager),
+          `${device.brand} ${device.model} came back damaged: ${device.damageNote}`,
+          { deviceId: device.id });
       }
       return request;
     });

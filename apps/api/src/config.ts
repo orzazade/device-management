@@ -9,6 +9,9 @@ export const config = {
   env: process.env.NODE_ENV ?? 'development',
   jwtSecret: process.env.JWT_SECRET ?? 'dev-only-secret-change-in-prod',
   jwtTtl: process.env.JWT_TTL ?? '12h',
+  // e.g. smtp://user:pass@mail.corp.local:587 — unset means emails wait in the outbox
+  smtpUrl: process.env.SMTP_URL ?? '',
+  smtpFrom: process.env.SMTP_FROM ?? 'DeviceDesk <devicedesk@localhost>',
 };
 
 // Loud failure: a production boot with the dev JWT secret is a security hole.

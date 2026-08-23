@@ -17,6 +17,7 @@ import { CreateDeviceHandler, UpdateDeviceHandler } from './devices/devices.comm
 import { DevicesController } from './devices/devices.controller';
 import { ImportService } from './devices/import.service';
 import { JobsService } from './jobs/jobs.service';
+import { NotificationsController } from './notifications/notifications.controller';
 import { ProjectsController } from './projects/projects.controller';
 import {
   CancelRequestHandler,
@@ -48,6 +49,7 @@ import { UsersController } from './users/users.controller';
     DevicesController,
     ProjectsController,
     RequestsController,
+    NotificationsController,
   ],
   providers: [
     AppDbContext,
