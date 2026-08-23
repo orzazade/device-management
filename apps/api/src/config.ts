@@ -7,4 +7,11 @@ export const config = {
     'postgres://devmgmt:devmgmt@localhost:5433/devmgmt',
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6380',
   env: process.env.NODE_ENV ?? 'development',
+  jwtSecret: process.env.JWT_SECRET ?? 'dev-only-secret-change-in-prod',
+  jwtTtl: process.env.JWT_TTL ?? '12h',
 };
+
+// Loud failure: a production boot with the dev JWT secret is a security hole.
+if (config.env === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in production');
+}

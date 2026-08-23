@@ -1,10 +1,12 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
 import type Redis from 'ioredis';
+import { Public } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { REDIS } from '../redis';
 
 type Probe = 'up' | 'down';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(

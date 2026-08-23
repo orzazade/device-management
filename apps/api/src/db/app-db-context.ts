@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AppSetting } from '../entities/app-setting.entity';
+import { AuditLog } from '../entities/audit-log.entity';
+import { User } from '../entities/user.entity';
 
 /**
  * EF Core–style DbContext: one injectable that owns every repository.
@@ -22,6 +24,14 @@ export class AppDbContext {
     return this.m(manager).getRepository(AppSetting);
   }
 
+  users(manager?: EntityManager): Repository<User> {
+    return this.m(manager).getRepository(User);
+  }
+
+  auditLogs(manager?: EntityManager): Repository<AuditLog> {
+    return this.m(manager).getRepository(AuditLog);
+  }
+
   withTransaction<T>(fn: (ctx: TransactionalContext) => Promise<T>): Promise<T> {
     return this.dataSource.transaction(async (manager) => {
       return fn(new TransactionalContext(manager));
@@ -39,5 +49,13 @@ export class TransactionalContext {
 
   get settings(): Repository<AppSetting> {
     return this.manager.getRepository(AppSetting);
+  }
+
+  get users(): Repository<User> {
+    return this.manager.getRepository(User);
+  }
+
+  get auditLogs(): Repository<AuditLog> {
+    return this.manager.getRepository(AuditLog);
   }
 }

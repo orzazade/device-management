@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';
@@ -10,6 +11,9 @@ async function bootstrap() {
     new FastifyAdapter(),
   );
   app.setGlobalPrefix('api/v1');
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, transform: true }),
+  );
   await app.listen(config.port, '0.0.0.0');
   console.log(`api listening on :${config.port} (${config.env})`);
 }
