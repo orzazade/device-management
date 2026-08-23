@@ -2,12 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import ChangeDiff from '../components/ChangeDiff';
 import Chip from '../components/Chip';
 import RequestModal from '../components/RequestModal';
 import { api } from '../lib/api';
 import type { AuditRow, DeviceRow } from '../lib/types';
-
-const short = (v: unknown) => (v == null ? '—' : JSON.stringify(v));
 
 export default function DeviceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -139,7 +138,7 @@ export default function DeviceDetail() {
                     <th className="px-4 py-2.5">When</th>
                     <th className="px-4 py-2.5">Who</th>
                     <th className="px-4 py-2.5">Action</th>
-                    <th className="px-4 py-2.5">Old → New</th>
+                    <th className="px-4 py-2.5">Change</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -149,9 +148,9 @@ export default function DeviceDetail() {
                         {new Date(a.createdAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-2.5">{a.actorName}</td>
-                      <td className="px-4 py-2.5">{a.action}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs">
-                        {short(a.oldValue)} → {short(a.newValue)}
+                      <td className="px-4 py-2.5">{a.action.replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-2.5">
+                        <ChangeDiff oldValue={a.oldValue} newValue={a.newValue} />
                       </td>
                     </tr>
                   ))}

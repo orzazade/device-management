@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import ChangeDiff from '../components/ChangeDiff';
 import { api } from '../lib/api';
 
 interface AuditRow {
@@ -11,8 +12,6 @@ interface AuditRow {
   newValue: unknown;
   createdAt: string;
 }
-
-const short = (v: unknown) => (v == null ? '—' : JSON.stringify(v));
 
 export default function Audit() {
   const rows = useQuery({ queryKey: ['audit'], queryFn: () => api<AuditRow[]>('/audit') });
@@ -29,7 +28,7 @@ export default function Audit() {
               <th className="px-4 py-2.5">When</th>
               <th className="px-4 py-2.5">Who</th>
               <th className="px-4 py-2.5">What</th>
-              <th className="px-4 py-2.5">Old → New</th>
+              <th className="px-4 py-2.5">Change</th>
             </tr>
           </thead>
           <tbody>
@@ -40,11 +39,11 @@ export default function Audit() {
                 </td>
                 <td className="px-4 py-2.5">{r.actorName}</td>
                 <td className="px-4 py-2.5">
-                  {r.entityType} <span className="font-mono text-xs">{r.entityId.slice(0, 8)}</span>{' '}
-                  → {r.action}
+                  <span className="capitalize">{r.entityType.replace(/_/g, ' ')}</span>{' '}
+                  <span className="font-semibold">{r.action.replace(/_/g, ' ')}</span>
                 </td>
-                <td className="px-4 py-2.5 font-mono text-xs">
-                  {short(r.oldValue)} → {short(r.newValue)}
+                <td className="px-4 py-2.5">
+                  <ChangeDiff oldValue={r.oldValue} newValue={r.newValue} />
                 </td>
               </tr>
             ))}

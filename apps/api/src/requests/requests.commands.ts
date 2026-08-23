@@ -68,19 +68,18 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         toDate: data.toDate,
         state: 'pending',
       });
+      const requesterName =
+        (await ctx.users.findOne({ where: { id: data.requesterId } }))?.name ?? 'someone';
       await writeAudit(ctx.manager, actor, {
         entityType: 'request',
         entityId: request.id,
         action: 'created',
         newValue: {
           device: `${device.brand} ${device.model}`,
-          requesterId: data.requesterId,
+          requester: requesterName,
           range: `${data.fromDate} – ${data.toDate}`,
         },
       });
-
-      const requesterName =
-        (await ctx.users.findOne({ where: { id: data.requesterId } }))?.name ?? 'someone';
       await notify(
         ctx.manager,
         'request_created',
