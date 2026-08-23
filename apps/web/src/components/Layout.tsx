@@ -53,7 +53,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-54 shrink-0 flex-col border-r border-neutral-200 bg-white">
+      <aside className="sticky top-0 flex h-screen w-54 shrink-0 flex-col border-r border-neutral-200 bg-white max-md:hidden">
         <div className="border-b border-neutral-200 px-4 py-4">
           <b className="text-base">DeviceDesk</b>
           <small className="block text-[10.5px] uppercase tracking-wider text-neutral-500">
@@ -80,6 +80,7 @@ export default function Layout() {
               <NavLink to="/import" className={linkCls}>Excel import</NavLink>
               <NavLink to="/projects" className={linkCls}>Projects</NavLink>
               <NavLink to="/users" className={linkCls}>Users</NavLink>
+              <NavLink to="/reports" className={linkCls}>Idle devices</NavLink>
               <NavLink to="/settings" className={linkCls}>Settings</NavLink>
             </>
           )}

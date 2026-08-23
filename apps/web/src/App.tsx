@@ -13,6 +13,7 @@ import Import from './pages/Import';
 import Login from './pages/Login';
 import Projects from './pages/Projects';
 import Repairs from './pages/Repairs';
+import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
 
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/approvals" element={<Approvals />} />
               <Route path="/handovers" element={<Handovers />} />
               <Route path="/repairs" element={<Repairs />} />
+              <Route path="/reports" element={<Reports />} />
               <Route path="/import" element={<Import />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/users" element={<Users />} />

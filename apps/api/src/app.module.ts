@@ -19,6 +19,7 @@ import { ImportService } from './devices/import.service';
 import { JobsService } from './jobs/jobs.service';
 import { NotificationsController } from './notifications/notifications.controller';
 import { RepairsController } from './repairs/repairs.controller';
+import { ReportsController } from './reports/reports.controller';
 import { ProjectsController } from './projects/projects.controller';
 import {
   CancelRequestHandler,
@@ -52,6 +53,7 @@ import { UsersController } from './users/users.controller';
     RequestsController,
     NotificationsController,
     RepairsController,
+    ReportsController,
   ],
   providers: [
     AppDbContext,
