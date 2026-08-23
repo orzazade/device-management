@@ -13,6 +13,10 @@ import { AppDbContext } from './db/app-db-context';
 import { dataSourceOptions } from './db/data-source';
 import { HealthController } from './health/health.controller';
 import { createRedis, REDIS } from './redis';
+import { CreateDeviceHandler, UpdateDeviceHandler } from './devices/devices.commands';
+import { DevicesController } from './devices/devices.controller';
+import { ImportService } from './devices/import.service';
+import { ProjectsController } from './projects/projects.controller';
 import { ChangeUserRoleHandler, CreateUserHandler } from './users/users.commands';
 import { UsersController } from './users/users.controller';
 
@@ -26,7 +30,14 @@ import { UsersController } from './users/users.controller';
       signOptions: { expiresIn: config.jwtTtl as `${number}h` },
     }),
   ],
-  controllers: [HealthController, AuthController, UsersController, AuditController],
+  controllers: [
+    HealthController,
+    AuthController,
+    UsersController,
+    AuditController,
+    DevicesController,
+    ProjectsController,
+  ],
   providers: [
     AppDbContext,
     { provide: REDIS, useFactory: createRedis },
@@ -34,6 +45,9 @@ import { UsersController } from './users/users.controller';
     { provide: APP_GUARD, useClass: AuthGuard },
     CreateUserHandler,
     ChangeUserRoleHandler,
+    CreateDeviceHandler,
+    UpdateDeviceHandler,
+    ImportService,
   ],
 })
 export class AppModule {}

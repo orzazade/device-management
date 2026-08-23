@@ -10,6 +10,10 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter(),
   );
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  await app.register(require('@fastify/multipart'), {
+    limits: { fileSize: 10 * 1024 * 1024 },
+  });
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),

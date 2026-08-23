@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AppSetting } from '../entities/app-setting.entity';
 import { AuditLog } from '../entities/audit-log.entity';
+import { Device } from '../entities/device.entity';
+import { Project } from '../entities/project.entity';
 import { User } from '../entities/user.entity';
 
 /**
@@ -32,6 +34,14 @@ export class AppDbContext {
     return this.m(manager).getRepository(AuditLog);
   }
 
+  devices(manager?: EntityManager): Repository<Device> {
+    return this.m(manager).getRepository(Device);
+  }
+
+  projects(manager?: EntityManager): Repository<Project> {
+    return this.m(manager).getRepository(Project);
+  }
+
   withTransaction<T>(fn: (ctx: TransactionalContext) => Promise<T>): Promise<T> {
     return this.dataSource.transaction(async (manager) => {
       return fn(new TransactionalContext(manager));
@@ -57,5 +67,13 @@ export class TransactionalContext {
 
   get auditLogs(): Repository<AuditLog> {
     return this.manager.getRepository(AuditLog);
+  }
+
+  get devices(): Repository<Device> {
+    return this.manager.getRepository(Device);
+  }
+
+  get projects(): Repository<Project> {
+    return this.manager.getRepository(Project);
   }
 }
