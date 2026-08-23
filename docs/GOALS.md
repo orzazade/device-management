@@ -10,10 +10,10 @@ No deadline; quality over speed.
 
 ## Users and roles
 
-- **Lab Owner** — sees all, can do all, final approval gate. (Was "Super Approver".)
-- **Admin** — manages devices (add, edit, import from Excel), approves requests,
+- **Admin** — sees all, can do all, final approval gate. (Was "Super Approver".)
+- **Manager** — manages devices (add, edit, import from Excel), approves requests,
   can request on behalf of a user, can override booking time ranges.
-- **Requester** — regular user. Searches devices, creates requests, holds devices.
+- **Tester** — regular user. Searches devices, creates requests, holds devices.
 
 Devices may sit with an admin/manager or on someone's desk. The approver is a
 user too, so a device's keeper can be an admin or a boss — handover works the

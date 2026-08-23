@@ -20,8 +20,8 @@ Flux → cluster → URL. Everything after this is just features.
 ## S1 — Users, auth, roles
 
 - Local `IdentityProvider` (email + password), sessions
-- Roles: Lab Owner / Admin / Requester; RBAC guards on API routes
-- Seed: one Lab Owner; Admin can create users
+- Roles: Admin / Manager / Tester; RBAC guards on API routes
+- Seed: one Admin; Managers can create users
 - Login page, user list (admin), profile
 - Audit module lands here: every mutation from S1 on writes audit rows
 
@@ -36,7 +36,7 @@ Flux → cluster → URL. Everything after this is just features.
 ## S3 — The request flow (the product)
 
 - Request: device + reason + time range → pending
-- Approve / reject (Admin), Lab Owner final gate, `approval_mode` config flag
+- Approve / reject (Manager), Admin final gate, `approval_mode` config flag
 - On approve: previous holder notified (in-app), confirms handover → device
   assigned, request active
 - Booking-overlap exclusion constraint in Postgres (btree_gist) + friendly
@@ -66,7 +66,7 @@ Flux → cluster → URL. Everything after this is just features.
 
 ## S7 — Polish + ship to the team
 
-- Audit log viewer (Lab Owner)
+- Audit log viewer (Admin)
 - Dashboard: my devices, my requests, pending approvals
 - Empty states, error states, mobile-friendly pass
 - Idle-device report (simple version — it sells the tool to managers)

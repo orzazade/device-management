@@ -7,7 +7,7 @@ at 100 users, splitting services buys nothing and costs operability.
 ## Modules (NestJS)
 
 - `auth` — login, sessions, pluggable identity provider (local now, LDAP later)
-- `users` — profiles, roles (Lab Owner / Admin / Requester), RBAC
+- `users` — profiles, roles (Admin / Manager / Tester), RBAC
 - `devices` — device CRUD, accessories, status, Excel import
 - `projects` — project entity, device attachment
 - `requests` — booking lifecycle: request → approve → handover → return

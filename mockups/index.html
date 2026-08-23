@@ -213,7 +213,7 @@ const dev   = id => S.devices.find(d=>d.id===id);
 const proj  = id => S.projects.find(p=>p.id===id);
 const me    = () => user(S.me);
 const isAdmin = () => ['admin','owner'].includes(me().role);
-const roleName = r => ({owner:'Lab Owner', admin:'Admin', requester:'Requester'})[r];
+const roleName = r => ({owner:'Admin', admin:'Manager', requester:'Tester'})[r];
 const esc = s => String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const initials = n => n.split(' ').map(w=>w[0]).join('').slice(0,2);
 function toast(msg){ $('#toastHost').innerHTML = `<div class="toast">${esc(msg)}</div>`;
@@ -439,7 +439,7 @@ function shell(route, inner){
           oninput="actions.search(this.value)" onfocus="if(location.hash!=='#/devices')location.hash='#/devices'">
         <div class="spacer"></div>
         <div class="roleSwitch" title="Mockup only: view as…">
-          ${[['u1','Owner'],['u2','Admin'],['u3','Requester']].map(([id,l])=>
+          ${[['u1','Admin'],['u2','Manager'],['u3','Tester']].map(([id,l])=>
             `<button class="${S.me===id?'on':''}" onclick="actions.setRole('${id}')">${l}</button>`).join('')}
         </div>
         <div class="bellWrap">
@@ -574,7 +574,7 @@ function approvalsView(){
       <button class="btn sm pri" onclick="actions.approve('${r.id}')">Approve</button>
       <button class="btn sm danger" onclick="actions.reject('${r.id}')">Reject</button>
       <button class="btn sm" onclick="actions.overrideTime('${r.id}')">Time…</button>`})}</div>
-    ${me().role==='owner'?'<p style="color:var(--muted);margin-top:10px">As Lab Owner you are the final gate — your approval closes the request.</p>':''}`;
+    ${me().role==='owner'?'<p style="color:var(--muted);margin-top:10px">As Admin you are the final gate — your approval closes the request.</p>':''}`;
 }
 
 function handoversView(){
