@@ -314,6 +314,12 @@ export class ReturnRequestHandler implements ICommandHandler<ReturnRequestComman
       if (data.damaged) {
         device.status = 'in_repair';
         device.damageNote = data.damageNote?.trim() || 'Damage found at return check-in';
+        await ctx.repairs.save({
+          deviceId: device.id,
+          reportedById: byUserId,
+          issue: device.damageNote,
+          state: 'in_repair',
+        });
       } else {
         device.status = 'available';
       }

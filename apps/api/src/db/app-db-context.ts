@@ -10,6 +10,7 @@ import {
   NotificationRule,
 } from '../entities/notification.entity';
 import { Project } from '../entities/project.entity';
+import { Repair } from '../entities/repair.entity';
 import { User } from '../entities/user.entity';
 
 /**
@@ -64,6 +65,10 @@ export class AppDbContext {
     return this.m(manager).getRepository(EmailOutbox);
   }
 
+  repairs(manager?: EntityManager): Repository<Repair> {
+    return this.m(manager).getRepository(Repair);
+  }
+
   withTransaction<T>(fn: (ctx: TransactionalContext) => Promise<T>): Promise<T> {
     return this.dataSource.transaction(async (manager) => {
       return fn(new TransactionalContext(manager));
@@ -101,5 +106,9 @@ export class TransactionalContext {
 
   get requests(): Repository<DeviceRequest> {
     return this.manager.getRepository(DeviceRequest);
+  }
+
+  get repairs(): Repository<Repair> {
+    return this.manager.getRepository(Repair);
   }
 }

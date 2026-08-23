@@ -142,6 +142,23 @@ export class DevicesController {
     return pub(d);
   }
 
+  @Get(':id/repairs')
+  async repairs(@Param('id') id: string) {
+    const rows = await this.db.repairs().find({
+      where: { deviceId: id },
+      relations: { reportedBy: true },
+      order: { createdAt: 'DESC' },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      issue: r.issue,
+      state: r.state,
+      reportedBy: r.reportedBy?.name,
+      createdAt: r.createdAt,
+      closedAt: r.closedAt,
+    }));
+  }
+
   @Get(':id/history')
   async history(@Param('id') id: string) {
     return this.db

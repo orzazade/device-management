@@ -69,6 +69,7 @@ export default function Layout() {
             Handovers
             <Badge n={handovers.data?.length} />
           </NavLink>
+          <NavLink to="/repairs" className={linkCls}>Repairs</NavLink>
           {isStaff(user.role) && (
             <>
               <Section label="Manage" />
