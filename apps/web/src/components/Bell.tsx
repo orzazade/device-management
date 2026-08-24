@@ -109,6 +109,11 @@ export default function Bell() {
                 </span>
               </button>
             ))}
+            {(data.data?.unread ?? 0) > (data.data?.items.filter((n) => !n.readAt).length ?? 0) && (
+              <p className="border-t border-neutral-100 px-4 py-2 text-center text-xs text-neutral-400">
+                Older unread exist beyond the latest 30 — “Mark all as read” clears them too.
+              </p>
+            )}
             {data.data?.items.length === 0 && (
               <p className="p-5 text-center text-neutral-400">No notifications yet.</p>
             )}
