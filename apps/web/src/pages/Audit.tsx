@@ -9,6 +9,7 @@ interface AuditRow {
   entityType: string;
   entityId: string;
   action: string;
+  entityLabel?: string | null;
   oldValue: unknown;
   newValue: unknown;
   createdAt: string;
@@ -42,6 +43,9 @@ export default function Audit() {
                 <td className="px-4 py-2.5">
                   <span className="capitalize">{r.entityType.replace(/_/g, ' ')}</span>{' '}
                   <span className="font-semibold">{r.action.replace(/_/g, ' ')}</span>
+                  {r.entityLabel && (
+                    <span className="block text-xs text-neutral-500">{r.entityLabel}</span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5">
                   <ChangeDiff oldValue={r.oldValue} newValue={r.newValue} />

@@ -243,9 +243,21 @@ export class DevicesController {
 
   @Get(':id/history')
   async history(@Param('id') id: string) {
+    // The device's story includes its loans and repairs, not just edits.
+    const [requestIds, repairIds] = await Promise.all([
+      this.db.requests().find({ where: { deviceId: id }, select: { id: true }, withDeleted: true }),
+      this.db.repairs().find({ where: { deviceId: id }, select: { id: true }, withDeleted: true }),
+    ]);
+    const wheres: { entityType: string; entityId: unknown }[] = [
+      { entityType: 'device', entityId: id },
+    ];
+    if (requestIds.length)
+      wheres.push({ entityType: 'request', entityId: In(requestIds.map((r) => r.id)) });
+    if (repairIds.length)
+      wheres.push({ entityType: 'repair', entityId: In(repairIds.map((r) => r.id)) });
     return this.db
       .auditLogs()
-      .find({ where: { entityType: 'device', entityId: id }, order: { id: 'DESC' }, take: 200 });
+      .find({ where: wheres as never, order: { id: 'DESC' }, take: 200 });
   }
 
   @Post()

@@ -87,6 +87,18 @@ export class UpdateDeviceHandler implements ICommandHandler<UpdateDeviceCommand>
       }
       if (Object.keys(after).length === 0) return device;
       await ctx.devices.save(device);
+      // The audit log answers "which project?", not "which UUID?".
+      if ('projectId' in after) {
+        const name = async (pid: unknown) =>
+          pid
+            ? ((await ctx.projects.findOne({ where: { id: pid as string }, withDeleted: true }))
+                ?.name ?? '—')
+            : '—';
+        before.project = await name(before.projectId);
+        after.project = await name(after.projectId);
+        delete before.projectId;
+        delete after.projectId;
+      }
       await writeAudit(ctx.manager, actor, {
         entityType: 'device',
         entityId: device.id,

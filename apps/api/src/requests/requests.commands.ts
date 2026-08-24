@@ -309,6 +309,10 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
       }
 
       const previousHolder = device.holderId;
+      const previousHolderName = previousHolder
+        ? ((await ctx.users.findOne({ where: { id: previousHolder }, withDeleted: true }))?.name ??
+          'unknown')
+        : 'lab desk';
       device.holderId = request.requesterId;
       device.status = 'assigned';
       await ctx.devices.save(device);
@@ -317,8 +321,8 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
         entityType: 'request',
         entityId: request.id,
         action: 'handover_confirmed',
-        oldValue: { state: old, holderId: previousHolder },
-        newValue: { state: 'active', holderId: request.requesterId },
+        oldValue: { state: old, holder: previousHolderName },
+        newValue: { state: 'active', holder: request.requester.name },
       });
       await notify(ctx.manager, 'request_approved', [request.requesterId],
         `${device.brand} ${device.model} is now assigned to you — return by ${request.toDate}`,

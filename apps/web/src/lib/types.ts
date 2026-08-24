@@ -30,6 +30,7 @@ export interface AuditRow {
   entityType: string;
   entityId: string;
   action: string;
+  entityLabel?: string | null;
   oldValue: unknown;
   newValue: unknown;
   createdAt: string;
