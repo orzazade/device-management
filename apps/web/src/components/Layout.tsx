@@ -37,7 +37,8 @@ const roleLabel: Record<string, string> = {
 };
 
 export default function Layout() {
-  const { user, loading, logout, mustChangePassword, clearMustChange } = useAuth();
+  const { user, loading, logout, mustChangePassword, clearMustChange, sessionCheckFailed, retrySession } =
+    useAuth();
   const nav = useNavigate();
   const staff = isStaff(user?.role);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -64,6 +65,21 @@ export default function Layout() {
     refetchInterval: 60000,
   });
   if (loading) return <p className="p-10 text-neutral-400">loading…</p>;
+  if (!user && sessionCheckFailed)
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
+          <b>Can’t reach the server.</b>
+          <p className="mt-1 mb-4">Your session is still saved — this is a connection problem, not a sign-out.</p>
+          <button
+            onClick={retrySession}
+            className="rounded-lg border border-red-300 bg-white px-4 py-2 font-semibold text-red-700"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   if (!user) return <Navigate to="/login" replace />;
 
   const initials = user.name

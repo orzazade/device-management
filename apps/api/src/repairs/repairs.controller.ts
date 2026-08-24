@@ -67,6 +67,21 @@ export class RepairsController {
     return this.db.withTransaction(async (ctx) => {
       const device = await ctx.devices.findOne({ where: { id: dto.deviceId } });
       if (!device) throw new NotFoundException('Device not found');
+      if (device.status === 'retired') {
+        throw new ConflictException('This device is written off — it has no repair path');
+      }
+      const openRepair = await ctx.repairs.findOne({
+        where: [
+          { deviceId: device.id, state: 'reported' },
+          { deviceId: device.id, state: 'repair_requested' },
+          { deviceId: device.id, state: 'in_repair' },
+        ],
+      });
+      if (openRepair) {
+        throw new ConflictException(
+          `This device already has an open repair (“${openRepair.issue}”) — add details there instead of filing a second one`,
+        );
+      }
       const repair = await ctx.repairs.save({
         deviceId: device.id,
         reportedById: req.user.sub,
