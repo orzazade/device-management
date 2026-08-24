@@ -165,6 +165,11 @@ export class UsersController {
   @Post()
   @Roles('admin', 'manager')
   async create(@Body() dto: CreateUserDto, @Req() req: { user: AuthUser }) {
+    // A manager must not be able to mint accounts at or above their own
+    // power — only an Admin creates Managers or Admins.
+    if (dto.role !== 'tester' && req.user.role !== 'admin') {
+      throw new ForbiddenException('Only an Admin can create Manager or Admin accounts');
+    }
     const user: User = await this.bus.execute(new CreateUserCommand(actor(req), dto));
     return pub(user);
   }

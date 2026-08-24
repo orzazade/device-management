@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { AppDbContext } from '../db/app-db-context';
 import { Role } from '../entities/user.entity';
 
 export interface AuthUser {
@@ -33,6 +34,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly jwt: JwtService,
     private readonly reflector: Reflector,
+    private readonly db: AppDbContext,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -45,12 +47,25 @@ export class AuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     const token = (req.headers['authorization'] ?? '').replace(/^Bearer /, '');
     if (!token) throw new UnauthorizedException('Missing token');
-    let user: AuthUser;
+    let claims: AuthUser;
     try {
-      user = await this.jwt.verifyAsync<AuthUser>(token);
+      claims = await this.jwt.verifyAsync<AuthUser>(token);
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+    // The token only proves identity. Role and active-ness come from the DB
+    // on every request, so deactivating/demoting someone takes effect NOW,
+    // not when their 12h token expires. (find() skips soft-deleted users.)
+    const dbUser = await this.db.users().findOne({ where: { id: claims.sub } });
+    if (!dbUser || !dbUser.active) {
+      throw new UnauthorizedException('Account is deactivated');
+    }
+    const user: AuthUser = {
+      sub: dbUser.id,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+    };
     req.user = user;
 
     const roles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [

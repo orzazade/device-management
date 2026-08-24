@@ -77,6 +77,14 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
         }
       }
       if (data.active !== undefined && data.active !== user.active) {
+        if (data.active === false && user.role === 'admin') {
+          const activeAdmins = await ctx.users.count({
+            where: { role: 'admin', active: true },
+          });
+          if (activeAdmins <= 1) {
+            throw new ConflictException('Cannot deactivate the last active Admin');
+          }
+        }
         before.active = user.active;
         after.active = data.active;
         user.active = data.active;
@@ -117,6 +125,14 @@ export class ChangeUserRoleHandler implements ICommandHandler<ChangeUserRoleComm
       if (!user) throw new NotFoundException('User not found');
       const old = user.role;
       if (old === role) return user;
+      if (old === 'admin') {
+        const otherAdmins = await ctx.users.count({
+          where: { role: 'admin', active: true },
+        });
+        if (otherAdmins <= 1) {
+          throw new ConflictException('Cannot demote the last active Admin');
+        }
+      }
       user.role = role;
       await ctx.users.save(user);
       await writeAudit(ctx.manager, actor, {
