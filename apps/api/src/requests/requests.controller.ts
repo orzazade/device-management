@@ -160,7 +160,7 @@ export class RequestsController {
   @Post(':id/approve')
   @Roles('admin', 'manager')
   async approve(@Param('id') id: string, @Req() req: { user: AuthUser }) {
-    await this.bus.execute(new DecideRequestCommand(actor(req), id, 'approved'));
+    await this.bus.execute(new DecideRequestCommand(actor(req), id, 'approved', req.user.role));
     return this.reload(id);
   }
 

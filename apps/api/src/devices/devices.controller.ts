@@ -163,6 +163,14 @@ export class DevicesController {
           `Device has ${open} open request(s) — resolve them first`,
         );
       }
+      const openRepairs = await ctx.repairs.count({
+        where: { deviceId: id, state: In(['reported', 'repair_requested', 'in_repair']) },
+      });
+      if (openRepairs > 0) {
+        throw new ConflictException(
+          `Device has ${openRepairs} open repair(s) — close them first`,
+        );
+      }
       await ctx.devices.softDelete(id);
       await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
         entityType: 'device',

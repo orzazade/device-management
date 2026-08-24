@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { config } from './config';
+import { PgConflictFilter } from './db/pg-conflict.filter';
 import { User } from './entities/user.entity';
 
 async function bootstrap() {
@@ -21,6 +22,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true }),
   );
+  app.useGlobalFilters(new PgConflictFilter());
   // The factory-default admin password must not survive quietly in
   // production. Login already forces a change; this makes it visible in
   // the logs on every boot until it is gone.

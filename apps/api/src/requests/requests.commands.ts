@@ -14,6 +14,14 @@ import { transition } from './request-machine';
 const EXCLUSION_VIOLATION = '23P01';
 
 async function loadRequest(ctx: TransactionalContext, id: string): Promise<DeviceRequest> {
+  // Row lock first (no relations — Postgres refuses FOR UPDATE on outer
+  // joins), so two concurrent decisions on one request serialize instead
+  // of silently overwriting each other.
+  const locked = await ctx.requests.findOne({
+    where: { id },
+    lock: { mode: 'pessimistic_write' },
+  });
+  if (!locked) throw new NotFoundException('Request not found');
   const request = await ctx.requests.findOne({
     where: { id },
     relations: { device: true, requester: true },
@@ -146,6 +154,7 @@ export class DecideRequestCommand {
     readonly actor: Actor,
     readonly requestId: string,
     readonly decision: 'approved' | 'rejected',
+    readonly actorRole?: string,
   ) {}
 }
 
@@ -153,9 +162,33 @@ export class DecideRequestCommand {
 export class DecideRequestHandler implements ICommandHandler<DecideRequestCommand> {
   constructor(private readonly db: AppDbContext) {}
 
-  async execute({ actor, requestId, decision }: DecideRequestCommand): Promise<DeviceRequest> {
+  async execute({ actor, requestId, decision, actorRole }: DecideRequestCommand): Promise<DeviceRequest> {
     return this.db.withTransaction(async (ctx) => {
       const request = await loadRequest(ctx, requestId);
+      const selfRequest =
+        actor.id === request.requesterId || actor.id === request.createdById;
+      let auditAction: string = decision;
+      if (decision === 'approved') {
+        // Approving your own request: a Manager needs a second pair of
+        // eyes; the Admin may, but the audit row says so explicitly.
+        if (selfRequest && actorRole !== 'admin') {
+          throw new ForbiddenException(
+            'You cannot approve your own request — ask another approver',
+          );
+        }
+        if (selfRequest && actorRole === 'admin') auditAction = 'self_approved';
+        // Approval is a promise about a physical device — re-check it can
+        // still be lent at all.
+        const device = request.device;
+        if (!device) {
+          throw new ConflictException('This device no longer exists — reject the request');
+        }
+        if (device.status === 'retired' || device.status === 'in_repair') {
+          throw new ConflictException(
+            `Device is ${device.status.replace('_', ' ')} — it cannot be promised right now`,
+          );
+        }
+      }
       if (decision === 'approved') {
         // The exclusion constraint misses an overdue loan (its range is in
         // the past) — but the device is physically out until it comes back.
@@ -179,7 +212,7 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
       await writeAudit(ctx.manager, actor, {
         entityType: 'request',
         entityId: request.id,
-        action: decision,
+        action: auditAction,
         oldValue: { state: old },
         newValue: { state: decision },
       });
@@ -239,6 +272,11 @@ export class OverrideTimeHandler implements ICommandHandler<OverrideTimeCommand>
       const old = `${request.fromDate} – ${request.toDate}`;
       request.fromDate = fromDate;
       request.toDate = toDate;
+      // Extending a late loan past today makes it simply active again —
+      // without this it stays "overdue" forever, alarms and all.
+      const today = new Date().toISOString().slice(0, 10);
+      const overdueCleared = request.state === 'overdue' && toDate >= today;
+      if (overdueCleared) transition(request, 'active');
       try {
         await ctx.requests.save(request);
       } catch (e) {
@@ -252,6 +290,15 @@ export class OverrideTimeHandler implements ICommandHandler<OverrideTimeCommand>
         oldValue: { range: old },
         newValue: { range: `${fromDate} – ${toDate}` },
       });
+      if (overdueCleared) {
+        await writeAudit(ctx.manager, actor, {
+          entityType: 'request',
+          entityId: request.id,
+          action: 'overdue_cleared',
+          oldValue: { state: 'overdue' },
+          newValue: { state: 'active', dueDate: toDate },
+        });
+      }
       return request;
     });
   }
@@ -287,25 +334,26 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
         );
       }
 
+      if (device.status === 'retired' || device.status === 'in_repair') {
+        throw new ConflictException(
+          `Device is ${device.status.replace('_', ' ')} — it cannot be handed over`,
+        );
+      }
       const old = transition(request, 'active');
 
-      // Whatever the previous holder still had running on this device is over.
+      // A device with an open loan is not the desk's to give away — the
+      // current loan gets checked in first (Loans page, one click), so
+      // every return passes the real check-in flow and is audited as one.
       const previous = await ctx.requests.find({
         where: [
           { deviceId: device.id, state: 'active' },
           { deviceId: device.id, state: 'overdue' },
         ],
       });
-      for (const p of previous) {
-        const pOld = transition(p, 'returned');
-        await ctx.requests.save(p);
-        await writeAudit(ctx.manager, actor, {
-          entityType: 'request',
-          entityId: p.id,
-          action: 'closed_by_handover',
-          oldValue: { state: pOld },
-          newValue: { state: 'returned' },
-        });
+      if (previous.some((p) => p.id !== request.id)) {
+        throw new ConflictException(
+          'This device is still checked out — check the current loan in first (Loans page)',
+        );
       }
 
       const previousHolder = device.holderId;

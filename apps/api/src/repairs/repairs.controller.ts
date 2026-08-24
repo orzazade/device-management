@@ -109,6 +109,7 @@ export class RepairsController {
       const repair = await ctx.repairs.findOne({
         where: { id },
         relations: { device: true, reportedBy: true },
+        withDeleted: true, // a soft-deleted device must not 500 the repair flow
       });
       if (!repair) throw new NotFoundException('Repair not found');
       const next: RepairState | undefined = (
@@ -136,6 +137,9 @@ export class RepairsController {
             oldValue: { state: pOld },
             newValue: { state: 'returned' },
           });
+          await notify(ctx.manager, 'repair_update', [p.requesterId],
+            `Your loan of ${device.brand} ${device.model} was closed — the device is going to repair. Please hand it in.`,
+            { requestId: p.id }, '/requests');
         }
         device.status = 'in_repair';
         device.holderId = null;
@@ -172,6 +176,7 @@ export class RepairsController {
       const repair = await ctx.repairs.findOne({
         where: { id },
         relations: { device: true, reportedBy: true },
+        withDeleted: true, // a soft-deleted device must not 500 the repair flow
       });
       if (!repair) throw new NotFoundException('Repair not found');
       const old = repairTransition(repair, 'written_off');
@@ -194,6 +199,9 @@ export class RepairsController {
           oldValue: { state: pOld },
           newValue: { state: 'returned' },
         });
+        await notify(ctx.manager, 'repair_update', [p.requesterId],
+          `Your loan of ${device.brand} ${device.model} was closed — the device is written off. Please hand it in.`,
+          { requestId: p.id }, '/requests');
       }
       device.status = 'retired';
       device.holderId = null;

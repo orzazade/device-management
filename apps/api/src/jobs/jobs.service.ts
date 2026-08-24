@@ -6,7 +6,6 @@ import { AppDbContext } from '../db/app-db-context';
 import { EmailOutbox } from '../entities/notification.entity';
 import { writeAudit } from '../audit/audit';
 import { notify, staffIds } from '../notifications/notify';
-import { transition } from '../requests/request-machine';
 
 const SYSTEM_ACTOR = { id: null, name: 'system' };
 export const SCHEDULER_QUEUE = 'scheduler';
@@ -73,8 +72,17 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       .getMany();
     for (const r of late) {
       await this.db.withTransaction(async (ctx) => {
-        const old = transition(r, 'overdue');
-        await ctx.requests.save(r);
+        // Guarded UPDATE: if a return won the race since our SELECT, we
+        // touch nothing and send nothing.
+        const res = await ctx.requests
+          .createQueryBuilder()
+          .update()
+          .set({ state: 'overdue' })
+          .where(`id = :id AND state = 'active'`, { id: r.id })
+          .execute();
+        if (!res.affected) return;
+        const old = 'active';
+        r.state = 'overdue';
         await writeAudit(ctx.manager, SYSTEM_ACTOR, {
           entityType: 'request',
           entityId: r.id,
@@ -86,7 +94,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         await notify(ctx.manager, 'overdue', [r.requesterId],
           `${name} is overdue — it was due back ${r.toDate}`, { requestId: r.id }, '/requests');
         await notify(ctx.manager, 'overdue', await staffIds(ctx.manager),
-          `${name} is overdue (due ${r.toDate})`, { requestId: r.id }, `/devices/${r.deviceId}`);
+          `${name} is overdue (due ${r.toDate})`, { requestId: r.id }, '/loans');
       });
     }
     if (late.length) this.log.warn(`overdue scan: ${late.length} request(s) marked overdue`);

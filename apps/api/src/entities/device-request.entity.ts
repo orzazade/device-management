@@ -23,7 +23,8 @@ export const REQUEST_TRANSITIONS: Record<RequestState, RequestState[]> = {
   pending: ['approved', 'rejected', 'cancelled'],
   approved: ['active', 'cancelled'],
   active: ['returned', 'overdue'],
-  overdue: ['returned'],
+  // 'active' = the loan was extended past today, so it is no longer late.
+  overdue: ['returned', 'active'],
   rejected: [],
   returned: [],
   cancelled: [],
