@@ -52,15 +52,19 @@ export default function RangeCalendar({
     };
   }, [bookings]);
 
-  const spanIsFree = (a: string, b: string) => {
+  const spanScan = (a: string, b: string) => {
+    let booked = 0;
+    let requested = 0;
     for (
       let t = new Date(a + 'T12:00:00').getTime();
       t <= new Date(b + 'T12:00:00').getTime();
       t += DAY
     ) {
-      if (kindOf(fmt(new Date(t)))) return false;
+      const k = kindOf(fmt(new Date(t)));
+      if (k === 'booked') booked++;
+      if (k === 'requested') requested++;
     }
-    return true;
+    return { booked, requested };
   };
 
   const pick = (iso: string) => {
@@ -73,10 +77,17 @@ export default function RangeCalendar({
       onChange({ from: iso, to: null });
       return;
     }
-    if (!spanIsFree(value.from, iso)) {
-      setHint('That range crosses a taken day — pick a free gap.');
+    const scan = spanScan(value.from, iso);
+    if (scan.booked > 0) {
+      setHint('That range crosses a booked day — pick a free gap.');
       onChange({ from: iso, to: null });
       return;
+    }
+    if (scan.requested > 0) {
+      // Pending requests don't own the calendar — warn, don't block.
+      setHint(
+        `⚠ ${scan.requested} of these days ${scan.requested === 1 ? 'is' : 'are'} also requested by someone else — the approver decides who gets them.`,
+      );
     }
     onChange({ from: value.from, to: iso });
   };
@@ -122,15 +133,15 @@ export default function RangeCalendar({
         {cells.map(({ iso, d, inMonth }) => {
           const kind = kindOf(iso);
           const past = iso < today;
-          const disabled = past || kind !== null;
+          const disabled = past || kind === 'booked';
           const inRange =
             value.from &&
             ((value.to && iso >= value.from && iso <= value.to) || iso === value.from);
-          const title = kind === 'booked' ? 'Booked' : kind === 'requested' ? 'Requested' : past ? 'Past' : '';
+          const title = kind === 'booked' ? 'Booked' : kind === 'requested' ? 'Requested by someone else — still pickable' : past ? 'Past' : '';
           let cls = 'text-neutral-900 hover:bg-accent-soft';
           if (!inMonth) cls = 'text-neutral-300 hover:bg-accent-soft';
           if (kind === 'booked') cls = 'bg-red-100 text-red-400 line-through cursor-not-allowed';
-          if (kind === 'requested') cls = 'bg-amber-100 text-amber-500 cursor-not-allowed';
+          if (kind === 'requested') cls = 'bg-amber-100 text-amber-700 hover:bg-amber-200';
           if (past && !kind) cls = 'text-neutral-300 cursor-not-allowed';
           if (inRange) cls = 'bg-accent text-white font-bold';
           return (
@@ -160,7 +171,7 @@ export default function RangeCalendar({
       </div>
       <p className="mt-2 min-h-4 text-sm">
         {hint ? (
-          <span className="text-red-700">{hint}</span>
+          <span className={hint.startsWith('⚠') ? 'text-amber-700' : 'text-red-700'}>{hint}</span>
         ) : value.from && value.to ? (
           <>
             Selected: <b>{value.from}</b> → <b>{value.to}</b>

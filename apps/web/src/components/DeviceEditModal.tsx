@@ -84,6 +84,10 @@ export default function DeviceEditModal({
               .map((a) => a.trim())
               .filter(Boolean),
             projectId: f.get('projectId') || null,
+            ...(f.get('status') && f.get('status') !== device.status
+              ? { status: String(f.get('status')) }
+              : {}),
+            ...(f.get('clearDamage') === 'on' ? { damageNote: null } : {}),
           });
         }}
       >
@@ -103,6 +107,22 @@ export default function DeviceEditModal({
             rules={[required('OS is required')]} />
           <VField name="osVersion" label="OS version" defaultValue={device.osVersion} />
           <VField name="imei" label="IMEI" defaultValue={device.imei} rules={[imei()]} />
+          {['available', 'retired'].includes(device.status) && (
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-neutral-500">Status</span>
+              <select
+                name="status"
+                defaultValue={device.status}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+              >
+                <option value="available">Available</option>
+                <option value="retired">Retired</option>
+              </select>
+              <span className="mt-0.5 block text-[11px] text-neutral-400">
+                Assigned / in-repair are set by the loan and repair flows.
+              </span>
+            </label>
+          )}
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-neutral-500">Project</span>
             <select
@@ -119,6 +139,14 @@ export default function DeviceEditModal({
             </select>
           </label>
         </div>
+        {device.damageNote && (
+          <label className="mt-3 flex items-center gap-2">
+            <input type="checkbox" name="clearDamage" />
+            <span>
+              Clear the damage note (<i className="text-neutral-500">{device.damageNote}</i>)
+            </span>
+          </label>
+        )}
         <SpecFields specs={device.specs} />
         <div className="mt-3">
           {field('accessories', 'Accessories (comma-separated)', device.accessories.join(', '))}

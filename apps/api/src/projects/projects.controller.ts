@@ -61,19 +61,26 @@ export class ProjectsController {
     return this.db.withTransaction(async (ctx) => {
       const project = await ctx.projects.findOne({ where: { id } });
       if (!project) throw new NotFoundException('Project not found');
-      // Devices keep living — they just lose the project tag.
-      const detached = await ctx.devices
+      // Devices keep living — they just lose the project tag. The ids go
+      // into the audit row so restore can put them back.
+      const detachedRows: { id: string }[] = await ctx.devices
         .createQueryBuilder()
         .update()
         .set({ projectId: null })
         .where('project_id = :id', { id })
-        .execute();
+        .returning('id')
+        .execute()
+        .then((r) => r.raw);
       await ctx.projects.softDelete(id);
       await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
         entityType: 'project',
         entityId: id,
         action: 'deleted',
-        oldValue: { name: project.name, devicesDetached: detached.affected ?? 0 },
+        oldValue: {
+          name: project.name,
+          devicesDetached: detachedRows.length,
+          detachedDeviceIds: detachedRows.map((d) => d.id),
+        },
       });
       return { ok: true };
     });
@@ -86,13 +93,33 @@ export class ProjectsController {
       const project = await ctx.projects.findOne({ where: { id }, withDeleted: true });
       if (!project || !project.deletedAt) throw new NotFoundException('No deleted project with this id');
       await ctx.projects.restore(id);
+      // Re-attach the devices the delete detached — but only those that
+      // haven't been given to another project in the meantime.
+      const deleteRow = await ctx.auditLogs.findOne({
+        where: { entityType: 'project', entityId: id, action: 'deleted' },
+        order: { id: 'DESC' },
+      });
+      const detachedIds =
+        ((deleteRow?.oldValue as { detachedDeviceIds?: string[] })?.detachedDeviceIds ?? []);
+      let reattached = 0;
+      if (detachedIds.length) {
+        const res = await ctx.devices
+          .createQueryBuilder()
+          .update()
+          .set({ projectId: id })
+          .where('id IN (:...ids) AND project_id IS NULL AND deleted_at IS NULL', {
+            ids: detachedIds,
+          })
+          .execute();
+        reattached = res.affected ?? 0;
+      }
       await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
         entityType: 'project',
         entityId: id,
         action: 'restored',
-        newValue: { name: project.name },
+        newValue: { name: project.name, devicesReattached: reattached },
       });
-      return { ok: true };
+      return { ok: true, reattached };
     });
   }
 

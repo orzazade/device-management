@@ -8,11 +8,26 @@ import { AuditLog } from '../entities/audit-log.entity';
 export class AuditController {
   constructor(private readonly db: AppDbContext) {}
 
+  /** Filterable, keyset-paginated. `beforeId` = id of the oldest row the
+   * client already has; results are always newest-first. */
   @Get()
   @Roles('admin')
-  async list(@Query('limit') limit?: string) {
+  async list(
+    @Query('limit') limit?: string,
+    @Query('entityType') entityType?: string,
+    @Query('actor') actorName?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('beforeId') beforeId?: string,
+  ) {
     const take = Math.min(parseInt(limit ?? '100', 10) || 100, 500);
-    const rows = await this.db.auditLogs().find({ order: { id: 'DESC' }, take });
+    const qb = this.db.auditLogs().createQueryBuilder('a').orderBy('a.id', 'DESC').take(take);
+    if (entityType) qb.andWhere('a.entityType = :entityType', { entityType });
+    if (actorName) qb.andWhere('a.actorName ILIKE :actor', { actor: `%${actorName}%` });
+    if (from) qb.andWhere('a.createdAt >= :from', { from });
+    if (to) qb.andWhere('a.createdAt < (:to)::date + 1', { to });
+    if (beforeId) qb.andWhere('a.id < :beforeId', { beforeId });
+    const rows = await qb.getMany();
     const labels = await this.resolveLabels(rows);
     return rows.map((r) => ({
       ...r,

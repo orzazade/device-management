@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { In } from 'typeorm';
 import { Actor, writeAudit } from '../audit/audit';
 import { AppDbContext } from '../db/app-db-context';
 import { Device } from '../entities/device.entity';
@@ -75,6 +76,18 @@ export class UpdateDeviceHandler implements ICommandHandler<UpdateDeviceCommand>
     return this.db.withTransaction(async (ctx) => {
       const device = await ctx.devices.findOne({ where: { id } });
       if (!device) throw new NotFoundException('Device not found');
+      // Retiring via edit runs the same guards as delete — no stranded loans.
+      if (data.status === 'retired' && device.status !== 'retired') {
+        if (device.holderId) {
+          throw new ConflictException('Device is in someone’s hands — take it back first');
+        }
+        const open = await ctx.requests.count({
+          where: { deviceId: id, state: In(['pending', 'approved', 'active', 'overdue']) },
+        });
+        if (open > 0) {
+          throw new ConflictException(`Device has ${open} open request(s) — resolve them first`);
+        }
+      }
       const before: Record<string, unknown> = {};
       const after: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(data)) {
