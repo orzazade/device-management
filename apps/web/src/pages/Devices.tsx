@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from '../components/Modal';
 import LoadFailed from '../components/LoadFailed';
 import { useEffect, useMemo, useState } from 'react';
@@ -33,13 +33,21 @@ export default function Devices() {
   const [error, setError] = useState<string | null>(null);
 
   const params = new URLSearchParams();
-  if (q) params.set('q', q);
+  // Debounced search: one request ~250ms after typing stops, and the
+  // previous rows stay on screen while the next result loads.
+  const [dq, setDq] = useState(q);
+  useEffect(() => {
+    const t = setTimeout(() => setDq(q), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+  if (dq) params.set('q', dq);
   if (brand) params.set('brand', brand);
   if (os) params.set('os', os);
   if (status) params.set('status', status);
   const devices = useQuery({
-    queryKey: ['devices', q, brand, os, status],
+    queryKey: ['devices', dq, brand, os, status],
     queryFn: () => api<DeviceRow[]>(`/devices?${params}`),
+    placeholderData: keepPreviousData,
   });
   const all = useQuery({ queryKey: ['devices'], queryFn: () => api<DeviceRow[]>('/devices') });
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api<ProjectRow[]>('/projects') });

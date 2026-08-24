@@ -80,7 +80,7 @@ export default function Layout() {
         </div>
       </div>
     );
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
 
   const initials = user.name
     .split(' ')

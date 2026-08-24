@@ -27,6 +27,7 @@ export default function Users() {
   const [showCreate, setShowCreate] = useState(false);
   const [editFor, setEditFor] = useState<UserRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<UserRow | null>(null);
+  const [roleChange, setRoleChange] = useState<{ user: UserRow; role: Role } | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,10 +137,11 @@ export default function Users() {
                   {me?.role === 'admin' && u.id !== me.id ? (
                     <select
                       value={u.role}
+                      disabled={changeRole.isPending}
                       onChange={(e) =>
-                        changeRole.mutate({ id: u.id, role: e.target.value as Role })
+                        setRoleChange({ user: u, role: e.target.value as Role })
                       }
-                      className="rounded-lg border border-neutral-300 px-2 py-1"
+                      className="rounded-lg border border-neutral-300 px-2 py-1 disabled:opacity-50"
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>
@@ -269,6 +271,20 @@ export default function Users() {
             </div>
           </VForm>
         </Modal>
+      )}
+
+      {roleChange && (
+        <ConfirmModal
+          title={`Make ${roleChange.user.name} a ${roleLabel[roleChange.role]}?`}
+          body={`${roleChange.user.name} goes from ${roleLabel[roleChange.user.role]} to ${roleLabel[roleChange.role]} immediately — their access changes on their next click.`}
+          confirmLabel="Change role"
+          busy={changeRole.isPending}
+          onConfirm={() => {
+            changeRole.mutate({ id: roleChange.user.id, role: roleChange.role });
+            setRoleChange(null);
+          }}
+          onClose={() => setRoleChange(null)}
+        />
       )}
 
       {confirmDelete && (

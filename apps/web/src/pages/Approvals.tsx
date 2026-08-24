@@ -110,6 +110,7 @@ export default function Approvals() {
             }}
           >
             <h2 className="mb-2 text-lg font-bold">Override time range</h2>
+            {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
             <p className="mb-4 text-neutral-500">
               Every change here is written to the audit log. Other bookings on this device are
               blocked in the calendar.
@@ -134,10 +135,10 @@ export default function Approvals() {
                 Cancel
               </button>
               <button
-                disabled={!overrideRange.from || !overrideRange.to}
+                disabled={!overrideRange.from || !overrideRange.to || override.isPending}
                 className="rounded-lg bg-accent px-4 py-2 font-semibold text-white disabled:opacity-50"
               >
-                Save override
+                {override.isPending ? 'Saving…' : 'Save override'}
               </button>
             </div>
           </form>

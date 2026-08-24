@@ -45,13 +45,13 @@ export default function Requests() {
         onRetry={() => rows.refetch()}
         empty="No requests yet. Find a device and ask for it."
         actions={(r) =>
-          r.state === 'pending' ? (
+          r.state === 'pending' || r.state === 'approved' ? (
             <button
               onClick={() => cancel.mutate(r.id)}
               disabled={cancel.isPending}
               className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
             >
-              Cancel
+              {r.state === 'approved' ? 'Cancel booking' : 'Cancel'}
             </button>
           ) : r.state === 'active' || r.state === 'overdue' ? (
             <button

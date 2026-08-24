@@ -109,15 +109,6 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
           range: `${data.fromDate} – ${data.toDate}`,
         },
       });
-      await notify(
-        ctx.manager,
-        'request_created',
-        await staffIds(ctx.manager),
-        `${requesterName} requested ${device.brand} ${device.model} (${data.fromDate} – ${data.toDate})`,
-        { requestId: request.id },
-        '/approvals',
-      );
-
       // Config flag (GOALS.md): 'all' = everything needs approval (launch),
       // 'busy_only' = a free device auto-approves.
       const mode = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
@@ -128,8 +119,10 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         mode?.value === 'busy_only' &&
         (device.holderId !== null ||
           (await conflictingBooking(ctx, device.id, data.fromDate, data.toDate, request.id)));
+      let autoApproved = false;
       if (mode?.value === 'busy_only' && !busy) {
         transition(request, 'approved');
+        autoApproved = true;
         try {
           await ctx.requests.save(request);
         } catch (e) {
@@ -143,6 +136,20 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
           oldValue: { state: 'pending' },
           newValue: { state: 'approved' },
         });
+      }
+      // The right people hear the right thing: an auto-approved request
+      // needs a handover, not an approval decision.
+      if (autoApproved) {
+        await notify(ctx.manager, 'request_approved', [request.requesterId],
+          `Your request for ${device.brand} ${device.model} was auto-approved (${data.fromDate} – ${data.toDate})`,
+          { requestId: request.id }, '/requests');
+        await notify(ctx.manager, 'handover_pending', await staffIds(ctx.manager),
+          `Hand ${device.brand} ${device.model} from the lab desk to ${requesterName}`,
+          { requestId: request.id }, '/handovers');
+      } else {
+        await notify(ctx.manager, 'request_created', await staffIds(ctx.manager),
+          `${requesterName} requested ${device.brand} ${device.model} (${data.fromDate} – ${data.toDate})`,
+          { requestId: request.id }, '/approvals');
       }
       return request;
     });
@@ -298,6 +305,15 @@ export class OverrideTimeHandler implements ICommandHandler<OverrideTimeCommand>
           oldValue: { state: 'overdue' },
           newValue: { state: 'active', dueDate: toDate },
         });
+      }
+      // The people living with these dates hear about the change.
+      const affected = new Set([request.requesterId]);
+      if (request.device?.holderId) affected.add(request.device.holderId);
+      affected.delete(actor.id!);
+      if (affected.size) {
+        await notify(ctx.manager, 'request_time_changed', [...affected],
+          `Booking time for ${request.device?.brand} ${request.device?.model} changed: ${old} → ${fromDate} – ${toDate}`,
+          { requestId: request.id }, '/requests');
       }
       return request;
     });
@@ -484,6 +500,23 @@ export class CancelRequestHandler implements ICommandHandler<CancelRequestComman
         oldValue: { state: old },
         newValue: { state: 'cancelled' },
       });
+      const name = `${request.device?.brand} ${request.device?.model}`;
+      const cancelledBySelf = byUserId === request.requesterId;
+      if (cancelledBySelf) {
+        // The requester pulled out — staff should stop expecting a handover.
+        if (old !== 'pending') {
+          const targets = new Set(await staffIds(ctx.manager));
+          if (request.device?.holderId) targets.add(request.device.holderId);
+          targets.delete(byUserId);
+          await notify(ctx.manager, 'request_cancelled', [...targets],
+            `${request.requester?.name ?? 'The requester'} cancelled their ${old} request for ${name}`,
+            { requestId: request.id }, '/approvals');
+        }
+      } else {
+        await notify(ctx.manager, 'request_cancelled', [request.requesterId],
+          `Your request for ${name} was cancelled by ${actor.name}`,
+          { requestId: request.id }, '/requests');
+      }
       return request;
     });
   }

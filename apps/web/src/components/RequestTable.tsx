@@ -37,8 +37,10 @@ export default function RequestTable({
                 <b>
                   {r.device.brand} {r.device.model}
                 </b>
-                {r.state === 'pending' && r.device.holder && (
-                  <div className="text-xs text-neutral-500">held by {r.device.holder.name}</div>
+                {(r.state === 'pending' || r.state === 'approved') && (
+                  <div className="text-xs text-neutral-500">
+                    {r.device.holder ? r.device.holder.name : 'lab desk'} → {r.requester.name}
+                  </div>
                 )}
               </td>
               <td className="px-4 py-2.5">{r.requester.name}</td>

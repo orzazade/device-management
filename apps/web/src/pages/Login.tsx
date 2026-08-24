@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { VForm, VField } from '../components/VForm';
 import { useAuth } from '../lib/auth';
 import { email, required } from '../lib/validate';
@@ -7,10 +7,12 @@ import { email, required } from '../lib/validate';
 export default function Login() {
   const { user, login } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from ?? '/';
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={from} replace />;
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -21,7 +23,7 @@ export default function Login() {
           setError(null);
           try {
             await login(String(f.get('email')), String(f.get('password')));
-            nav('/');
+            nav(from);
           } catch (err) {
             setError(err instanceof Error ? err.message : 'Login failed');
           } finally {

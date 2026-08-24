@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import * as bcrypt from 'bcryptjs';
+import { In } from 'typeorm';
 import { Actor, writeAudit } from '../audit/audit';
 import { AppDbContext } from '../db/app-db-context';
 import { Role, User } from '../entities/user.entity';
@@ -77,12 +78,33 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
         }
       }
       if (data.active !== undefined && data.active !== user.active) {
-        if (data.active === false && user.role === 'admin') {
-          const activeAdmins = await ctx.users.count({
-            where: { role: 'admin', active: true },
+        if (data.active === false) {
+          // Same guards as delete — a deactivated account cannot sign in,
+          // so it must not silently strand devices or open requests.
+          if (user.role === 'admin') {
+            const activeAdmins = await ctx.users.count({
+              where: { role: 'admin', active: true },
+            });
+            if (activeAdmins <= 1) {
+              throw new ConflictException('Cannot deactivate the last active Admin');
+            }
+          }
+          const holds = await ctx.devices.count({ where: { holderId: user.id } });
+          if (holds > 0) {
+            throw new ConflictException(
+              `${user.name} still holds ${holds} device(s) — take them back first`,
+            );
+          }
+          const open = await ctx.requests.count({
+            where: {
+              requesterId: user.id,
+              state: In(['pending', 'approved', 'active', 'overdue']),
+            },
           });
-          if (activeAdmins <= 1) {
-            throw new ConflictException('Cannot deactivate the last active Admin');
+          if (open > 0) {
+            throw new ConflictException(
+              `${user.name} has ${open} open request(s) — resolve them first`,
+            );
           }
         }
         before.active = user.active;

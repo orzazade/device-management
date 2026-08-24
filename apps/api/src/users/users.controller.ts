@@ -181,12 +181,22 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @Req() req: { user: AuthUser },
   ) {
-    // Deactivating or resetting passwords is the Admin's call alone —
-    // refuse loudly instead of silently dropping the fields.
-    if ((dto.active !== undefined || dto.newPassword) && req.user.role !== 'admin') {
+    // Deactivating, resetting passwords or changing the email someone
+    // signs in with is the Admin's call alone — refuse loudly.
+    if (
+      (dto.active !== undefined || dto.newPassword || dto.email !== undefined) &&
+      req.user.role !== 'admin'
+    ) {
       throw new ForbiddenException(
-        'Only an Admin can deactivate users or reset passwords',
+        'Only an Admin can deactivate users, reset passwords or change emails',
       );
+    }
+    // A manager must not edit anyone at or above their own rank.
+    if (req.user.role !== 'admin') {
+      const target = await this.db.users().findOne({ where: { id } });
+      if (target && target.role !== 'tester' && target.id !== req.user.sub) {
+        throw new ForbiddenException('Only an Admin can edit Manager or Admin accounts');
+      }
     }
     const user: User = await this.bus.execute(new UpdateUserCommand(actor(req), id, dto));
     return pub(user);

@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toasts';
 import { AuthProvider, useAuth, type Role } from './lib/auth';
@@ -18,6 +18,21 @@ import Repairs from './pages/Repairs';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Users from './pages/Users';
+
+function NotFound() {
+  return (
+    <div className="py-16 text-center">
+      <p className="text-5xl">🤷</p>
+      <h1 className="mt-3 text-xl font-bold">This page doesn’t exist</h1>
+      <p className="mt-1 text-neutral-500">
+        The link may be old.{' '}
+        <Link to="/" className="font-semibold text-accent">
+          Back to the dashboard
+        </Link>
+      </p>
+    </div>
+  );
+}
 
 /** Blocks a route group by role. The API refuses anyway (403) — this keeps
  * testers from ever landing on staff pages via a typed URL. */
@@ -55,6 +70,7 @@ export default function App() {
               <Route element={<RequireRole roles={['admin']} />}>
                 <Route path="/audit" element={<Audit />} />
               </Route>
+              <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
         </BrowserRouter>
