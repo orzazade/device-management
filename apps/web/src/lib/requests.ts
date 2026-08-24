@@ -7,6 +7,7 @@ export interface RequestRow {
     holder?: { id: string; name: string } | null;
     accessories?: string[];
     damageNote?: string | null;
+    status?: string;
   };
   requester: { id: string; name?: string };
   createdById: string;

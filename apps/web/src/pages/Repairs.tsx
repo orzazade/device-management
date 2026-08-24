@@ -109,7 +109,7 @@ export default function Repairs() {
                     {!['fixed', 'written_off'].includes(r.state) && (
                       <button
                         onClick={() => act.mutate({ id: r.id, verb: 'advance' })}
-                        disabled={act.isPending}
+                        disabled={act.isPending && act.variables?.id === r.id}
                         className="mr-1.5 rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
                       >
                         Advance →

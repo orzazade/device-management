@@ -92,6 +92,7 @@ const pub = (r: DeviceRequest) => ({
         holder: r.device.holder ? { id: r.device.holder.id, name: r.device.holder.name } : null,
         accessories: r.device.accessories,
         damageNote: r.device.damageNote,
+        status: r.device.status,
       }
     : { id: r.deviceId },
   requester: r.requester ? { id: r.requester.id, name: r.requester.name } : { id: r.requesterId },

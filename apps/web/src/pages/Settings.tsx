@@ -11,6 +11,19 @@ interface Rule {
   email: boolean;
 }
 
+/** Who actually receives each event — shown so the matrix is not a guess. */
+const AUDIENCE: Record<string, string> = {
+  request_created: 'Staff',
+  request_approved: 'Requester',
+  request_rejected: 'Requester',
+  handover_pending: 'Holder / staff',
+  due_soon: 'Holder',
+  overdue: 'Holder + staff',
+  repair_update: 'Reporter / staff',
+  request_time_changed: 'Requester + holder',
+  request_cancelled: 'The other side',
+};
+
 interface OutboxRow {
   id: string;
   toEmail: string;
@@ -125,6 +138,7 @@ export default function Settings() {
           <thead>
             <tr className="border-b border-neutral-200 text-left text-[11px] uppercase tracking-wider text-neutral-500">
               <th className="px-5 py-2.5">Event</th>
+              <th className="px-5 py-2.5">Who gets it</th>
               <th className="px-5 py-2.5 text-center">In-app</th>
               <th className="px-5 py-2.5 text-center">Email</th>
             </tr>
@@ -133,6 +147,7 @@ export default function Settings() {
             {rules.data?.map((r) => (
               <tr key={r.event} className="border-b border-neutral-100 last:border-0">
                 <td className="px-5 py-2.5">{r.label}</td>
+                <td className="px-5 py-2.5 text-xs text-neutral-500">{AUDIENCE[r.event] ?? '—'}</td>
                 {(['inapp', 'email'] as const).map((field) => (
                   <td key={field} className="px-5 py-2.5 text-center">
                     <input

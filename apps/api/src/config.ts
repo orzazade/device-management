@@ -12,6 +12,8 @@ export const config = {
   // e.g. smtp://user:pass@mail.corp.local:587 — unset means emails wait in the outbox
   smtpUrl: process.env.SMTP_URL ?? '',
   smtpFrom: process.env.SMTP_FROM ?? 'DeviceDesk <devicedesk@localhost>',
+  // Public URL of the web app — used in email deeplinks.
+  appUrl: process.env.APP_URL ?? 'http://localhost:5173',
 };
 
 // Loud failure: a production boot with the dev JWT secret is a security hole.

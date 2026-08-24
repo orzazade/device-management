@@ -40,7 +40,9 @@ export class ProjectsController {
         .where('p.deletedAt IS NOT NULL')
         .orderBy('p.name')
         .getMany();
-      return gone.map((p) => ({ ...p, deviceCount: 0 }));
+      // Deleted projects have no attached devices by definition (delete
+      // detaches them) — report null so the UI shows '—', not a fake 0.
+      return gone.map((p) => ({ ...p, deviceCount: null }));
     }
     const projects = await this.db.projects().find({ order: { name: 'ASC' } });
     const counts = await this.db

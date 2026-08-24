@@ -27,10 +27,13 @@ export default function RangeCalendar({
   bookings,
   value,
   onChange,
+  allowPast = false,
 }: {
   bookings: BookingRange[];
   value: DateRange;
   onChange: (v: DateRange) => void;
+  /** Override mode: staff may keep or set past days. */
+  allowPast?: boolean;
 }) {
   // Open on the month of the current selection, not always "now" —
   // otherwise a future booking's override calendar looks empty.
@@ -134,7 +137,7 @@ export default function RangeCalendar({
         ))}
         {cells.map(({ iso, d, inMonth }) => {
           const kind = kindOf(iso);
-          const past = iso < today;
+          const past = !allowPast && iso < today;
           const disabled = past || kind === 'booked';
           const inRange =
             value.from &&

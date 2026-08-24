@@ -61,6 +61,7 @@ export class ReportsController {
     const rows = await this.db.raw.query(
       `
       SELECT d.id, d.brand, d.model, d.serial, d.status,
+             COUNT(r.id) FILTER (WHERE r.state IN ('active','overdue','returned')) AS uses,
              GREATEST(
                d.created_at,
                COALESCE(MAX(CASE WHEN r.state IN ('active','overdue','returned')
@@ -68,7 +69,7 @@ export class ReportsController {
              ) AS last_activity
       FROM devices d
       LEFT JOIN requests r ON r.device_id = d.id
-      WHERE d.status != 'retired' AND d.deleted_at IS NULL
+      WHERE d.status = 'available' AND d.deleted_at IS NULL
       GROUP BY d.id
       HAVING GREATEST(
                d.created_at,
@@ -86,6 +87,7 @@ export class ReportsController {
       serial: r.serial,
       status: r.status,
       lastActivity: r.last_activity,
+      neverBorrowed: Number(r.uses) === 0,
     }));
   }
 }

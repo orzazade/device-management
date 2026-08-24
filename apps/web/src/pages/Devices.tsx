@@ -91,7 +91,9 @@ export default function Devices() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold">Devices</h1>
         <span className="text-neutral-500">
-          {devices.data?.length ?? '…'} of {all.data?.length ?? '…'}
+          {status === 'deleted'
+            ? `${devices.data?.length ?? '…'} deleted`
+            : `${devices.data?.length ?? '…'} of ${all.data?.length ?? '…'}`}
         </span>
         <div className="flex-1" />
         {isStaff(user?.role) && (
@@ -185,7 +187,13 @@ export default function Devices() {
                   {d.os} {d.osVersion}
                 </td>
                 <td className="px-4 py-2.5">
-                  <Chip status={d.status} />
+                  {status === 'deleted' ? (
+                    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                      Deleted
+                    </span>
+                  ) : (
+                    <Chip status={d.status} />
+                  )}
                 </td>
                 <td className="px-4 py-2.5">
                   {d.holder?.name ?? '—'}

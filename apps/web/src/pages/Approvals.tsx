@@ -25,6 +25,10 @@ export default function Approvals() {
     enabled: !!timeFor,
   });
 
+  const settings = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api<{ approvalMode: string }>('/settings'),
+  });
   const rows = useQuery({
     queryKey: ['requests', 'pending-approvals'],
     queryFn: () => api<RequestRow[]>('/requests?scope=all&state=pending'),
@@ -61,7 +65,9 @@ export default function Approvals() {
       <div className="mb-4 flex items-baseline gap-3">
         <h1 className="text-xl font-bold">Approvals</h1>
         <span className="text-neutral-500">
-          Policy: every request needs approval — change in Settings later.
+          {settings.data?.approvalMode === 'busy_only'
+            ? 'Policy: free devices auto-approve — only busy ones land here.'
+            : 'Policy: every request needs approval — change it in Settings.'}
         </span>
       </div>
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
@@ -74,14 +80,14 @@ export default function Approvals() {
           <span className="flex gap-1.5">
             <button
               onClick={() => act.mutate({ id: r.id, verb: 'approve' })}
-              disabled={act.isPending}
+              disabled={act.isPending && act.variables?.id === r.id}
               className={`${btn} bg-accent text-white`}
             >
               Approve
             </button>
             <button
               onClick={() => setRejectFor(r)}
-              disabled={act.isPending}
+              disabled={act.isPending && act.variables?.id === r.id}
               className={`${btn} border border-neutral-300 text-red-700`}
             >
               Reject
@@ -173,6 +179,7 @@ export default function Approvals() {
                   bookings={overrideBookings.data ?? []}
                   value={overrideRange}
                   onChange={setOverrideRange}
+                  allowPast
                 />
               )}
             </div>

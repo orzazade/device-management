@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import ChangeDiff from '../components/ChangeDiff';
 import LoadFailed from '../components/LoadFailed';
 import { VForm, VField } from '../components/VForm';
@@ -17,7 +17,10 @@ import type { AuditRow, DeviceRow } from '../lib/types';
 
 export default function DeviceDetail() {
   const { id } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<'specs' | 'history' | 'repairs'>('specs');
+  const [tabParams, setTabParams] = useSearchParams();
+  const tab = (tabParams.get('tab') ?? 'specs') as 'specs' | 'history' | 'repairs';
+  const setTab = (t: 'specs' | 'history' | 'repairs') =>
+    setTabParams(t === 'specs' ? {} : { tab: t }, { replace: true });
   const [showRequest, setShowRequest] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const { user } = useAuth();

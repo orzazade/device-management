@@ -1,4 +1,5 @@
 import { EntityManager, In } from 'typeorm';
+import { config } from '../config';
 import { EmailOutbox, Notification, NotificationRule } from '../entities/notification.entity';
 import { User } from '../entities/user.entity';
 
@@ -33,8 +34,9 @@ export async function notify(
     await manager.getRepository(EmailOutbox).insert(
       users.map((u) => ({
         toEmail: u.email,
-        subject: `DeviceDesk: ${rule.label}`,
-        body: `Hi ${u.name},\n\n${text}\n\n— DeviceDesk`,
+        // Subject carries the actual content — scannable in a full inbox.
+        subject: `DeviceDesk: ${text.length > 70 ? text.slice(0, 67) + '…' : text}`,
+        body: `Hi ${u.name},\n\n${text}\n\nOpen DeviceDesk: ${config.appUrl}${link ?? ''}\n\n— DeviceDesk`,
       })),
     );
   }

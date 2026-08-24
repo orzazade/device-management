@@ -6,6 +6,7 @@ import Chip from '../components/Chip';
 import { api } from '../lib/api';
 
 interface IdleRow {
+  neverBorrowed?: boolean;
   id: string;
   brand: string;
   model: string;
@@ -63,7 +64,9 @@ export default function Reports() {
                   <Chip status={d.status} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs">
-                  {new Date(d.lastActivity).toLocaleDateString()}
+                  {d.neverBorrowed
+                    ? `never borrowed (added ${new Date(d.lastActivity).toLocaleDateString()})`
+                    : new Date(d.lastActivity).toLocaleDateString()}
                 </td>
               </tr>
             ))}

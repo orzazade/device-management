@@ -113,7 +113,9 @@ export default function Projects() {
               )}
             </div>
             <div className="mb-3 mt-1 text-neutral-500">{p.description || '—'}</div>
-            <div className="text-neutral-500">{p.deviceCount} devices attached</div>
+            <div className="text-neutral-500">
+              {p.deviceCount == null ? '—' : `${p.deviceCount} devices attached`}
+            </div>
           </div>
         ))}
       </div>
@@ -168,7 +170,7 @@ export default function Projects() {
       {confirmDelete && (
         <ConfirmModal
           title={`Delete project "${confirmDelete.name}"?`}
-          body={`${confirmDelete.deviceCount} attached device(s) keep living — they just lose the project tag. Restorable from "Show deleted".`}
+          body={`Its attached devices keep living — they just lose the project tag (and get it back on restore). Restorable from "Show deleted".`}
           busy={remove.isPending}
           onConfirm={() => remove.mutate(confirmDelete.id)}
           onClose={() => setConfirmDelete(null)}
