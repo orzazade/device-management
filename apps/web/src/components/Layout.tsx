@@ -55,6 +55,12 @@ export default function Layout() {
     enabled: !!user && staff,
     refetchInterval: 30000,
   });
+  const overdue = useQuery({
+    queryKey: ['requests', 'overdue-count'],
+    queryFn: () => api<RequestRow[]>('/requests?scope=all&state=overdue'),
+    enabled: !!user && staff,
+    refetchInterval: 60000,
+  });
   if (loading) return <p className="p-10 text-neutral-400">loading…</p>;
   if (!user) return <Navigate to="/login" replace />;
 
@@ -92,6 +98,10 @@ export default function Layout() {
             <NavLink to="/approvals" className={linkCls}>
               Approvals
               <Badge n={approvals.data?.length} />
+            </NavLink>
+            <NavLink to="/loans" className={linkCls}>
+              Loans
+              <Badge n={overdue.data?.length} />
             </NavLink>
             <NavLink to="/projects" className={linkCls}>Projects</NavLink>
             <NavLink to="/users" className={linkCls}>Users</NavLink>

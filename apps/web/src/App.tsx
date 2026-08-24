@@ -7,6 +7,7 @@ import Approvals from './pages/Approvals';
 import Audit from './pages/Audit';
 import Dashboard from './pages/Dashboard';
 import Handovers from './pages/Handovers';
+import Loans from './pages/Loans';
 import Requests from './pages/Requests';
 import DeviceDetail from './pages/DeviceDetail';
 import Devices from './pages/Devices';
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="/handovers" element={<Handovers />} />
               <Route path="/repairs" element={<Repairs />} />
               <Route element={<RequireRole roles={['admin', 'manager']} />}>
+                <Route path="/loans" element={<Loans />} />
                 <Route path="/approvals" element={<Approvals />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/projects" element={<Projects />} />
