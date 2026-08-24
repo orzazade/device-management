@@ -107,6 +107,7 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
           device: `${device.brand} ${device.model}`,
           requester: requesterName,
           range: `${data.fromDate} – ${data.toDate}`,
+          reason: data.reason,
         },
       });
       // Config flag (GOALS.md): 'all' = everything needs approval (launch),
@@ -203,6 +204,11 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
         const clash = await conflictingBooking(
           ctx, request.deviceId, request.fromDate, request.toDate, request.id,
         );
+        if (clash && clash.state !== 'overdue') {
+          throw new ConflictException(
+            `This clashes with an existing ${clash.state} booking (${clash.fromDate} – ${clash.toDate})`,
+          );
+        }
         if (clash?.state === 'overdue') {
           throw new ConflictException(
             'This device is overdue with its current holder — check it in before approving new bookings',
@@ -356,6 +362,14 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
       if (device.status === 'retired' || device.status === 'in_repair') {
         throw new ConflictException(
           `Device is ${device.status.replace('_', ' ')} — it cannot be handed over`,
+        );
+      }
+      // No handover before the booking starts — the calendar promise
+      // means something.
+      const startToday = new Date().toISOString().slice(0, 10);
+      if (request.fromDate > startToday) {
+        throw new ConflictException(
+          `This booking starts ${request.fromDate} — hand over on or after that day`,
         );
       }
       const old = transition(request, 'active');

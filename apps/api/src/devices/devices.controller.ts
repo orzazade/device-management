@@ -130,6 +130,9 @@ export class DevicesController {
       .orderBy('d.brand')
       .addOrderBy('d.model');
     const staffUser = req.user.role === 'admin' || req.user.role === 'manager';
+    if (status && status !== 'deleted' && !(DEVICE_STATUSES as readonly string[]).includes(status)) {
+      throw new BadRequestException(`Unknown status "${status}"`);
+    }
     if (status === 'deleted' && staffUser) {
       qb.andWhere('d.deletedAt IS NOT NULL');
     } else {

@@ -25,6 +25,7 @@ import { OneOpenLoan1725300000000 } from '../migrations/1725300000000-one-open-l
 import { OutboxBackoff1725400000000 } from '../migrations/1725400000000-outbox-backoff';
 import { MoreRules1725500000000 } from '../migrations/1725500000000-more-rules';
 import { DecisionNote1725600000000 } from '../migrations/1725600000000-decision-note';
+import { AuditHardening1725700000000 } from '../migrations/1725700000000-audit-hardening';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -56,6 +57,7 @@ export const dataSourceOptions: DataSourceOptions = {
     OutboxBackoff1725400000000,
     MoreRules1725500000000,
     DecisionNote1725600000000,
+    AuditHardening1725700000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

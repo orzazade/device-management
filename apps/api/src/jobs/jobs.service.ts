@@ -101,7 +101,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Marks active requests past their to-date as overdue. Returns count. */
-  async scanOverdue(): Promise<number> {
+  async scanOverdue(byActor?: { id: string | null; name: string }): Promise<number> {
     const today = new Date().toISOString().slice(0, 10);
     const late = await this.db
       .requests()
@@ -123,7 +123,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         if (!res.affected) return;
         const old = 'active';
         r.state = 'overdue';
-        await writeAudit(ctx.manager, SYSTEM_ACTOR, {
+        await writeAudit(ctx.manager, byActor ?? SYSTEM_ACTOR, {
           entityType: 'request',
           entityId: r.id,
           action: 'marked_overdue',

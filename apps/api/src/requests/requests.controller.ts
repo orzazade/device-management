@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -13,10 +14,10 @@ import { CommandBus } from '@nestjs/cqrs';
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MinLength,
 } from 'class-validator';
 import { AuthUser, Roles } from '../auth/auth.guard';
@@ -40,10 +41,10 @@ class CreateRequestDto {
   @MinLength(5)
   reason: string;
 
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fromDate must be YYYY-MM-DD' })
   fromDate: string;
 
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'toDate must be YYYY-MM-DD' })
   toDate: string;
 
   /** Staff only: request on behalf of this user. */
@@ -59,10 +60,10 @@ class RejectDto {
 }
 
 class TimeDto {
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fromDate must be YYYY-MM-DD' })
   fromDate: string;
 
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'toDate must be YYYY-MM-DD' })
   toDate: string;
 }
 
@@ -115,6 +116,12 @@ export class RequestsController {
   async create(@Body() dto: CreateRequestDto, @Req() req: { user: AuthUser }) {
     const requesterId =
       dto.onBehalfOfId && staff(req.user) ? dto.onBehalfOfId : req.user.sub;
+    if (requesterId !== req.user.sub) {
+      const target = await this.db.users().findOne({ where: { id: requesterId, active: true } });
+      if (!target) {
+        throw new BadRequestException('That user is deactivated or gone — pick someone active');
+      }
+    }
     const r: DeviceRequest = await this.bus.execute(
       new CreateRequestCommand(actor(req), {
         deviceId: dto.deviceId,
@@ -136,6 +143,7 @@ export class RequestsController {
     const qb = this.db
       .requests()
       .createQueryBuilder('r')
+      .withDeleted() // history must outlive a deleted device
       .leftJoinAndSelect('r.device', 'device')
       .leftJoinAndSelect('device.holder', 'deviceHolder')
       .leftJoinAndSelect('r.requester', 'requester')
@@ -232,8 +240,8 @@ export class RequestsController {
   /** Manual overdue scan — same code the hourly job runs, for ops and tests. */
   @Post('scan-overdue')
   @Roles('admin', 'manager')
-  async scanOverdue() {
-    const marked = await this.jobs.scanOverdue();
+  async scanOverdue(@Req() req: { user: AuthUser }) {
+    const marked = await this.jobs.scanOverdue(actor(req));
     return { marked };
   }
 
@@ -249,6 +257,7 @@ export class RequestsController {
     const r = await this.db.requests().findOne({
       where: { id },
       relations: { device: { holder: true }, requester: true },
+      withDeleted: true,
     });
     return pub(r!);
   }

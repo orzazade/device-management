@@ -67,7 +67,7 @@ export default function App() {
                 <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
-              <Route element={<RequireRole roles={['admin']} />}>
+              <Route element={<RequireRole roles={['admin', 'manager']} />}>
                 <Route path="/audit" element={<Audit />} />
               </Route>
               <Route path="*" element={<NotFound />} />

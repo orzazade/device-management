@@ -11,7 +11,7 @@ export class AuditController {
   /** Filterable, keyset-paginated. `beforeId` = id of the oldest row the
    * client already has; results are always newest-first. */
   @Get()
-  @Roles('admin')
+  @Roles('admin', 'manager')
   async list(
     @Query('limit') limit?: string,
     @Query('entityType') entityType?: string,

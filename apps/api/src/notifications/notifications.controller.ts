@@ -52,9 +52,13 @@ export class NotificationsController {
   @Post('notifications/:id/read')
   async readOne(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     // Scoped to the caller: nobody can mark someone else's notification.
-    await this.db
+    const res = await this.db
       .notifications()
       .update({ id, userId: req.user.sub, readAt: IsNull() }, { readAt: new Date() });
+    if (!res.affected) {
+      const mine = await this.db.notifications().findOne({ where: { id, userId: req.user.sub } });
+      if (!mine) throw new NotFoundException('Not your notification');
+    }
     return { ok: true };
   }
 

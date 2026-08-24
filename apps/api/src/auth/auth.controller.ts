@@ -78,6 +78,14 @@ export class AuthController {
       throw new UnauthorizedException('Wrong email or password');
     }
     this.fails.delete(key);
+    await this.db.withTransaction(async (ctx) => {
+      await writeAudit(ctx.manager, { id: user.id, name: user.name }, {
+        entityType: 'user',
+        entityId: user.id,
+        action: 'signed_in',
+        newValue: { email: user.email },
+      });
+    });
 
     const payload: AuthUser = {
       sub: user.id,
