@@ -311,8 +311,10 @@ export class ReturnRequestHandler implements ICommandHandler<ReturnRequestComman
 
       const device = request.device;
       device.holderId = null;
+      // A device retired while on loan stays retired — a return check-in
+      // must never resurrect written-off hardware.
       if (data.damaged) {
-        device.status = 'in_repair';
+        if (device.status !== 'retired') device.status = 'in_repair';
         device.damageNote = data.damageNote?.trim() || 'Damage found at return check-in';
         await ctx.repairs.save({
           deviceId: device.id,
@@ -320,7 +322,7 @@ export class ReturnRequestHandler implements ICommandHandler<ReturnRequestComman
           issue: device.damageNote,
           state: 'in_repair',
         });
-      } else {
+      } else if (device.status !== 'retired') {
         device.status = 'available';
       }
       await ctx.devices.save(device);

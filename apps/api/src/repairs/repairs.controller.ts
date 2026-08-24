@@ -126,8 +126,12 @@ export class RepairsController {
         device.holderId = null;
       }
       if (next === 'fixed') {
-        device.status = 'available';
-        device.damageNote = null;
+        // Only revive a device that is actually out for this repair — a
+        // written-off (retired) device must never come back via 'fixed'.
+        if (device.status === 'in_repair') {
+          device.status = 'available';
+          device.damageNote = null;
+        }
         repair.closedAt = new Date();
       }
       await ctx.devices.save(device);
@@ -157,6 +161,25 @@ export class RepairsController {
       if (!repair) throw new NotFoundException('Repair not found');
       const old = repairTransition(repair, 'written_off');
       const device = repair.device;
+      // Retirement ends any open loan — otherwise a later return check-in
+      // would flip the retired device back to available.
+      const open = await ctx.requests.find({
+        where: [
+          { deviceId: device.id, state: 'active' },
+          { deviceId: device.id, state: 'overdue' },
+        ],
+      });
+      for (const p of open) {
+        const pOld = requestTransition(p, 'returned');
+        await ctx.requests.save(p);
+        await writeAudit(ctx.manager, actor(req), {
+          entityType: 'request',
+          entityId: p.id,
+          action: 'closed_by_write_off',
+          oldValue: { state: pOld },
+          newValue: { state: 'returned' },
+        });
+      }
       device.status = 'retired';
       device.holderId = null;
       repair.closedAt = new Date();
