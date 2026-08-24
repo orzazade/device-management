@@ -26,6 +26,13 @@ export default function Repairs() {
   const [writeOffFor, setWriteOffFor] = useState<RepairRow | null>(null);
   const [cancelFor, setCancelFor] = useState<RepairRow | null>(null);
   const rows = useQuery({ queryKey: ['repairs'], queryFn: () => api<RepairRow[]>('/repairs') });
+  const [tab, setTab] = useState<'open' | 'closed'>('open');
+  const OPEN_STATES = ['reported', 'repair_requested', 'in_repair'];
+  const visible = rows.data?.filter((r) =>
+    tab === 'open' ? OPEN_STATES.includes(r.state) : !OPEN_STATES.includes(r.state),
+  );
+  const openCount = rows.data?.filter((r) => OPEN_STATES.includes(r.state)).length ?? 0;
+  const closedCount = (rows.data?.length ?? 0) - openCount;
 
   const act = useMutation({
     mutationFn: ({ id, verb, body }: { id: string; verb: 'advance' | 'write-off' | 'cancel'; body?: Record<string, unknown> }) =>
@@ -56,6 +63,19 @@ export default function Repairs() {
         </span>
       </div>
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
+      <div className="mb-3 flex gap-1.5">
+        {(['open', 'closed'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold ${
+              tab === t ? 'bg-accent text-white' : 'border border-neutral-300 bg-white'
+            }`}
+          >
+            {t === 'open' ? `Open (${openCount})` : `Closed (${closedCount})`}
+          </button>
+        ))}
+      </div>
       <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
         <table className="w-full border-collapse">
           <thead>
@@ -69,7 +89,7 @@ export default function Repairs() {
             </tr>
           </thead>
           <tbody>
-            {rows.data?.map((r) => (
+            {visible?.map((r) => (
               <tr key={r.id} className="border-b border-neutral-100 align-top last:border-0">
                 <td className="px-4 py-2.5">
                   <b>
@@ -120,8 +140,10 @@ export default function Repairs() {
             ))}
           </tbody>
         </table>
-        {rows.data?.length === 0 && (
-          <p className="p-6 text-neutral-400">No repairs. Long may it last.</p>
+        {visible?.length === 0 && (
+          <p className="p-6 text-neutral-400">
+            {tab === 'open' ? 'No open repairs. Long may it last.' : 'Nothing closed yet.'}
+          </p>
         )}
       </div>
 

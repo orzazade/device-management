@@ -24,3 +24,9 @@ body {
 .toast-in {
   animation: toast-in 0.18s ease-out;
 }
+
+/* Native controls follow the brand accent instead of browser blue. */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--color-accent, #6d28d9);
+}

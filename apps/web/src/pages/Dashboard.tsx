@@ -141,7 +141,14 @@ export default function Dashboard() {
                   </b>
                   <br />
                   <small className="text-neutral-500">
-                    {d.os} {d.osVersion}
+                    {(() => {
+                      const loan = myRequests.data?.find(
+                        (r) => r.device.id === d.id && ['active', 'overdue'].includes(r.state),
+                      );
+                      return loan
+                        ? `due back ${loan.toDate}`
+                        : `${d.os} ${d.osVersion}`;
+                    })()}
                   </small>
                 </span>
                 <Chip status={d.status} />

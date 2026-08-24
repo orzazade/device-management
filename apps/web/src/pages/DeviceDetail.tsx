@@ -12,7 +12,7 @@ import Chip from '../components/Chip';
 import DeviceEditModal from '../components/DeviceEditModal';
 import RequestModal from '../components/RequestModal';
 import { isStaff, useAuth } from '../lib/auth';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import type { AuditRow, DeviceRow } from '../lib/types';
 
 export default function DeviceDetail() {
@@ -68,6 +68,14 @@ export default function DeviceDetail() {
 
   const d = device.data;
   if (device.isLoading) return <p className="text-neutral-400">loading…</p>;
+  if (device.isError) {
+    const notFound = device.error instanceof ApiError && device.error.status === 404;
+    return notFound ? (
+      <p className="text-neutral-400">Device not found — it may have been deleted.</p>
+    ) : (
+      <LoadFailed what="this device" onRetry={() => device.refetch()} />
+    );
+  }
   if (!d) return <p className="text-neutral-400">Device not found.</p>;
 
   const tabBtn = (key: typeof tab, label: string) => (

@@ -136,8 +136,8 @@ export function VField({
       <span className="mb-1 flex items-baseline justify-between text-xs font-semibold text-neutral-500">
         {label}
         {maxLength && (
-          <span className={`font-normal ${count > maxLength * 0.9 ? 'text-amber-600' : 'text-neutral-400'}`}>
-            {count}/{maxLength}
+          <span className={`font-normal ${count >= maxLength ? 'font-semibold text-amber-700' : count > maxLength * 0.9 ? 'text-amber-600' : 'text-neutral-400'}`}>
+            {count}/{maxLength}{count >= maxLength ? ' — limit reached, extra text is cut' : ''}
           </span>
         )}
       </span>

@@ -14,7 +14,10 @@ function human(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'boolean') return v ? 'On' : 'Off';
   if (Array.isArray(v)) return v.length ? v.map(human).join(', ') : '—';
-  if (typeof v === 'object') return Object.values(v as object).map(human).join(', ');
+  if (typeof v === 'object')
+    return Object.entries(v as Record<string, unknown>)
+      .map(([k, val]) => `${label(k)}: ${human(val)}`)
+      .join(' · ');
   return String(v).replace(/_/g, ' ');
 }
 

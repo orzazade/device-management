@@ -84,6 +84,35 @@ export default function Audit() {
         <input type="date" value={from} onChange={(e) => setFilter('from', e.target.value)} className={filterCls} />
         <span className="text-neutral-400">–</span>
         <input type="date" value={to} onChange={(e) => setFilter('to', e.target.value)} className={filterCls} />
+        <button
+          onClick={() => {
+            const rowsFlat = pages.data?.pages.flat() ?? [];
+            const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+            const csv = [
+              ['when', 'who', 'entity', 'entityLabel', 'action', 'oldValue', 'newValue'].join(','),
+              ...rowsFlat.map((r) =>
+                [
+                  r.createdAt,
+                  r.actorName,
+                  r.entityType,
+                  r.entityLabel ?? '',
+                  r.action,
+                  JSON.stringify(r.oldValue ?? null),
+                  JSON.stringify(r.newValue ?? null),
+                ].map(esc).join(','),
+              ),
+            ].join('\n');
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm font-semibold"
+        >
+          Export CSV
+        </button>
         {(entityType || actor || from || to) && (
           <button
             onClick={() => setParams(new URLSearchParams(), { replace: true })}

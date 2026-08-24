@@ -104,8 +104,14 @@ export class UsersController {
         .getMany();
       return gone.map(pub);
     }
-    const users = await this.db.users().find({ order: { createdAt: 'ASC' } });
-    return users.map(pub);
+    const users = await this.db.users().find({ order: { name: 'ASC' } });
+    // Who holds how many devices — the column the design reference had.
+    const holds: { holder_id: string; n: string }[] = await this.db.devices().query(
+      `SELECT holder_id, COUNT(*)::int AS n FROM devices
+       WHERE holder_id IS NOT NULL AND deleted_at IS NULL GROUP BY holder_id`,
+    );
+    const byId = new Map(holds.map((h) => [h.holder_id, Number(h.n)]));
+    return users.map((u) => ({ ...pub(u), holds: byId.get(u.id) ?? 0 }));
   }
 
   @Delete(':id')
@@ -150,7 +156,8 @@ export class UsersController {
       if (!user || !user.deletedAt) throw new NotFoundException('No deleted user with this id');
       await ctx.users.restore(id);
       user.deletedAt = null;
-      user.active = true;
+      // Deliberately NOT reactivated: restoring history must not silently
+      // re-enable sign-in. The admin flips Active on explicitly.
       await ctx.users.save(user);
       await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
         entityType: 'user',

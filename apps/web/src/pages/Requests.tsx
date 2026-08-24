@@ -3,6 +3,7 @@ import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import RequestTable from '../components/RequestTable';
+import ConfirmModal from '../components/ConfirmModal';
 import Modal from '../components/Modal';
 import ReturnModal from '../components/ReturnModal';
 import { api } from '../lib/api';
@@ -14,6 +15,8 @@ export default function Requests() {
   const [error, setError] = useState<string | null>(null);
   const [returnFor, setReturnFor] = useState<RequestRow | null>(null);
   const [extendFor, setExtendFor] = useState<RequestRow | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<RequestRow | null>(null);
+  const [filter, setFilter] = useState<'open' | 'all'>('open');
   const rows = useQuery({
     queryKey: ['requests', 'mine'],
     queryFn: () => api<RequestRow[]>('/requests'),
@@ -53,15 +56,32 @@ export default function Requests() {
         </Link>
       </div>
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
+      <div className="mb-3 flex gap-1.5">
+        {(['open', 'all'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setFilter(t)}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold ${
+              filter === t ? 'bg-accent text-white' : 'border border-neutral-300 bg-white'
+            }`}
+          >
+            {t === 'open' ? 'Open' : 'All'}
+          </button>
+        ))}
+      </div>
       <RequestTable
-        rows={rows.data}
+        rows={
+          filter === 'open'
+            ? rows.data?.filter((r) => !['returned', 'rejected', 'cancelled'].includes(r.state))
+            : rows.data
+        }
         error={rows.isError}
         onRetry={() => rows.refetch()}
-        empty="No requests yet. Find a device and ask for it."
+        empty={filter === 'open' ? 'Nothing open. Find a device and ask for it.' : 'No requests yet.'}
         actions={(r) =>
           r.state === 'pending' || r.state === 'approved' ? (
             <button
-              onClick={() => cancel.mutate(r.id)}
+              onClick={() => (r.state === 'approved' ? setConfirmCancel(r) : cancel.mutate(r.id))}
               disabled={cancel.isPending}
               className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
             >
@@ -86,6 +106,19 @@ export default function Requests() {
         }
       />
       {returnFor && <ReturnModal request={returnFor} onClose={() => setReturnFor(null)} />}
+      {confirmCancel && (
+        <ConfirmModal
+          title="Cancel this booking?"
+          body={`Your approved booking for ${confirmCancel.device.brand} ${confirmCancel.device.model} (${confirmCancel.fromDate} – ${confirmCancel.toDate}) is released for others. This can't be undone — you'd have to request again.`}
+          confirmLabel="Cancel booking"
+          busy={cancel.isPending}
+          onConfirm={() => {
+            cancel.mutate(confirmCancel.id);
+            setConfirmCancel(null);
+          }}
+          onClose={() => setConfirmCancel(null)}
+        />
+      )}
       {extendFor && (
         <Modal onClose={() => setExtendFor(null)}>
           <form

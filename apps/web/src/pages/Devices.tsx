@@ -19,13 +19,13 @@ export default function Devices() {
   const { user } = useAuth();
   const nav = useNavigate();
   const qc = useQueryClient();
-  const [urlParams] = useSearchParams();
+  const [urlParams, setUrlParams] = useSearchParams();
   const [q, setQ] = useState(urlParams.get('q') ?? '');
   // The header's global search lands here as ?q=… — keep the box in sync.
   useEffect(() => setQ(urlParams.get('q') ?? ''), [urlParams]);
-  const [brand, setBrand] = useState('');
-  const [os, setOs] = useState('');
-  const [status, setStatus] = useState('');
+  const [brand, setBrand] = useState(urlParams.get('brand') ?? '');
+  const [os, setOs] = useState(urlParams.get('os') ?? '');
+  const [status, setStatus] = useState(urlParams.get('status') ?? '');
   const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -33,6 +33,15 @@ export default function Devices() {
   const [error, setError] = useState<string | null>(null);
 
   const params = new URLSearchParams();
+  // Filters mirror into the URL so back-from-a-device keeps them.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (q) next.set('q', q);
+    if (brand) next.set('brand', brand);
+    if (os) next.set('os', os);
+    if (status) next.set('status', status);
+    if (next.toString() !== urlParams.toString()) setUrlParams(next, { replace: true });
+  }, [q, brand, os, status]);
   // Debounced search: one request ~250ms after typing stops, and the
   // previous rows stay on screen while the next result loads.
   const [dq, setDq] = useState(q);

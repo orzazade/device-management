@@ -31,7 +31,7 @@ export async function api<T>(
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith('/auth/login')) {
       tokenStore.clear();
-      window.location.href = '/login';
+      window.location.href = '/login?expired=1';
     }
     const msg = Array.isArray(body?.message)
       ? body.message.join('; ')

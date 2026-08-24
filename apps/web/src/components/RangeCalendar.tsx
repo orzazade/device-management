@@ -32,9 +32,11 @@ export default function RangeCalendar({
   value: DateRange;
   onChange: (v: DateRange) => void;
 }) {
+  // Open on the month of the current selection, not always "now" —
+  // otherwise a future booking's override calendar looks empty.
   const [month, setMonth] = useState(() => {
-    const n = new Date();
-    return new Date(n.getFullYear(), n.getMonth(), 1);
+    const base = value.from ? new Date(value.from + 'T12:00:00') : new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
   });
   const [hint, setHint] = useState<string | null>(null);
 

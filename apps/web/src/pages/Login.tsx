@@ -5,19 +5,22 @@ import { useAuth } from '../lib/auth';
 import { email, required } from '../lib/validate';
 
 export default function Login() {
-  const { user, login } = useAuth();
+  const { user, loading, login } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/';
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // No form flash for someone who is already signed in (F193).
+  if (loading) return <p className="p-10 text-center text-neutral-400">loading…</p>;
   if (user) return <Navigate to={from} replace />;
+  const expired = new URLSearchParams(location.search).get('expired') === '1';
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center p-4">
       <VForm
-        className="w-90 rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
+        className="w-full max-w-90 rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
         onValidSubmit={async (f) => {
           setBusy(true);
           setError(null);
@@ -25,7 +28,8 @@ export default function Login() {
             await login(String(f.get('email')), String(f.get('password')));
             nav(from);
           } catch (err) {
-            setError(err instanceof Error ? err.message : 'Login failed');
+            const msg = err instanceof Error ? err.message : 'Login failed';
+            setError(msg.includes('fetch') ? 'Can’t reach the server — check the connection and try again' : msg);
           } finally {
             setBusy(false);
           }
@@ -35,6 +39,11 @@ export default function Login() {
         <small className="mb-6 block text-[10.5px] uppercase tracking-wider text-neutral-500">
           QA Device Lab
         </small>
+        {expired && (
+          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Your session expired — sign in again to continue.
+          </p>
+        )}
         <div className="mb-3">
           <VField
             name="email"

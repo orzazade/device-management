@@ -14,6 +14,7 @@ interface UserRow {
   email: string;
   role: Role;
   active: boolean;
+  holds?: number;
   createdAt: string;
 }
 
@@ -29,6 +30,7 @@ export default function Users() {
   const [confirmDelete, setConfirmDelete] = useState<UserRow | null>(null);
   const [roleChange, setRoleChange] = useState<{ user: UserRow; role: Role } | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const users = useQuery({
@@ -99,6 +101,13 @@ export default function Users() {
       <div className="mb-4 flex items-center gap-3">
         <h1 className="text-xl font-bold">Users</h1>
         <div className="flex-1" />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name or email…"
+          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm focus:border-accent focus:outline-none"
+        />
         <label className="flex items-center gap-1.5 text-neutral-500">
           <input
             type="checkbox"
@@ -124,12 +133,20 @@ export default function Users() {
               <th className="px-4 py-2.5">Name</th>
               <th className="px-4 py-2.5">Email</th>
               <th className="px-4 py-2.5">Role</th>
+              <th className="px-4 py-2.5">Holds</th>
               <th className="px-4 py-2.5">Status</th>
               <th className="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody>
-            {users.data?.map((u) => (
+            {users.data
+              ?.filter(
+                (u) =>
+                  !q ||
+                  u.name.toLowerCase().includes(q.toLowerCase()) ||
+                  u.email.toLowerCase().includes(q.toLowerCase()),
+              )
+              .map((u) => (
               <tr key={u.id} className="border-b border-neutral-100 last:border-0">
                 <td className="px-4 py-2.5 font-semibold">{u.name}</td>
                 <td className="px-4 py-2.5 font-mono text-xs">{u.email}</td>
@@ -153,8 +170,13 @@ export default function Users() {
                     roleLabel[u.role]
                   )}
                 </td>
+                <td className="px-4 py-2.5 tabular-nums">{u.holds ?? '—'}</td>
                 <td className="px-4 py-2.5">
-                  {u.active ? (
+                  {showDeleted ? (
+                    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                      Deleted
+                    </span>
+                  ) : u.active ? (
                     <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
                       Active
                     </span>

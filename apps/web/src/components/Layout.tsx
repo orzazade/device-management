@@ -58,6 +58,12 @@ export default function Layout() {
     enabled: !!user && staff,
     refetchInterval: 30000,
   });
+  const dash = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => api<{ openRepairs: number }>('/reports/dashboard'),
+    enabled: !!user,
+    refetchInterval: 60000,
+  });
   const overdue = useQuery({
     queryKey: ['requests', 'overdue-count'],
     queryFn: () => api<RequestRow[]>('/requests?scope=all&state=overdue'),
@@ -109,7 +115,10 @@ export default function Layout() {
           Handovers
           <Badge n={handovers.data?.length} />
         </NavLink>
-        <NavLink to="/repairs" className={linkCls}>Repairs</NavLink>
+        <NavLink to="/repairs" className={linkCls}>
+          Repairs
+          <Badge n={dash.data?.openRepairs} />
+        </NavLink>
         {staff && (
           <>
             <Section label="Manage" />
