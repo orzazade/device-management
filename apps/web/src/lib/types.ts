@@ -13,6 +13,7 @@ export interface DeviceRow {
   damageNote: string | null;
   accessories: string[];
   holder: { id: string; name: string } | null;
+  busy?: { until: string; state: 'active' | 'overdue' } | null;
   project: { id: string; name: string } | null;
   createdAt: string;
 }

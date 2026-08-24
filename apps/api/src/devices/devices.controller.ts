@@ -144,7 +144,15 @@ export class DevicesController {
     }
     if (brand) qb.andWhere('d.brand = :brand', { brand });
     if (os) qb.andWhere('d.os = :os', { os });
-    return (await qb.getMany()).map(pub);
+    const rows = await qb.getMany();
+    // "When does it come free?" — the end date of the current loan.
+    const open = rows.length
+      ? await this.db.requests().find({
+          where: { deviceId: In(rows.map((r) => r.id)), state: In(['active', 'overdue']) },
+        })
+      : [];
+    const busy = new Map(open.map((l) => [l.deviceId, { until: l.toDate, state: l.state }]));
+    return rows.map((d) => ({ ...pub(d), busy: busy.get(d.id) ?? null }));
   }
 
   @Delete(':id')

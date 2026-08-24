@@ -163,6 +163,14 @@ export default function Devices() {
                   {d.damageNote && <span title={d.damageNote}> 🛠</span>}
                   <br />
                   <span className="font-mono text-xs text-neutral-500">{d.serial}</span>
+                  {Boolean(d.specs?.ram || d.specs?.storage || d.specs?.chipset) && (
+                    <span className="block text-xs text-neutral-500">
+                      {[d.specs?.chipset, d.specs?.ram, d.specs?.storage]
+                        .filter(Boolean)
+                        .map(String)
+                        .join(' · ')}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2.5">
                   {d.os} {d.osVersion}
@@ -170,7 +178,14 @@ export default function Devices() {
                 <td className="px-4 py-2.5">
                   <Chip status={d.status} />
                 </td>
-                <td className="px-4 py-2.5">{d.holder?.name ?? '—'}</td>
+                <td className="px-4 py-2.5">
+                  {d.holder?.name ?? '—'}
+                  {d.busy && (
+                    <span className="block text-xs text-neutral-500">
+                      free from {d.busy.until}{d.busy.state === 'overdue' ? ' (overdue)' : ''}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5">{d.project?.name ?? '—'}</td>
                 <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                   {status === 'deleted' ? (

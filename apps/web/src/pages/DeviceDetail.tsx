@@ -25,6 +25,13 @@ export default function DeviceDetail() {
     queryKey: ['device', id],
     queryFn: () => api<DeviceRow>(`/devices/${id}`),
   });
+  const bookings = useQuery({
+    queryKey: ['device-bookings', id],
+    queryFn: () =>
+      api<{ fromDate: string; toDate: string; kind: 'booked' | 'requested' }[]>(
+        `/devices/${id}/bookings`,
+      ),
+  });
   const qc = useQueryClient();
   const toast = useToast();
   const [showDamage, setShowDamage] = useState(false);
@@ -112,6 +119,35 @@ export default function DeviceDetail() {
       </div>
       {showRequest && <RequestModal device={d} onClose={() => setShowRequest(false)} />}
       {showEdit && <DeviceEditModal device={d} onClose={() => setShowEdit(false)} />}
+
+      {(d.holder || (bookings.data?.length ?? 0) > 0) && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm shadow-sm">
+          <span className="font-semibold text-neutral-500">Availability</span>
+          {d.holder && (
+            <span>
+              Held by <b>{d.holder.name}</b>
+              {(() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const current = bookings.data?.find(
+                  (b) => b.kind === 'booked' && b.fromDate <= today,
+                );
+                return current ? <> until <b>{current.toDate}</b></> : null;
+              })()}
+            </span>
+          )}
+          {bookings.data
+            ?.filter((b) => b.kind === 'booked' && b.fromDate > new Date().toISOString().slice(0, 10))
+            .slice(0, 3)
+            .map((b) => (
+              <span key={b.fromDate} className="text-neutral-500">
+                booked {b.fromDate} – {b.toDate}
+              </span>
+            ))}
+          {bookings.data?.some((b) => b.kind === 'requested') && (
+            <span className="text-amber-700">+ pending requests</span>
+          )}
+        </div>
+      )}
 
       {d.damageNote && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5">

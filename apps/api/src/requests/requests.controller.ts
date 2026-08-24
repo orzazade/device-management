@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -185,13 +186,25 @@ export class RequestsController {
     return this.reload(id);
   }
 
+  /** Staff can move any booking; the holder may extend their OWN active
+   * or overdue loan (the conflict checks still apply). */
   @Patch(':id/time')
-  @Roles('admin', 'manager')
   async overrideTime(
     @Param('id') id: string,
     @Body() dto: TimeDto,
     @Req() req: { user: AuthUser },
   ) {
+    if (!staff(req.user)) {
+      const r = await this.db.requests().findOne({ where: { id } });
+      const ownOpenLoan =
+        r && r.requesterId === req.user.sub && ['active', 'overdue'].includes(r.state);
+      if (!ownOpenLoan) {
+        throw new ForbiddenException('Only staff can change other bookings — you can extend your own active loan');
+      }
+      if (dto.fromDate !== r.fromDate) {
+        throw new ForbiddenException('You can only move the end date of your loan');
+      }
+    }
     await this.bus.execute(new OverrideTimeCommand(actor(req), id, dto.fromDate, dto.toDate));
     return this.reload(id);
   }
