@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import LoadFailed from '../components/LoadFailed';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Chip from '../components/Chip';
@@ -185,7 +186,10 @@ export default function Devices() {
           </tbody>
         </table>
         {devices.isLoading && <p className="p-6 text-neutral-400">loading…</p>}
-        {devices.data?.length === 0 && (
+        {devices.isError && (
+          <div className="p-4"><LoadFailed what="devices" onRetry={() => devices.refetch()} /></div>
+        )}
+        {!devices.isError && devices.data?.length === 0 && (
           <p className="p-6 text-neutral-400">No devices match. Clear a filter?</p>
         )}
       </div>

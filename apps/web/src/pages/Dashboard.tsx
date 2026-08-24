@@ -57,7 +57,12 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
         <div>
           <h2 className="mb-2 font-bold">My requests</h2>
-          <RequestTable rows={openRequests} empty="No open requests. Find a device and ask for it." />
+          <RequestTable
+            rows={openRequests}
+            empty="No open requests. Find a device and ask for it."
+            error={myRequests.isError}
+            onRetry={() => myRequests.refetch()}
+          />
         </div>
         <div>
           <h2 className="mb-2 font-bold">Devices I hold</h2>

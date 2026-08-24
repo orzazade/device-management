@@ -17,6 +17,17 @@ interface Toast {
 const Ctx = createContext<(text: string, kind?: Kind) => void>(() => {});
 export const useToast = () => useContext(Ctx);
 
+/** Imperative escape hatch for code outside the React tree (the global
+ * query error handler). ToastProvider registers itself here on mount. */
+let emit: ((text: string, kind?: Kind) => void) | null = null;
+const recent = new Map<string, number>();
+export function toastFromAnywhere(text: string, kind: Kind = 'error') {
+  const last = recent.get(text) ?? 0;
+  if (Date.now() - last < 15000) return; // same message max every 15s
+  recent.set(text, Date.now());
+  emit?.(text, kind);
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const idRef = useRef(0);
@@ -26,6 +37,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((t) => [...t, { id, text, kind }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
   }, []);
+  emit = push;
 
   return (
     <Ctx.Provider value={push}>

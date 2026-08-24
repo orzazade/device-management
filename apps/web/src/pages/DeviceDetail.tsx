@@ -3,6 +3,7 @@ import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ChangeDiff from '../components/ChangeDiff';
+import LoadFailed from '../components/LoadFailed';
 import { VForm, VField } from '../components/VForm';
 import { minLen, required } from '../lib/validate';
 import { SPEC_FIELDS, SPEC_SECTIONS } from '../lib/specs';
@@ -213,6 +214,8 @@ export default function DeviceDetail() {
                 </tbody>
               </table>
             </div>
+          ) : history.isError ? (
+            <div className="p-4"><LoadFailed what="history" onRetry={() => history.refetch()} /></div>
           ) : (
             <p className="p-6 text-neutral-400">
               {history.isLoading ? 'loading…' : 'No history yet.'}
@@ -247,6 +250,8 @@ export default function DeviceDetail() {
                 </tbody>
               </table>
             </div>
+          ) : repairs.isError ? (
+            <div className="p-4"><LoadFailed what="repairs" onRetry={() => repairs.refetch()} /></div>
           ) : (
             <p className="p-6 text-neutral-400">
               {repairs.isLoading ? 'loading…' : 'No repairs. Long may it last.'}

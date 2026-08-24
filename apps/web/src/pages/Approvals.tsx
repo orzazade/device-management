@@ -62,6 +62,8 @@ export default function Approvals() {
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
       <RequestTable
         rows={rows.data}
+        error={rows.isError}
+        onRetry={() => rows.refetch()}
         empty="Nothing waiting for approval. 🎉"
         actions={(r) => (
           <span className="flex gap-1.5">

@@ -1,7 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
-import { ToastProvider } from './components/Toasts';
+import { ToastProvider, toastFromAnywhere } from './components/Toasts';
 import { AuthProvider, useAuth, type Role } from './lib/auth';
 import Approvals from './pages/Approvals';
 import Audit from './pages/Audit';
@@ -27,6 +27,13 @@ function RequireRole({ roles }: { roles: Role[] }) {
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+  // A failed fetch must be loud everywhere — never a silently empty screen.
+  queryCache: new QueryCache({
+    onError: (err) =>
+      toastFromAnywhere(
+        err instanceof Error && err.message ? `Loading failed: ${err.message}` : 'Loading failed',
+      ),
+  }),
 });
 
 export default function App() {

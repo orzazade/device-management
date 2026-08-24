@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import LoadFailed from './LoadFailed';
 import { useToast } from './Toasts';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -97,6 +98,9 @@ export default function RequestModal({
           </span>
           {bookings.isLoading ? (
             <p className="p-4 text-neutral-400">loading calendar…</p>
+          ) : bookings.isError ? (
+            // Never show an all-free calendar when we don't KNOW it's free.
+            <LoadFailed what="availability" onRetry={() => bookings.refetch()} />
           ) : (
             <RangeCalendar bookings={bookings.data ?? []} value={range} onChange={setRange} />
           )}

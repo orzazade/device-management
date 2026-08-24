@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import LoadFailed from '../components/LoadFailed';
 import ChangeDiff from '../components/ChangeDiff';
 import { api } from '../lib/api';
 
@@ -50,6 +51,7 @@ export default function Audit() {
           </tbody>
         </table>
         {rows.isLoading && <p className="p-6 text-neutral-400">loading…</p>}
+        {rows.isError && <div className="p-4"><LoadFailed what="the audit log" onRetry={() => rows.refetch()} /></div>}
         {rows.data?.length === 0 && <p className="p-6 text-neutral-400">No entries yet.</p>}
       </div>
     </div>

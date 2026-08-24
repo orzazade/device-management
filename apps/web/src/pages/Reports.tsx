@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import LoadFailed from '../components/LoadFailed';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Chip from '../components/Chip';
@@ -68,6 +69,9 @@ export default function Reports() {
             ))}
           </tbody>
         </table>
+        {rows.isError && (
+          <div className="p-4"><LoadFailed what="the idle report" onRetry={() => rows.refetch()} /></div>
+        )}
         {rows.data?.length === 0 && (
           <p className="p-6 text-neutral-400">
             Nothing idle — every device was used in the last {days} days. 🎉

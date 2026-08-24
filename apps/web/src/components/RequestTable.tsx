@@ -1,16 +1,22 @@
 import type { ReactNode } from 'react';
 import Chip from './Chip';
+import LoadFailed from './LoadFailed';
 import type { RequestRow } from '../lib/requests';
 
 export default function RequestTable({
   rows,
   actions,
   empty = 'Nothing here.',
+  error = false,
+  onRetry,
 }: {
   rows: RequestRow[] | undefined;
   actions?: (r: RequestRow) => ReactNode;
   empty?: string;
+  error?: boolean;
+  onRetry?: () => void;
 }) {
+  if (error && onRetry) return <LoadFailed what="requests" onRetry={onRetry} />;
   return (
     <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
       <table className="w-full border-collapse">
