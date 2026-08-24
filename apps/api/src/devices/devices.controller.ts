@@ -11,6 +11,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
 import { In } from 'typeorm';
 import { writeAudit } from '../audit/audit';
@@ -291,7 +292,27 @@ export class DevicesController {
   async import(@Query('commit') commit: string, @Req() req: any) {
     const file = await req.file();
     if (!file) throw new BadRequestException('Upload an .xlsx file');
-    const buffer: Buffer = await file.toBuffer();
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch {
+      // fastify-multipart throws when the 10 MB limit trips mid-stream.
+      throw new BadRequestException(
+        'File is bigger than the 10 MB limit — split it or remove embedded images',
+      );
+    }
     return this.importer.run(buffer, actor(req), commit === 'true');
+  }
+
+  /** The column contract as a file, not a sentence: header row + one
+   * example, generated from the same map the importer reads. */
+  @Get('import/template')
+  @Roles('admin', 'manager')
+  async importTemplate(@Res({ passthrough: false }) res: any) {
+    const buffer = await this.importer.buildTemplate();
+    res
+      .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('content-disposition', 'attachment; filename="devicedesk-import-template.xlsx"')
+      .send(buffer);
   }
 }

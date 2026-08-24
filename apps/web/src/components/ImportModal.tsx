@@ -1,13 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Modal from './Modal';
 import { useRef, useState, type DragEvent } from 'react';
-import { api } from '../lib/api';
+import { api, tokenStore } from '../lib/api';
 import { useToast } from './Toasts';
 
 interface Report {
   ok: number;
   errors: { row: number; message: string }[];
   committed: boolean;
+  unknownColumns?: string[];
 }
 
 type Phase = 'pick' | 'checking' | 'report' | 'importing' | 'done';
@@ -79,11 +80,26 @@ export default function ImportModal({ onClose }: { onClose: () => void }) {
       <div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6">
         <h2 className="mb-1 text-lg font-bold">Import devices from Excel</h2>
         <p className="mb-4 text-neutral-500">
-          Columns:{' '}
-          <code className="font-mono text-xs">
-            brand, model, os, os_version, specs, serial, imei, accessories, project
-          </code>
-          . Nothing is saved until you confirm the check report.
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await fetch('/api/v1/devices/import/template', {
+                headers: { authorization: `Bearer ${tokenStore.get()}` },
+              });
+              if (!res.ok) return;
+              const url = URL.createObjectURL(await res.blob());
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'devicedesk-import-template.xlsx';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="font-semibold text-accent"
+          >
+            Download the template
+          </button>{' '}
+          — it has every column with an example row. Files up to 10 MB. Nothing is saved until
+          you confirm the check report.
         </p>
 
         {phase === 'checking' && spinner('Checking the file…')}
@@ -153,7 +169,13 @@ export default function ImportModal({ onClose }: { onClose: () => void }) {
                   <span className="mr-2 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
                     ✓ {report.ok} rows OK
                   </span>
-                  {report.errors.length > 0 && (
+                  {(report.unknownColumns?.length ?? 0) > 0 && (
+                  <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Ignored columns (not part of the template):{' '}
+                    <code className="font-mono">{report.unknownColumns!.join(', ')}</code>
+                  </p>
+                )}
+                {report.errors.length > 0 && (
                     <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">
                       ✗ {report.errors.length} rows broken
                     </span>

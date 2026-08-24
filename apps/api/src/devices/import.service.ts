@@ -13,7 +13,35 @@ export interface ImportReport {
   ok: number;
   errors: ImportRowError[];
   committed: boolean;
+  /** Headers present in the file that the importer does not read. */
+  unknownColumns?: string[];
 }
+
+/** One source of truth for spec columns: header → specs key. Bool columns
+ * accept yes/true/1. Mirrors the web SPEC_FIELDS registry. */
+export const SPEC_COLUMNS: ReadonlyArray<{ header: string; key: string; bool?: boolean }> = [
+  { header: 'chipset', key: 'chipset' },
+  { header: 'ram', key: 'ram' },
+  { header: 'storage', key: 'storage' },
+  { header: 'battery', key: 'battery' },
+  { header: 'screen', key: 'screenSize' },
+  { header: 'resolution', key: 'resolution' },
+  { header: 'refresh_rate', key: 'refreshRate' },
+  { header: '5g', key: 'fiveG', bool: true },
+  { header: 'nfc', key: 'nfc', bool: true },
+  { header: 'esim', key: 'esim', bool: true },
+  { header: 'wifi', key: 'wifi' },
+  { header: 'bluetooth', key: 'bluetooth' },
+  { header: 'fingerprint', key: 'fingerprint', bool: true },
+  { header: 'face_unlock', key: 'faceUnlock', bool: true },
+  { header: 'year', key: 'releaseYear' },
+  { header: 'color', key: 'color' },
+  { header: 'specs', key: 'notes' },
+];
+
+export const BASE_COLUMNS = [
+  'brand', 'model', 'os', 'os_version', 'serial', 'imei', 'accessories', 'project',
+];
 
 /**
  * Excel import (GOALS.md): dry run first, loud row-by-row errors, no silent
@@ -24,9 +52,42 @@ export interface ImportReport {
 export class ImportService {
   constructor(private readonly db: AppDbContext) {}
 
+  /** Template with the exact headers the importer reads + one example row. */
+  async buildTemplate(): Promise<Buffer> {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Devices');
+    const headers = [...BASE_COLUMNS, ...SPEC_COLUMNS.map((c) => c.header)];
+    ws.addRow(headers);
+    ws.getRow(1).font = { bold: true };
+    const example: Record<string, string> = {
+      brand: 'Samsung', model: 'Galaxy S24', os: 'Android', os_version: '14',
+      serial: 'RF8T2001', imei: '353912100000002', accessories: 'Box, Cable, Charger',
+      project: '', chipset: 'Exynos 2400', ram: '8 GB', storage: '128 GB',
+      battery: '4000 mAh', screen: '6.2"', resolution: '1080 × 2340',
+      refresh_rate: '120 Hz', '5g': 'yes', nfc: 'yes', esim: 'yes',
+      wifi: 'Wi-Fi 6E', bluetooth: '5.3', fingerprint: 'yes', face_unlock: 'yes',
+      year: '2024', color: 'Onyx Black', specs: 'Test-only unit',
+    };
+    ws.addRow(headers.map((h) => example[h] ?? ''));
+    const out = await wb.xlsx.writeBuffer();
+    return Buffer.from(out as ArrayBuffer);
+  }
+
   async run(buffer: Buffer, actor: Actor, commit: boolean): Promise<ImportReport> {
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+    try {
+      await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+    } catch {
+      return {
+        ok: 0,
+        errors: [{
+          row: 0,
+          message:
+            'Could not read this file as .xlsx. Old .xls files must be re-saved as .xlsx (File → Save As in Excel).',
+        }],
+        committed: false,
+      };
+    }
     const ws = wb.worksheets[0];
     if (!ws) return { ok: 0, errors: [{ row: 0, message: 'File has no sheets' }], committed: false };
 
@@ -93,18 +154,14 @@ export class ImportService {
       }
       seenSerials.add(serial);
       const specs: Record<string, unknown> = {};
-      for (const [col, key] of [
-        ['chipset', 'chipset'],
-        ['ram', 'ram'],
-        ['storage', 'storage'],
-        ['battery', 'battery'],
-        ['screen', 'screenSize'],
-        ['color', 'color'],
-        ['year', 'releaseYear'],
-        ['specs', 'notes'],
-      ] as const) {
-        const v = cellStr(row, col);
-        if (v) specs[key] = v;
+      for (const { header, key, bool } of SPEC_COLUMNS) {
+        const v = cellStr(row, header);
+        if (!v) continue;
+        if (bool) {
+          specs[key] = ['yes', 'true', '1', 'y'].includes(v.toLowerCase());
+        } else {
+          specs[key] = v;
+        }
       }
       valid.push({
         brand,
@@ -122,11 +179,20 @@ export class ImportService {
       });
     });
 
-    if (!commit) return { ok: valid.length, errors, committed: false };
+    const known = new Set([...BASE_COLUMNS, ...SPEC_COLUMNS.map((c) => c.header)]);
+    const unknownColumns = Object.keys(headers).filter((h) => !known.has(h));
+    if (!commit) return { ok: valid.length, errors, committed: false, unknownColumns };
 
     await this.db.withTransaction(async (ctx) => {
       for (const d of valid) {
-        await ctx.devices.save({ ...d, accessories: d.accessories ?? [] });
+        const saved = await ctx.devices.save({ ...d, accessories: d.accessories ?? [] });
+        // Every imported device gets its own history, like a manual add.
+        await writeAudit(ctx.manager, actor, {
+          entityType: 'device',
+          entityId: saved.id,
+          action: 'created',
+          newValue: { brand: d.brand, model: d.model, serial: d.serial, via: 'excel_import' },
+        });
       }
       await writeAudit(ctx.manager, actor, {
         entityType: 'device',
@@ -135,6 +201,6 @@ export class ImportService {
         newValue: { imported: valid.length, rejectedRows: errors.map((e) => e.row) },
       });
     });
-    return { ok: valid.length, errors, committed: true };
+    return { ok: valid.length, errors, committed: true, unknownColumns };
   }
 }
