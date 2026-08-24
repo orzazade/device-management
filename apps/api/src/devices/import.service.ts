@@ -20,22 +20,12 @@ export interface ImportReport {
 /** One source of truth for spec columns: header → specs key. Bool columns
  * accept yes/true/1. Mirrors the web SPEC_FIELDS registry. */
 export const SPEC_COLUMNS: ReadonlyArray<{ header: string; key: string; bool?: boolean }> = [
-  { header: 'chipset', key: 'chipset' },
   { header: 'ram', key: 'ram' },
   { header: 'storage', key: 'storage' },
-  { header: 'battery', key: 'battery' },
   { header: 'screen', key: 'screenSize' },
-  { header: 'resolution', key: 'resolution' },
-  { header: 'refresh_rate', key: 'refreshRate' },
   { header: '5g', key: 'fiveG', bool: true },
-  { header: 'nfc', key: 'nfc', bool: true },
   { header: 'esim', key: 'esim', bool: true },
-  { header: 'wifi', key: 'wifi' },
-  { header: 'bluetooth', key: 'bluetooth' },
-  { header: 'fingerprint', key: 'fingerprint', bool: true },
-  { header: 'face_unlock', key: 'faceUnlock', bool: true },
-  { header: 'year', key: 'releaseYear' },
-  { header: 'color', key: 'color' },
+  { header: 'nfc', key: 'nfc', bool: true },
   { header: 'specs', key: 'notes' },
 ];
 
@@ -62,11 +52,8 @@ export class ImportService {
     const example: Record<string, string> = {
       brand: 'Samsung', model: 'Galaxy S24', os: 'Android', os_version: '14',
       serial: 'RF8T2001', imei: '353912100000002', accessories: 'Box, Cable, Charger',
-      project: '', chipset: 'Exynos 2400', ram: '8 GB', storage: '128 GB',
-      battery: '4000 mAh', screen: '6.2"', resolution: '1080 × 2340',
-      refresh_rate: '120 Hz', '5g': 'yes', nfc: 'yes', esim: 'yes',
-      wifi: 'Wi-Fi 6E', bluetooth: '5.3', fingerprint: 'yes', face_unlock: 'yes',
-      year: '2024', color: 'Onyx Black', specs: 'Test-only unit',
+      project: '', ram: '8 GB', storage: '128 GB', screen: '6.2"',
+      '5g': 'yes', esim: 'yes', nfc: 'yes', specs: 'Test-only unit',
     };
     ws.addRow(headers.map((h) => example[h] ?? ''));
     const out = await wb.xlsx.writeBuffer();

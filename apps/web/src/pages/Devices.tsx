@@ -174,9 +174,9 @@ export default function Devices() {
                   {d.damageNote && <span title={d.damageNote}> 🛠</span>}
                   <br />
                   <span className="font-mono text-xs text-neutral-500">{d.serial}</span>
-                  {Boolean(d.specs?.ram || d.specs?.storage || d.specs?.chipset) && (
+                  {Boolean(d.specs?.ram || d.specs?.storage || d.specs?.screenSize) && (
                     <span className="block text-xs text-neutral-500">
-                      {[d.specs?.chipset, d.specs?.ram, d.specs?.storage]
+                      {[d.specs?.ram, d.specs?.storage, d.specs?.screenSize]
                         .filter(Boolean)
                         .map(String)
                         .join(' · ')}
