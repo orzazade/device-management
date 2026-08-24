@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { useToast } from '../components/Toasts';
 import Chip from '../components/Chip';
 import RequestTable from '../components/RequestTable';
 import { api } from '../lib/api';
@@ -16,9 +17,35 @@ function Stat({ k, label }: { k: number | string; label: string }) {
   );
 }
 
+interface DashStats {
+  availableNow: number;
+  openRepairs: number;
+  overdue: { id: string; device: string; holder: string; dueDate: string }[];
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
   const devices = useQuery({ queryKey: ['devices'], queryFn: () => api<DeviceRow[]>('/devices') });
+  const stats = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => api<DashStats>('/reports/dashboard'),
+    refetchInterval: 60000,
+  });
+  const handovers = useQuery({
+    queryKey: ['requests', 'pending-handover'],
+    queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
+  });
+  const confirmHandover = useMutation({
+    mutationFn: (id: string) => api(`/requests/${id}/handover`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requests'] });
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      toast('Handover confirmed');
+    },
+    onError: (e) => toast(e.message, 'error'),
+  });
   const myRequests = useQuery({
     queryKey: ['requests', 'mine'],
     queryFn: () => api<RequestRow[]>('/requests'),
@@ -40,20 +67,55 @@ export default function Dashboard() {
         <h1 className="text-xl font-bold">Hi, {user?.name.split(' ')[0]}</h1>
         <p className="text-neutral-500">Here’s the lab right now.</p>
       </div>
+      {isStaff(user?.role) && (stats.data?.overdue.length ?? 0) > 0 && (
+        <div className="mb-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3">
+          <b className="text-red-800">
+            {stats.data!.overdue.length} device{stats.data!.overdue.length > 1 ? 's are' : ' is'} overdue
+          </b>
+          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-0.5 text-red-800">
+            {stats.data!.overdue.map((o) => (
+              <span key={o.id}>
+                {o.device} — {o.holder} (due {o.dueDate})
+              </span>
+            ))}
+          </div>
+          <Link to="/loans" className="mt-1 inline-block font-semibold text-red-700">
+            Chase them on the Loans board →
+          </Link>
+        </div>
+      )}
       <div className="mb-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-        <Stat
-          k={devices.data?.filter((d) => d.status === 'available').length ?? '…'}
-          label="Devices available now"
-        />
+        <Link to="/devices" className="text-inherit no-underline">
+          <Stat k={stats.data?.availableNow ?? '…'} label="Devices available now" />
+        </Link>
         <Stat k={mine.length} label="In my hands" />
         {isStaff(user?.role) && (
-          <Stat k={pending.data?.length ?? '…'} label="Waiting for approval" />
+          <Link to="/approvals" className="text-inherit no-underline">
+            <Stat k={pending.data?.length ?? '…'} label="Waiting for approval" />
+          </Link>
         )}
-        <Stat
-          k={devices.data?.filter((d) => d.status === 'in_repair').length ?? '…'}
-          label="In repair"
-        />
+        <Link to="/repairs" className="text-inherit no-underline">
+          <Stat k={stats.data?.openRepairs ?? '…'} label="In repair flow" />
+        </Link>
       </div>
+      {(handovers.data?.length ?? 0) > 0 && (
+        <div className="mb-5">
+          <h2 className="mb-2 font-bold">Hand these over</h2>
+          <RequestTable
+            rows={handovers.data}
+            empty=""
+            actions={(r) => (
+              <button
+                onClick={() => confirmHandover.mutate(r.id)}
+                disabled={confirmHandover.isPending}
+                className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                Confirm handover
+              </button>
+            )}
+          />
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
         <div>
           <h2 className="mb-2 font-bold">My requests</h2>
