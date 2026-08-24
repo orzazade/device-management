@@ -110,7 +110,11 @@ export class AuthController {
       throw new BadRequestException('Password needs at least 8 characters with letters and numbers');
     }
     return this.db.withTransaction(async (ctx) => {
-      const user = await ctx.users.findOne({ where: { id: req.user.sub } });
+      const user = await ctx.users
+        .createQueryBuilder('u')
+        .addSelect('u.passwordHash')
+        .where('u.id = :id', { id: req.user.sub })
+        .getOne();
       if (!user) throw new UnauthorizedException();
       const ok = await bcrypt.compare(dto.currentPassword, user.passwordHash);
       if (!ok) throw new UnauthorizedException('Current password is wrong');

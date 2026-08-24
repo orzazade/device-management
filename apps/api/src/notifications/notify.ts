@@ -22,7 +22,11 @@ export async function notify(
   const ids = [...new Set(userIds)].filter(Boolean);
   if (!ids.length) return;
   const rule = await manager.getRepository(NotificationRule).findOne({ where: { event } });
-  if (!rule) return; // unknown event: nothing configured, nothing sent
+  if (!rule) {
+    // Loud, not silent: an unseeded event means a migration was missed.
+    console.error(`notify(): no notification_rules row for event "${event}" — nothing sent`);
+    return;
+  }
 
   if (rule.inapp) {
     await manager.getRepository(Notification).insert(

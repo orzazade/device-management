@@ -30,7 +30,10 @@ async function bootstrap() {
     const admins = await app
       .get(DataSource)
       .getRepository(User)
-      .find({ where: { role: 'admin', active: true } });
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where(`u.role = 'admin' AND u.active = true`)
+      .getMany();
     for (const a of admins) {
       if (bcrypt.compareSync('admin123', a.passwordHash)) {
         console.error(

@@ -11,7 +11,10 @@ export class LocalIdentityProvider implements IdentityProvider {
   async verify(email: string, password: string): Promise<User | null> {
     const user = await this.db
       .users()
-      .findOne({ where: { email: email.toLowerCase().trim(), active: true } });
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('u.email = :email AND u.active = true', { email: email.toLowerCase().trim() })
+      .getOne();
     if (!user) return null;
     const ok = await bcrypt.compare(password, user.passwordHash);
     return ok ? user : null;

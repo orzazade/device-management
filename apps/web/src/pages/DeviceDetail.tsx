@@ -195,7 +195,10 @@ export default function DeviceDetail() {
           <div className="border-t border-neutral-100 p-4 pt-3">
             {SPEC_SECTIONS.map((section) => {
               const filled = SPEC_FIELDS.filter(
-                (def) => def.section === section && d.specs?.[def.key] != null,
+                (def) =>
+                  def.section === section &&
+                  d.specs?.[def.key] != null &&
+                  (def.type !== 'bool' || d.specs[def.key] === true),
               );
               if (!filled.length) return null;
               return (

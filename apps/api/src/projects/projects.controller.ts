@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   ConflictException,
+  ForbiddenException,
   Delete,
   Get,
   NotFoundException,
@@ -32,7 +33,10 @@ export class ProjectsController {
 
   @Get()
   async list(@Req() req: { user: AuthUser }, @Query('deleted') deleted?: string) {
-    if (deleted === 'true' && ['admin', 'manager'].includes(req.user.role)) {
+    if (deleted === 'true' && !['admin', 'manager'].includes(req.user.role)) {
+      throw new ForbiddenException('Only staff can list deleted projects');
+    }
+    if (deleted === 'true') {
       const gone = await this.db
         .projects()
         .createQueryBuilder('p')
@@ -135,7 +139,10 @@ export class ProjectsController {
     return this.db.withTransaction(async (ctx) => {
       const project = await ctx.projects.findOne({ where: { id } });
       if (!project) throw new NotFoundException('Project not found');
-      const dup = await ctx.projects.findOne({ where: { name: dto.name } });
+      const dup = await ctx.projects
+        .createQueryBuilder('p')
+        .where('LOWER(p.name) = LOWER(:name)', { name: dto.name })
+        .getOne();
       if (dup && dup.id !== id) throw new ConflictException(`Project "${dto.name}" already exists`);
       const before = { name: project.name, description: project.description };
       project.name = dto.name;
@@ -156,7 +163,10 @@ export class ProjectsController {
   @Roles('admin', 'manager')
   async create(@Body() dto: ProjectDto, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
-      const dup = await ctx.projects.findOne({ where: { name: dto.name } });
+      const dup = await ctx.projects
+        .createQueryBuilder('p')
+        .where('LOWER(p.name) = LOWER(:name)', { name: dto.name })
+        .getOne();
       if (dup) throw new ConflictException(`Project "${dto.name}" already exists`);
       const project = await ctx.projects.save({
         name: dto.name,

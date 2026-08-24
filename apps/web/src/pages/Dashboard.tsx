@@ -27,7 +27,11 @@ export default function Dashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
-  const devices = useQuery({ queryKey: ['devices'], queryFn: () => api<DeviceRow[]>('/devices') });
+  const devices = useQuery({
+    queryKey: ['devices'],
+    queryFn: () => api<DeviceRow[]>('/devices'),
+    refetchInterval: 60000,
+  });
   const stats = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => api<DashStats>('/reports/dashboard'),
@@ -49,6 +53,7 @@ export default function Dashboard() {
   const myRequests = useQuery({
     queryKey: ['requests', 'mine'],
     queryFn: () => api<RequestRow[]>('/requests'),
+    refetchInterval: 60000,
   });
   const pending = useQuery({
     queryKey: ['requests', 'pending-approvals'],

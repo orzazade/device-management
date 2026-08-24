@@ -115,6 +115,7 @@ export default function RangeCalendar({
       <div className="mb-2 flex items-center justify-between">
         <button
           type="button"
+          aria-label="Previous month"
           onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
           className="h-7 w-7 rounded-lg border border-neutral-200 font-bold"
         >
@@ -123,6 +124,7 @@ export default function RangeCalendar({
         <b>{monthLabel}</b>
         <button
           type="button"
+          aria-label="Next month"
           onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
           className="h-7 w-7 rounded-lg border border-neutral-200 font-bold"
         >
@@ -148,6 +150,7 @@ export default function RangeCalendar({
           if (kind === 'booked') cls = 'bg-red-100 text-red-400 line-through cursor-not-allowed';
           if (kind === 'requested') cls = 'bg-amber-100 text-amber-700 hover:bg-amber-200';
           if (past && !kind) cls = 'text-neutral-300 cursor-not-allowed';
+          if (iso === today && !inRange) cls += ' ring-1 ring-accent font-bold';
           if (inRange) cls = 'bg-accent text-white font-bold';
           return (
             <button

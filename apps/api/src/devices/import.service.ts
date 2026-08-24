@@ -107,16 +107,18 @@ export class ImportService {
 
     const projects = await this.db.projects().find();
     const projectByName = new Map(projects.map((p) => [p.name.toLowerCase(), p.id]));
-    const existingSerials = new Set(
-      (
-        await this.db.devices().find({ select: { serial: true }, withDeleted: true })
-      ).map((d) => d.serial),
-    );
+    const existing = await this.db
+      .devices()
+      .find({ select: { serial: true, deletedAt: true }, withDeleted: true });
+    const existingSerials = new Map(existing.map((d) => [d.serial, !!d.deletedAt]));
 
     const cellStr = (row: ExcelJS.Row, name: string): string => {
       const col = headers[name];
       if (!col) return '';
-      const v = row.getCell(col).value;
+      const cell = row.getCell(col);
+      // .text resolves rich text, formulas and hyperlinks to what the
+      // user actually sees — String(value) would print [object Object].
+      const v = cell.text ?? cell.value;
       return v == null ? '' : String(v).trim();
     };
 
@@ -139,9 +141,17 @@ export class ImportService {
       if (!model) problems.push('model is empty');
       if (!os) problems.push('os is empty');
       if (!serial) problems.push('serial is empty');
-      if (serial && existingSerials.has(serial)) problems.push(`serial ${serial} already exists`);
+      if (serial && existingSerials.has(serial)) {
+        problems.push(
+          existingSerials.get(serial)
+            ? `serial ${serial} belongs to a DELETED device — restore it instead of re-importing`
+            : `serial ${serial} already exists`,
+        );
+      }
       if (serial && seenSerials.has(serial)) problems.push(`serial ${serial} is duplicated in the file`);
       if (imei && !/^\d{8,20}$/.test(imei)) problems.push(`imei "${imei}" is not a number`);
+      if (serial && !/^[A-Za-z0-9-]{4,}$/.test(serial))
+        problems.push(`serial "${serial}" — letters/numbers only, at least 4, no spaces`);
       let projectId: string | null = null;
       if (projectName) {
         projectId = projectByName.get(projectName.toLowerCase()) ?? null;

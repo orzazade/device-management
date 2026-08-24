@@ -87,6 +87,13 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
       if (data.fromDate > data.toDate) {
         throw new BadRequestException('The "from" date must not be after the "to" date');
       }
+      const days =
+        (Date.parse(data.toDate) - Date.parse(data.fromDate)) / 86400000 + 1;
+      if (days > 60) {
+        throw new BadRequestException(
+          'Bookings are capped at 60 days — split longer needs or talk to a manager',
+        );
+      }
 
       const request = await ctx.requests.save({
         deviceId: data.deviceId,

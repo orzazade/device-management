@@ -141,7 +141,7 @@ export class DevicesController {
     }
     if (q) {
       qb.andWhere(
-        '(d.brand ILIKE :q OR d.model ILIKE :q OR d.os ILIKE :q OR d.serial ILIKE :q OR holder.name ILIKE :q OR d.specs::text ILIKE :q)',
+        '(d.brand ILIKE :q OR d.model ILIKE :q OR d.os ILIKE :q OR d.serial ILIKE :q OR d.imei ILIKE :q OR holder.name ILIKE :q OR d.specs::text ILIKE :q)',
         { q: `%${q}%` },
       );
     }
