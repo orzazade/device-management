@@ -54,7 +54,6 @@ export default function DeviceDetail() {
   const repairs = useQuery({
     queryKey: ['device-repairs', id],
     queryFn: () => api<RepairTabRow[]>(`/devices/${id}/repairs`),
-    enabled: tab === 'repairs',
   });
   const report = useMutation({
     mutationFn: (issue: string) =>
@@ -170,7 +169,7 @@ export default function DeviceDetail() {
         <div className="flex gap-1 border-b border-neutral-200 px-4">
           {tabBtn('specs', 'Specs')}
           {tabBtn('history', 'History')}
-          {tabBtn('repairs', 'Repairs')}
+          {tabBtn('repairs', repairs.data ? `Repairs (${repairs.data.length})` : 'Repairs')}
         </div>
 
         {tab === 'specs' && (

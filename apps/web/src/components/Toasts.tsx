@@ -35,17 +35,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((text: string, kind: Kind = 'success') => {
     const id = ++idRef.current;
     setToasts((t) => [...t, { id, text, kind }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+    // Errors deserve reading time; anything is dismissible by click.
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 8000 : 4000);
   }, []);
   emit = push;
 
   return (
     <Ctx.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 flex-col items-center gap-2">
+      <div
+        aria-live="polite"
+        className="pointer-events-none fixed bottom-6 left-1/2 z-[100] flex -translate-x-1/2 flex-col items-center gap-2"
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
+            role="status"
+            onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))}
+            style={{ pointerEvents: 'auto', cursor: 'pointer' }}
             className={`toast-in flex items-center gap-2.5 rounded-xl px-4 py-2.5 font-semibold text-white shadow-lg ${
               t.kind === 'success' ? 'bg-neutral-900' : 'bg-red-700'
             }`}

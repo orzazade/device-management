@@ -7,15 +7,19 @@ import ConfirmModal from '../components/ConfirmModal';
 import Modal from '../components/Modal';
 import ReturnModal from '../components/ReturnModal';
 import { api } from '../lib/api';
+import { isStaff, useAuth } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
 
 export default function Requests() {
+  const { user } = useAuth();
+  const staffUser = isStaff(user?.role);
   const qc = useQueryClient();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [returnFor, setReturnFor] = useState<RequestRow | null>(null);
   const [extendFor, setExtendFor] = useState<RequestRow | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<RequestRow | null>(null);
+  const [offerReturn, setOfferReturn] = useState<RequestRow | null>(null);
   const [filter, setFilter] = useState<'open' | 'all'>('open');
   const rows = useQuery({
     queryKey: ['requests', 'mine'],
@@ -30,6 +34,15 @@ export default function Requests() {
       setExtendFor(null);
       setError(null);
       toast('Loan extended');
+    },
+    onError: (e) => setError(e.message),
+  });
+
+  const returnIntent = useMutation({
+    mutationFn: (id: string) => api(`/requests/${id}/return-intent`, { method: 'POST' }),
+    onSuccess: () => {
+      setOfferReturn(null);
+      toast('Staff notified — bring the device to the desk');
     },
     onError: (e) => setError(e.message),
   });
@@ -96,7 +109,7 @@ export default function Requests() {
                 Extend
               </button>
               <button
-                onClick={() => setReturnFor(r)}
+                onClick={() => (staffUser ? setReturnFor(r) : setOfferReturn(r))}
                 className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white"
               >
                 Return
@@ -106,6 +119,16 @@ export default function Requests() {
         }
       />
       {returnFor && <ReturnModal request={returnFor} onClose={() => setReturnFor(null)} />}
+      {offerReturn && (
+        <ConfirmModal
+          title={`Return ${offerReturn.device.brand} ${offerReturn.device.model}?`}
+          body="Bring the device to the lab desk — a manager checks it in there (that's your receipt). This notifies them you're on the way."
+          confirmLabel="Notify the desk"
+          busy={returnIntent.isPending}
+          onConfirm={() => returnIntent.mutate(offerReturn.id)}
+          onClose={() => setOfferReturn(null)}
+        />
+      )}
       {confirmCancel && (
         <ConfirmModal
           title="Cancel this booking?"

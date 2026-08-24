@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
+  NotFoundException,
   ForbiddenException,
   Get,
   Param,
@@ -236,6 +238,37 @@ export class RequestsController {
       new ReturnRequestCommand(actor(req), id, req.user.sub, staff(req.user), dto),
     );
     return this.reload(id);
+  }
+
+  /** The tester's half of the return: announce the device is coming back.
+   * Staff record the actual check-in (the receipt) on the Loans board. */
+  @Post(':id/return-intent')
+  async returnIntent(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const r = await ctx.requests.findOne({
+        where: { id },
+        relations: { device: true, requester: true },
+      });
+      if (!r) throw new NotFoundException('Request not found');
+      if (r.requesterId !== req.user.sub) {
+        throw new ForbiddenException('Only the holder can offer a return');
+      }
+      if (!['active', 'overdue'].includes(r.state)) {
+        throw new ConflictException(`Nothing to return — the loan is ${r.state}`);
+      }
+      const { writeAudit } = await import('../audit/audit');
+      const { notify, staffIds } = await import('../notifications/notify');
+      await writeAudit(ctx.manager, actor(req), {
+        entityType: 'request',
+        entityId: r.id,
+        action: 'return_offered',
+        newValue: { device: `${r.device.brand} ${r.device.model}` },
+      });
+      await notify(ctx.manager, 'handover_pending', await staffIds(ctx.manager),
+        `${r.requester.name} is returning ${r.device.brand} ${r.device.model} — check it in on the Loans board`,
+        { requestId: r.id }, '/loans');
+      return { ok: true };
+    });
   }
 
   /** Manual overdue scan — same code the hourly job runs, for ops and tests. */

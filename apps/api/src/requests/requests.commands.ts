@@ -442,8 +442,13 @@ export class ReturnRequestHandler implements ICommandHandler<ReturnRequestComman
     const { actor, requestId, byUserId, byStaff, data } = cmd;
     return this.db.withTransaction(async (ctx) => {
       const request = await loadRequest(ctx, requestId);
-      if (request.requesterId !== byUserId && !byStaff) {
-        throw new ForbiddenException('Only the holder (or staff) can check in this return');
+      // The receipt principle: a device is returned when someone at the
+      // desk RECEIVES it — mirroring handover. Testers signal intent via
+      // return-intent; staff record the actual check-in.
+      if (!byStaff) {
+        throw new ForbiddenException(
+          'Bring the device to the desk — a manager checks it in (you can notify them from My requests)',
+        );
       }
       const old = transition(request, 'returned');
 

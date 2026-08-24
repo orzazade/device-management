@@ -17,8 +17,41 @@ export default function RequestTable({
   onRetry?: () => void;
 }) {
   if (error && onRetry) return <LoadFailed what="requests" onRetry={onRetry} />;
+  const empty_ = rows?.length === 0;
   return (
-    <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+    <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+      {/* Phones get cards with real tap targets; the table is md+. */}
+      <div className="md:hidden">
+        {rows?.map((r) => (
+          <div key={r.id} className="border-b border-neutral-100 p-4 last:border-0">
+            <div className="flex items-start justify-between gap-2">
+              <b>
+                {r.device.brand} {r.device.model}
+              </b>
+              <Chip status={r.state} />
+            </div>
+            <div className="mt-0.5 text-sm text-neutral-500">
+              {r.fromDate} → {r.toDate} · {r.requester.name}
+            </div>
+            {r.device.damageNote && (
+              <div className="mt-0.5 text-xs font-semibold text-amber-700">
+                🛠 {r.device.damageNote}
+              </div>
+            )}
+            {r.state === 'rejected' && r.decisionNote && (
+              <div className="mt-0.5 text-xs text-neutral-500">{r.decisionNote}</div>
+            )}
+            <div className="mt-1 text-sm">{r.reason}</div>
+            {actions && (
+              <div className="mt-2.5 [&_button]:min-h-10 [&_button]:flex-1 [&_span]:flex [&_span]:w-full [&_span]:gap-2">
+                {actions(r)}
+              </div>
+            )}
+          </div>
+        ))}
+        {empty_ && <p className="p-6 text-neutral-400">{empty}</p>}
+      </div>
+      <div className="overflow-x-auto max-md:hidden">
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-neutral-200 text-left text-[11px] uppercase tracking-wider text-neutral-500">
@@ -67,7 +100,8 @@ export default function RequestTable({
           ))}
         </tbody>
       </table>
-      {rows?.length === 0 && <p className="p-6 text-neutral-400">{empty}</p>}
+      {empty_ && <p className="p-6 text-neutral-400">{empty}</p>}
+      </div>
     </div>
   );
 }

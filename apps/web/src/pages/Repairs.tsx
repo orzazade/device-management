@@ -112,7 +112,7 @@ export default function Repairs() {
                         disabled={act.isPending && act.variables?.id === r.id}
                         className="mr-1.5 rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
                       >
-                        Advance →
+                        {({ reported: 'Request repair →', repair_requested: 'Send to repair →', in_repair: 'Mark fixed ✓' } as Record<string, string>)[r.state] ?? 'Advance →'}
                       </button>
                     )}
                     {['reported', 'repair_requested'].includes(r.state) && (

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
@@ -70,6 +70,17 @@ export default function Layout() {
     enabled: !!user && staff,
     refetchInterval: 60000,
   });
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+  useEffect(() => {
+    const name = location.pathname === '/' ? 'Dashboard'
+      : location.pathname.slice(1).split('/')[0].replace(/^\w/, (c) => c.toUpperCase());
+    document.title = `${name} · DeviceDesk`;
+  });
   if (loading) return <p className="p-10 text-neutral-400">loading…</p>;
   if (!user && sessionCheckFailed)
     return (
@@ -100,11 +111,22 @@ export default function Layout() {
         menuOpen ? 'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50' : 'max-md:hidden'
       }`}
     >
-      <div className="border-b border-neutral-200 px-4 py-4">
+      <div className="flex items-start justify-between border-b border-neutral-200 px-4 py-4">
+        <div>
         <b className="text-base">DeviceDesk</b>
         <small className="block text-[10.5px] uppercase tracking-wider text-neutral-500">
           QA Device Lab
         </small>
+        </div>
+        {menuOpen && (
+          <button
+            aria-label="Close menu"
+            onClick={() => setMenuOpen(false)}
+            className="rounded-lg border border-neutral-200 px-2 py-0.5 text-lg md:hidden"
+          >
+            ×
+          </button>
+        )}
       </div>
       <nav className="flex-1 overflow-y-auto p-2" onClick={() => setMenuOpen(false)}>
         <Section label="Lab" />

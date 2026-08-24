@@ -36,8 +36,9 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     this.queue = new Queue(SCHEDULER_QUEUE, { connection: redisConnection() });
-    await this.queue.upsertJobScheduler('overdue-scan', { pattern: '0 * * * *' });
-    await this.queue.upsertJobScheduler('due-soon-scan', { pattern: '0 8 * * *' });
+    const tz = process.env.TZ_APP ?? 'Asia/Baku'; // the team works UTC+4
+    await this.queue.upsertJobScheduler('overdue-scan', { pattern: '0 * * * *', tz });
+    await this.queue.upsertJobScheduler('due-soon-scan', { pattern: '0 8 * * *', tz });
     await this.queue.upsertJobScheduler('email-outbox', { pattern: '* * * * *' });
     this.worker = new Worker(
       SCHEDULER_QUEUE,
@@ -46,7 +47,10 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
           await this.scanOverdue();
           await this.expireStaleApprovals();
         }
-        if (job.name === 'due-soon-scan') await this.scanDueSoon();
+        if (job.name === 'due-soon-scan') {
+          await this.scanDueSoon();
+          await this.renagOverdue();
+        }
         if (job.name === 'email-outbox') await this.drainOutbox();
       },
       { connection: redisConnection() },
@@ -139,6 +143,35 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     }
     if (late.length) this.log.warn(`overdue scan: ${late.length} request(s) marked overdue`);
     return late.length;
+  }
+
+  /** Still-overdue loans get a repeat nag every 3 days — one overdue
+   * notification at flip time is easy to scroll past. */
+  async renagOverdue(): Promise<number> {
+    const overdue = await this.db
+      .requests()
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.device', 'device')
+      .where(`r.state = 'overdue'`)
+      .getMany();
+    let sent = 0;
+    for (const r of overdue) {
+      const recent = await this.db
+        .notifications()
+        .createQueryBuilder('n')
+        .where(`n.event = 'overdue'`)
+        .andWhere(`n.meta->>'requestId' = :id`, { id: r.id })
+        .andWhere(`n.createdAt > now() - interval '3 days'`)
+        .getOne();
+      if (recent) continue;
+      await this.db.withTransaction(async (ctx) => {
+        await notify(ctx.manager, 'overdue', [r.requesterId],
+          `${r.device.brand} ${r.device.model} is STILL overdue — it was due back ${r.toDate}`,
+          { requestId: r.id }, '/requests');
+      });
+      sent++;
+    }
+    return sent;
   }
 
   /** Reminds holders the day before a return is due. De-duped per request/day. */
