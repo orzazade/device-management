@@ -72,6 +72,11 @@ export default function RequestModal({
         <h2 className="mb-3 text-lg font-bold">
           Request {device.brand} {device.model}
         </h2>
+        {device.damageNote && (
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5">
+            🛠 Known damage: <b>{device.damageNote}</b> — make sure it doesn’t block your test.
+          </div>
+        )}
         {device.holder && (
           <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5">
             Held by <b>{device.holder.name}</b> now. If approved, they’ll be asked to hand it

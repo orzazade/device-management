@@ -51,6 +51,12 @@ class CreateRequestDto {
   onBehalfOfId?: string;
 }
 
+class RejectDto {
+  @IsString()
+  @MinLength(5)
+  note: string;
+}
+
 class TimeDto {
   @IsDateString()
   fromDate: string;
@@ -83,6 +89,7 @@ const pub = (r: DeviceRequest) => ({
         model: r.device.model,
         holder: r.device.holder ? { id: r.device.holder.id, name: r.device.holder.name } : null,
         accessories: r.device.accessories,
+        damageNote: r.device.damageNote,
       }
     : { id: r.deviceId },
   requester: r.requester ? { id: r.requester.id, name: r.requester.name } : { id: r.requesterId },
@@ -91,6 +98,7 @@ const pub = (r: DeviceRequest) => ({
   fromDate: r.fromDate,
   toDate: r.toDate,
   state: r.state,
+  decisionNote: r.decisionNote,
   createdAt: r.createdAt,
 });
 
@@ -166,8 +174,14 @@ export class RequestsController {
 
   @Post(':id/reject')
   @Roles('admin', 'manager')
-  async reject(@Param('id') id: string, @Req() req: { user: AuthUser }) {
-    await this.bus.execute(new DecideRequestCommand(actor(req), id, 'rejected'));
+  async reject(
+    @Param('id') id: string,
+    @Body() dto: RejectDto,
+    @Req() req: { user: AuthUser },
+  ) {
+    await this.bus.execute(
+      new DecideRequestCommand(actor(req), id, 'rejected', req.user.role, dto.note),
+    );
     return this.reload(id);
   }
 

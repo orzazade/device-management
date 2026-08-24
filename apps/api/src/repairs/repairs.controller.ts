@@ -25,6 +25,13 @@ class ReportDto {
   issue: string;
 }
 
+class WriteOffDto {
+  /** Finance will ask "why was this scrapped" — the answer lives here. */
+  @IsString()
+  @MinLength(5)
+  reason: string;
+}
+
 function repairTransition(repair: Repair, to: RepairState): RepairState {
   const allowed = REPAIR_TRANSITIONS[repair.state] ?? [];
   if (!allowed.includes(to)) {
@@ -169,9 +176,47 @@ export class RepairsController {
     });
   }
 
+  /** A mistaken report gets an exit that does not drag the device out
+   * of circulation. Staff only; clears the damage note it created. */
+  @Post(':id/cancel')
+  @Roles('admin', 'manager')
+  async cancel(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const repair = await ctx.repairs.findOne({
+        where: { id },
+        relations: { device: true, reportedBy: true },
+        withDeleted: true,
+      });
+      if (!repair) throw new NotFoundException('Repair not found');
+      const old = repairTransition(repair, 'cancelled');
+      repair.closedAt = new Date();
+      const device = repair.device;
+      if (device.damageNote === repair.issue) {
+        device.damageNote = null;
+        await ctx.devices.save(device);
+      }
+      await ctx.repairs.save(repair);
+      await writeAudit(ctx.manager, actor(req), {
+        entityType: 'repair',
+        entityId: repair.id,
+        action: 'cancelled',
+        oldValue: { state: old },
+        newValue: { state: 'cancelled' },
+      });
+      await notify(ctx.manager, 'repair_update', [repair.reportedById],
+        `Your damage report for ${device.brand} ${device.model} was cancelled by ${req.user.name}`,
+        { repairId: repair.id }, '/repairs');
+      return pub(repair);
+    });
+  }
+
   @Post(':id/write-off')
   @Roles('admin')
-  async writeOff(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+  async writeOff(
+    @Param('id') id: string,
+    @Body() dto: WriteOffDto,
+    @Req() req: { user: AuthUser },
+  ) {
     return this.db.withTransaction(async (ctx) => {
       const repair = await ctx.repairs.findOne({
         where: { id },
@@ -213,7 +258,7 @@ export class RepairsController {
         entityId: repair.id,
         action: 'written_off',
         oldValue: { state: old },
-        newValue: { state: 'written_off', deviceStatus: 'retired' },
+        newValue: { state: 'written_off', deviceStatus: 'retired', reason: dto.reason },
       });
       return pub(repair);
     });

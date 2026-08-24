@@ -14,15 +14,19 @@ export type RepairState =
   | 'repair_requested'
   | 'in_repair'
   | 'fixed'
-  | 'written_off';
+  | 'written_off'
+  | 'cancelled';
 
 /** Legal transitions (GOALS.md repair lifecycle). */
 export const REPAIR_TRANSITIONS: Record<RepairState, RepairState[]> = {
-  reported: ['repair_requested'],
-  repair_requested: ['in_repair', 'written_off'],
+  // 'cancelled' = the report was a mistake; only before the device
+  // actually leaves circulation.
+  reported: ['repair_requested', 'cancelled'],
+  repair_requested: ['in_repair', 'written_off', 'cancelled'],
   in_repair: ['fixed', 'written_off'],
   fixed: [],
   written_off: [],
+  cancelled: [],
 };
 
 @Entity('repairs')

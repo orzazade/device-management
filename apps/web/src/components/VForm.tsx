@@ -73,6 +73,8 @@ export function VField({
   maxLength,
   className = '',
   autoFocus,
+  autoComplete,
+  inputMode,
 }: {
   name: string;
   label: string;
@@ -85,6 +87,8 @@ export function VField({
   maxLength?: number;
   className?: string;
   autoFocus?: boolean;
+  autoComplete?: string;
+  inputMode?: 'text' | 'numeric' | 'email' | 'tel' | 'search' | 'decimal' | 'url';
 }) {
   const ctx = useContext(Ctx);
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
@@ -118,6 +122,8 @@ export function VField({
     placeholder,
     maxLength,
     autoFocus,
+    autoComplete,
+    inputMode,
     onBlur: () => setError(runRules(rules, ref.current?.value ?? '')),
     onChange: () => {
       if (maxLength) setCount(ref.current?.value.length ?? 0);

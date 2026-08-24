@@ -69,6 +69,10 @@ export class DeviceRequest {
   @Column({ type: 'uuid', nullable: true })
   decidedById: string | null;
 
+  /** Why it was rejected — shown to the requester, required on reject. */
+  @Column({ type: 'varchar', nullable: true })
+  decisionNote: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

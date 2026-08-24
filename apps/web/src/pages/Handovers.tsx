@@ -14,6 +14,15 @@ export default function Handovers() {
     queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
   });
 
+  const cancelReq = useMutation({
+    mutationFn: (id: string) => api(`/requests/${id}/cancel`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requests'] });
+      toast('Request cancelled — the requester is notified');
+    },
+    onError: (e) => setError(e.message),
+  });
+
   const confirm = useMutation({
     mutationFn: (id: string) => api(`/requests/${id}/handover`, { method: 'POST' }),
     onSuccess: () => {
@@ -40,13 +49,22 @@ export default function Handovers() {
         onRetry={() => rows.refetch()}
         empty="No handovers waiting for you."
         actions={(r) => (
-          <button
-            onClick={() => confirm.mutate(r.id)}
-            disabled={confirm.isPending}
-            className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            Confirm handover
-          </button>
+          <span className="flex gap-1.5">
+            <button
+              onClick={() => cancelReq.mutate(r.id)}
+              disabled={cancelReq.isPending}
+              className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
+            >
+              Can’t hand over
+            </button>
+            <button
+              onClick={() => confirm.mutate(r.id)}
+              disabled={confirm.isPending}
+              className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              Confirm handover
+            </button>
+          </span>
         )}
       />
       <p className="mt-3 text-neutral-500">

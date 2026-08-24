@@ -6,6 +6,7 @@ export interface RequestRow {
     model?: string;
     holder?: { id: string; name: string } | null;
     accessories?: string[];
+    damageNote?: string | null;
   };
   requester: { id: string; name?: string };
   createdById: string;
@@ -13,5 +14,6 @@ export interface RequestRow {
   fromDate: string;
   toDate: string;
   state: string;
+  decisionNote?: string | null;
   createdAt: string;
 }

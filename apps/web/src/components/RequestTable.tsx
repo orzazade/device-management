@@ -42,6 +42,9 @@ export default function RequestTable({
                     {r.device.holder ? r.device.holder.name : 'lab desk'} → {r.requester.name}
                   </div>
                 )}
+                {r.device.damageNote && (
+                  <div className="text-xs font-semibold text-amber-700">🛠 {r.device.damageNote}</div>
+                )}
               </td>
               <td className="px-4 py-2.5">{r.requester.name}</td>
               <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs">
@@ -52,6 +55,9 @@ export default function RequestTable({
               <td className="max-w-64 px-4 py-2.5">{r.reason}</td>
               <td className="px-4 py-2.5">
                 <Chip status={r.state} />
+                {r.state === 'rejected' && r.decisionNote && (
+                  <div className="mt-1 max-w-44 text-xs text-neutral-500">{r.decisionNote}</div>
+                )}
               </td>
               {actions && <td className="whitespace-nowrap px-4 py-2.5">{actions(r)}</td>}
             </tr>

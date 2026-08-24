@@ -40,6 +40,7 @@ export default function Login() {
             name="email"
             label="Work email"
             type="email"
+            autoComplete="username"
             autoFocus
             rules={[required('Enter your work email'), email()]}
             placeholder="name@company.com"
@@ -50,6 +51,7 @@ export default function Login() {
             name="password"
             label="Password"
             type="password"
+            autoComplete="current-password"
             rules={[required('Enter your password')]}
           />
         </div>

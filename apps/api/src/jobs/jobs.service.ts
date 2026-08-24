@@ -42,7 +42,10 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     this.worker = new Worker(
       SCHEDULER_QUEUE,
       async (job) => {
-        if (job.name === 'overdue-scan') await this.scanOverdue();
+        if (job.name === 'overdue-scan') {
+          await this.scanOverdue();
+          await this.expireStaleApprovals();
+        }
         if (job.name === 'due-soon-scan') await this.scanDueSoon();
         if (job.name === 'email-outbox') await this.drainOutbox();
       },
@@ -58,6 +61,43 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     await this.worker?.close();
     await this.queue?.close();
+  }
+
+  /** Approved but never collected: after 2 days past the start date the
+   * promise expires, freeing the device's calendar. */
+  async expireStaleApprovals(): Promise<number> {
+    const cutoff = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    const stale = await this.db
+      .requests()
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.device', 'device')
+      .where(`r.state = 'approved'`)
+      .andWhere('r.fromDate < :cutoff', { cutoff })
+      .getMany();
+    let n = 0;
+    for (const r of stale) {
+      await this.db.withTransaction(async (ctx) => {
+        const res = await ctx.requests
+          .createQueryBuilder()
+          .update()
+          .set({ state: 'cancelled' })
+          .where(`id = :id AND state = 'approved'`, { id: r.id })
+          .execute();
+        if (!res.affected) return;
+        n++;
+        await writeAudit(ctx.manager, SYSTEM_ACTOR, {
+          entityType: 'request',
+          entityId: r.id,
+          action: 'expired',
+          oldValue: { state: 'approved' },
+          newValue: { state: 'cancelled', reason: 'never collected within 2 days of start date' },
+        });
+        await notify(ctx.manager, 'request_cancelled', [r.requesterId],
+          `Your approved booking for ${r.device.brand} ${r.device.model} expired — it was never collected. Request again if you still need it.`,
+          { requestId: r.id }, '/requests');
+      });
+    }
+    return n;
   }
 
   /** Marks active requests past their to-date as overdue. Returns count. */

@@ -160,6 +160,7 @@ export default function Devices() {
                   <b>
                     {d.brand} {d.model}
                   </b>
+                  {d.damageNote && <span title={d.damageNote}> 🛠</span>}
                   <br />
                   <span className="font-mono text-xs text-neutral-500">{d.serial}</span>
                 </td>
@@ -238,9 +239,9 @@ export default function Devices() {
                 rules={[required('OS is required')]} />
               <VField name="osVersion" label="OS version" placeholder="14" />
               <VField name="serial" label="Serial *" placeholder="RF8T2001"
-                rules={[required('Serial is required'), serial()]} />
+                autoComplete="off" rules={[required('Serial is required'), serial()]} />
               <VField name="imei" label="IMEI" placeholder="353912100000001"
-                rules={[imei()]} />
+                autoComplete="off" inputMode="numeric" rules={[imei()]} />
             </div>
             <SpecFields />
             <label className="mt-3 block">

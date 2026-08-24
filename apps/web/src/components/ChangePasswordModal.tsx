@@ -53,6 +53,7 @@ export default function ChangePasswordModal({
             name="currentPassword"
             label="Current password"
             type="password"
+            autoComplete="current-password"
             autoFocus
             rules={[required('Enter your current password')]}
           />
@@ -62,6 +63,7 @@ export default function ChangePasswordModal({
             name="newPassword"
             label="New password"
             type="password"
+            autoComplete="new-password"
             rules={[required('Pick a new password'), minLen(8), password()]}
           />
         </div>
@@ -70,6 +72,7 @@ export default function ChangePasswordModal({
             name="confirm"
             label="New password, again"
             type="password"
+            autoComplete="new-password"
             rules={[required('Type it once more')]}
           />
         </div>

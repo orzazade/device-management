@@ -2,6 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import Chip from '../components/Chip';
+import ConfirmModal from '../components/ConfirmModal';
+import Modal from '../components/Modal';
+import { VForm, VField } from '../components/VForm';
+import { minLen, required } from '../lib/validate';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 
@@ -19,16 +23,26 @@ export default function Repairs() {
   const qc = useQueryClient();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
+  const [writeOffFor, setWriteOffFor] = useState<RepairRow | null>(null);
+  const [cancelFor, setCancelFor] = useState<RepairRow | null>(null);
   const rows = useQuery({ queryKey: ['repairs'], queryFn: () => api<RepairRow[]>('/repairs') });
 
   const act = useMutation({
-    mutationFn: ({ id, verb }: { id: string; verb: 'advance' | 'write-off' }) =>
-      api(`/repairs/${id}/${verb}`, { method: 'POST' }),
+    mutationFn: ({ id, verb, body }: { id: string; verb: 'advance' | 'write-off' | 'cancel'; body?: Record<string, unknown> }) =>
+      api(`/repairs/${id}/${verb}`, { method: 'POST', body }),
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['repairs'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
       setError(null);
-      toast(v.verb === 'advance' ? 'Repair moved forward' : 'Device written off and retired');
+      setWriteOffFor(null);
+      setCancelFor(null);
+      toast(
+        v.verb === 'advance'
+          ? 'Repair moved forward'
+          : v.verb === 'cancel'
+            ? 'Report cancelled'
+            : 'Device written off and retired',
+      );
     },
     onError: (e) => setError(e.message),
   });
@@ -81,14 +95,23 @@ export default function Repairs() {
                         Advance →
                       </button>
                     )}
+                    {['reported', 'repair_requested'].includes(r.state) && (
+                      <button
+                        onClick={() => setCancelFor(r)}
+                        disabled={act.isPending}
+                        className="mr-1.5 rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
+                      >
+                        Cancel report
+                      </button>
+                    )}
                     {['repair_requested', 'in_repair'].includes(r.state) &&
                       user?.role === 'admin' && (
                         <button
-                          onClick={() => act.mutate({ id: r.id, verb: 'write-off' })}
+                          onClick={() => setWriteOffFor(r)}
                           disabled={act.isPending}
                           className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
                         >
-                          Write off
+                          Write off…
                         </button>
                       )}
                   </td>
@@ -101,6 +124,64 @@ export default function Repairs() {
           <p className="p-6 text-neutral-400">No repairs. Long may it last.</p>
         )}
       </div>
+
+      {cancelFor && (
+        <ConfirmModal
+          title={`Cancel this damage report?`}
+          body={`“${cancelFor.issue}” on ${cancelFor.device.brand} ${cancelFor.device.model} will be closed as a mistake and the damage note cleared. ${cancelFor.reportedBy?.name ?? 'The reporter'} is notified.`}
+          confirmLabel="Cancel report"
+          busy={act.isPending}
+          onConfirm={() => act.mutate({ id: cancelFor.id, verb: 'cancel' })}
+          onClose={() => setCancelFor(null)}
+        />
+      )}
+
+      {writeOffFor && (
+        <Modal onClose={() => setWriteOffFor(null)}>
+          <VForm
+            className="w-full max-w-md rounded-2xl bg-white p-6"
+            onValidSubmit={(f) =>
+              act.mutate({ id: writeOffFor.id, verb: 'write-off', body: { reason: String(f.get('reason')) } })
+            }
+          >
+            <h2 className="mb-1 text-lg font-bold">
+              Write off {writeOffFor.device.brand} {writeOffFor.device.model}?
+            </h2>
+            <p className="mb-3 text-neutral-500">
+              This retires the device permanently and closes any open loan. Finance will ask why —
+              the reason goes into the audit log.
+            </p>
+            <div className="mb-3">
+              <VField
+                name="reason"
+                label="Reason"
+                textarea
+                rows={2}
+                maxLength={300}
+                autoFocus
+                placeholder="e.g. Board damage after drop, repair quote exceeds value"
+                rules={[required('Say why this device is being scrapped'), minLen(5)]}
+              />
+            </div>
+            {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setWriteOffFor(null)}
+                className="rounded-lg border border-neutral-300 px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={act.isPending}
+                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
+              >
+                {act.isPending ? 'Writing off…' : 'Write off device'}
+              </button>
+            </div>
+          </VForm>
+        </Modal>
+      )}
     </div>
   );
 }

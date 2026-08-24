@@ -162,6 +162,7 @@ export class DecideRequestCommand {
     readonly requestId: string,
     readonly decision: 'approved' | 'rejected',
     readonly actorRole?: string,
+    readonly note?: string,
   ) {}
 }
 
@@ -169,7 +170,7 @@ export class DecideRequestCommand {
 export class DecideRequestHandler implements ICommandHandler<DecideRequestCommand> {
   constructor(private readonly db: AppDbContext) {}
 
-  async execute({ actor, requestId, decision, actorRole }: DecideRequestCommand): Promise<DeviceRequest> {
+  async execute({ actor, requestId, decision, actorRole, note }: DecideRequestCommand): Promise<DeviceRequest> {
     return this.db.withTransaction(async (ctx) => {
       const request = await loadRequest(ctx, requestId);
       const selfRequest =
@@ -210,6 +211,7 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
       }
       const old = transition(request, decision);
       request.decidedById = actor.id;
+      if (decision === 'rejected') request.decisionNote = note?.trim() || null;
       try {
         await ctx.requests.save(request);
       } catch (e) {
@@ -221,7 +223,7 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
         entityId: request.id,
         action: auditAction,
         oldValue: { state: old },
-        newValue: { state: decision },
+        newValue: decision === 'rejected' && note ? { state: decision, reason: note } : { state: decision },
       });
 
       const device = request.device;
@@ -241,7 +243,8 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
         }
       } else {
         await notify(ctx.manager, 'request_rejected', [request.requesterId],
-          `Your request for ${name} was rejected`, { requestId: request.id }, '/requests');
+          `Your request for ${name} was rejected${note ? ` — ${note.trim()}` : ''}`,
+          { requestId: request.id }, '/requests');
       }
       return request;
     });

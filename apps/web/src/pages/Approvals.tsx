@@ -4,6 +4,8 @@ import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import RangeCalendar, { type BookingRange, type DateRange } from '../components/RangeCalendar';
 import RequestTable from '../components/RequestTable';
+import { VForm, VField } from '../components/VForm';
+import { minLen, required } from '../lib/validate';
 import { api } from '../lib/api';
 import type { RequestRow } from '../lib/requests';
 
@@ -12,6 +14,7 @@ export default function Approvals() {
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [timeFor, setTimeFor] = useState<RequestRow | null>(null);
+  const [rejectFor, setRejectFor] = useState<RequestRow | null>(null);
   const [overrideRange, setOverrideRange] = useState<DateRange>({ from: null, to: null });
   const overrideBookings = useQuery({
     queryKey: ['device-bookings', timeFor?.device.id, timeFor?.id],
@@ -28,11 +31,12 @@ export default function Approvals() {
   });
 
   const act = useMutation({
-    mutationFn: ({ id, verb }: { id: string; verb: 'approve' | 'reject' }) =>
-      api(`/requests/${id}/${verb}`, { method: 'POST' }),
+    mutationFn: ({ id, verb, note }: { id: string; verb: 'approve' | 'reject'; note?: string }) =>
+      api(`/requests/${id}/${verb}`, { method: 'POST', body: note ? { note } : undefined }),
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ['requests'] });
       setError(null);
+      setRejectFor(null);
       toast(v.verb === 'approve' ? 'Approved — handover pending' : 'Request rejected');
     },
     onError: (e) => setError(e.message),
@@ -76,9 +80,9 @@ export default function Approvals() {
               Approve
             </button>
             <button
-              onClick={() => act.mutate({ id: r.id, verb: 'reject' })}
+              onClick={() => setRejectFor(r)}
               disabled={act.isPending}
-              className={`${btn} border border-neutral-300 text-red-700 disabled:opacity-50`}
+              className={`${btn} border border-neutral-300 text-red-700`}
             >
               Reject
             </button>
@@ -94,6 +98,52 @@ export default function Approvals() {
           </span>
         )}
       />
+
+      {rejectFor && (
+        <Modal onClose={() => setRejectFor(null)}>
+          <VForm
+            className="w-full max-w-md rounded-2xl bg-white p-6"
+            onValidSubmit={(f) =>
+              act.mutate({ id: rejectFor.id, verb: 'reject', note: String(f.get('note')) })
+            }
+          >
+            <h2 className="mb-1 text-lg font-bold">
+              Reject {rejectFor.device.brand} {rejectFor.device.model}?
+            </h2>
+            <p className="mb-3 text-neutral-500">
+              {rejectFor.requester.name} will see this reason — make it useful.
+            </p>
+            <div className="mb-3">
+              <VField
+                name="note"
+                label="Reason"
+                textarea
+                rows={2}
+                maxLength={300}
+                autoFocus
+                placeholder="e.g. Device is reserved for the release test that week"
+                rules={[required('Give the requester a reason'), minLen(5)]}
+              />
+            </div>
+            {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRejectFor(null)}
+                className="rounded-lg border border-neutral-300 px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={act.isPending}
+                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
+              >
+                {act.isPending ? 'Rejecting…' : 'Reject request'}
+              </button>
+            </div>
+          </VForm>
+        </Modal>
+      )}
 
       {timeFor && (
         <Modal onClose={() => setTimeFor(null)}>
