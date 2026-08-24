@@ -3,6 +3,7 @@ import { Queue, Worker } from 'bullmq';
 import * as nodemailer from 'nodemailer';
 import { config } from '../config';
 import { AppDbContext } from '../db/app-db-context';
+import { EmailOutbox } from '../entities/notification.entity';
 import { writeAudit } from '../audit/audit';
 import { notify, staffIds } from '../notifications/notify';
 import { transition } from '../requests/request-machine';
@@ -124,21 +125,31 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   /** Sends pending outbox emails. Failures stay visible with the error. */
   async drainOutbox(): Promise<void> {
-    const pending = await this.db.emailOutbox().find({
-      where: [{ state: 'pending' }],
-      order: { id: 'ASC' },
-      take: 20,
-    });
-    if (!pending.length) return;
+    // Atomic claim: bump next_attempt_at so an overlapping drain (or a
+    // second replica) skips these rows instead of double-sending. If we
+    // crash mid-send, the row simply becomes claimable again in 2 min.
+    const claimed: EmailOutbox[] = await this.db
+      .emailOutbox()
+      .query(
+        `UPDATE email_outbox SET next_attempt_at = now() + interval '2 minutes'
+         WHERE id IN (
+           SELECT id FROM email_outbox
+           WHERE state = 'pending' AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+           ORDER BY id LIMIT 20
+           FOR UPDATE SKIP LOCKED
+         )
+         RETURNING id, to_email AS "toEmail", subject, body, attempts`,
+      );
+    if (!claimed.length) return;
     if (!config.smtpUrl) {
       if (!this.smtpWarned) {
-        this.log.warn(`SMTP_URL not set — ${pending.length}+ email(s) stay pending in the outbox`);
+        this.log.warn(`SMTP_URL not set — ${claimed.length}+ email(s) stay pending in the outbox`);
         this.smtpWarned = true;
       }
       return;
     }
     const transport = nodemailer.createTransport(config.smtpUrl);
-    for (const mail of pending) {
+    for (const mail of claimed) {
       try {
         await transport.sendMail({
           from: config.smtpFrom,
@@ -146,16 +157,26 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
           subject: mail.subject,
           text: mail.body,
         });
-        mail.state = 'sent';
-        mail.sentAt = new Date();
-        mail.lastError = null;
+        await this.db.emailOutbox().update(mail.id, {
+          state: 'sent',
+          sentAt: new Date(),
+          lastError: null,
+        });
       } catch (e) {
-        mail.attempts += 1;
-        mail.lastError = e instanceof Error ? e.message : String(e);
-        if (mail.attempts >= 5) mail.state = 'failed';
-        this.log.error(`email to ${mail.toEmail} failed (attempt ${mail.attempts}): ${mail.lastError}`);
+        const attempts = mail.attempts + 1;
+        const lastError = e instanceof Error ? e.message : String(e);
+        // Exponential backoff: 1m, 2m, 4m … capped at 6h. 'failed' only
+        // after 10 real attempts (~a day of SMTP being down), never after
+        // five minutes of hiccup.
+        const backoffMin = Math.min(2 ** (attempts - 1), 360);
+        await this.db.emailOutbox().update(mail.id, {
+          attempts,
+          lastError,
+          state: attempts >= 10 ? 'failed' : 'pending',
+          nextAttemptAt: new Date(Date.now() + backoffMin * 60_000),
+        });
+        this.log.error(`email to ${mail.toEmail} failed (attempt ${attempts}): ${lastError}`);
       }
-      await this.db.emailOutbox().save(mail);
     }
   }
 }

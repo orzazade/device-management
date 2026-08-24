@@ -11,6 +11,20 @@ interface Rule {
   email: boolean;
 }
 
+interface OutboxRow {
+  id: string;
+  toEmail: string;
+  subject: string;
+  state: 'pending' | 'sent' | 'failed';
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+}
+interface OutboxData {
+  counts: { pending: number; sent: number; failed: number };
+  rows: OutboxRow[];
+}
+
 export default function Settings() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -24,6 +38,20 @@ export default function Settings() {
   const rules = useQuery({
     queryKey: ['notification-rules'],
     queryFn: () => api<Rule[]>('/notification-rules'),
+  });
+
+  const outbox = useQuery({
+    queryKey: ['email-outbox'],
+    queryFn: () => api<OutboxData>('/email-outbox'),
+  });
+
+  const retryMail = useMutation({
+    mutationFn: (id: string) => api(`/email-outbox/${id}/retry`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['email-outbox'] });
+      toast('Queued for another send');
+    },
+    onError: (e) => setError(e.message),
   });
 
   const setMode = useMutation({
@@ -121,9 +149,71 @@ export default function Settings() {
           </tbody>
         </table>
         <p className="p-5 pt-3 text-neutral-500">
-          Email goes through corporate SMTP. Failed sends stay visible in an outbox with the
-          error — they are never silently dropped.
+          Email goes through corporate SMTP. Failed sends stay visible in the outbox below
+          with the error — they are never silently dropped.
         </p>
+      </div>
+
+      <div className="mt-4 max-w-2xl overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+        <div className="border-b border-neutral-200 p-5 pb-3">
+          <h2 className="font-bold">Email outbox</h2>
+          <p className="text-neutral-500">
+            {outbox.data
+              ? `${outbox.data.counts.pending} waiting · ${outbox.data.counts.sent} sent · ${outbox.data.counts.failed} failed`
+              : 'Every queued email, newest first.'}
+          </p>
+        </div>
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-neutral-200 text-left text-[11px] uppercase tracking-wider text-neutral-500">
+              <th className="px-5 py-2.5">To</th>
+              <th className="px-5 py-2.5">Subject</th>
+              <th className="px-5 py-2.5">State</th>
+              <th className="px-5 py-2.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {outbox.data?.rows.map((m) => (
+              <tr key={m.id} className="border-b border-neutral-100 align-top last:border-0">
+                <td className="whitespace-nowrap px-5 py-2.5">{m.toEmail}</td>
+                <td className="px-5 py-2.5">
+                  {m.subject}
+                  {m.lastError && (
+                    <span className="mt-0.5 block text-xs text-red-600">
+                      {m.attempts}× failed: {m.lastError}
+                    </span>
+                  )}
+                </td>
+                <td className="px-5 py-2.5">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      m.state === 'sent'
+                        ? 'bg-green-100 text-green-800'
+                        : m.state === 'failed'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {m.state}
+                  </span>
+                </td>
+                <td className="px-5 py-2.5 text-right">
+                  {m.state === 'failed' && (
+                    <button
+                      onClick={() => retryMail.mutate(m.id)}
+                      className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
+                    >
+                      Retry
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {outbox.data?.rows.length === 0 && (
+          <p className="p-5 text-neutral-400">Nothing queued yet.</p>
+        )}
       </div>
     </div>
   );

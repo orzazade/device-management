@@ -22,6 +22,7 @@ import { Repairs1725000000000 } from '../migrations/1725000000000-repairs';
 import { SoftDelete1725100000000 } from '../migrations/1725100000000-soft-delete';
 import { SpecsJson1725200000000 } from '../migrations/1725200000000-specs-json';
 import { OneOpenLoan1725300000000 } from '../migrations/1725300000000-one-open-loan';
+import { OutboxBackoff1725400000000 } from '../migrations/1725400000000-outbox-backoff';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -50,6 +51,7 @@ export const dataSourceOptions: DataSourceOptions = {
     SoftDelete1725100000000,
     SpecsJson1725200000000,
     OneOpenLoan1725300000000,
+    OutboxBackoff1725400000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

@@ -67,6 +67,11 @@ export class EmailOutbox {
   @Column({ type: 'timestamptz', nullable: true })
   sentAt: Date | null;
 
+  /** Earliest time the next send attempt may run — exponential backoff,
+   * and also the claim marker that keeps overlapping drains off a row. */
+  @Column({ type: 'timestamptz', nullable: true })
+  nextAttemptAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

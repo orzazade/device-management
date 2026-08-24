@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   NotFoundException,
@@ -103,6 +104,46 @@ export class NotificationsController {
   async settings() {
     const mode = await this.db.settings().findOne({ where: { key: 'approval_mode' } });
     return { approvalMode: mode?.value ?? 'all' };
+  }
+
+  /** The outbox Settings promises: staff can SEE queued/failed mail. */
+  @Get('email-outbox')
+  @Roles('admin', 'manager')
+  async emailOutbox() {
+    const rows = await this.db.emailOutbox().find({
+      order: { id: 'DESC' },
+      take: 100,
+    });
+    const counts = { pending: 0, sent: 0, failed: 0 };
+    for (const r of await this.db.emailOutbox().find()) {
+      counts[r.state as keyof typeof counts] =
+        (counts[r.state as keyof typeof counts] ?? 0) + 1;
+    }
+    return { counts, rows };
+  }
+
+  @Post('email-outbox/:id/retry')
+  @Roles('admin', 'manager')
+  async retryEmail(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+    return this.db.withTransaction(async (ctx) => {
+      const mail = await ctx.emailOutbox.findOne({ where: { id } });
+      if (!mail) throw new NotFoundException('Outbox entry not found');
+      if (mail.state === 'sent') {
+        throw new ConflictException('This email was already sent');
+      }
+      await ctx.emailOutbox.update(mail.id, {
+        state: 'pending',
+        attempts: 0,
+        nextAttemptAt: null,
+      });
+      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
+        entityType: 'email',
+        entityId: mail.id,
+        action: 'retry_queued',
+        newValue: { to: mail.toEmail, subject: mail.subject },
+      });
+      return { ok: true };
+    });
   }
 
   @Patch('settings/approval-mode')

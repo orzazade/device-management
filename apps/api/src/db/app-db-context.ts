@@ -111,4 +111,8 @@ export class TransactionalContext {
   get repairs(): Repository<Repair> {
     return this.manager.getRepository(Repair);
   }
+
+  get emailOutbox(): Repository<EmailOutbox> {
+    return this.manager.getRepository(EmailOutbox);
+  }
 }
