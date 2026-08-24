@@ -31,6 +31,27 @@ const overlapError = () =>
     'This device already has an approved booking that overlaps this time range',
   );
 
+/** A booking that makes the device unavailable for [from, to]:
+ * an overdue loan occupies the device until an unknown return date, so it
+ * conflicts with ANY range; approved/active bookings conflict by range. */
+async function conflictingBooking(
+  ctx: TransactionalContext,
+  deviceId: string,
+  fromDate: string,
+  toDate: string,
+  excludeId?: string,
+): Promise<DeviceRequest | null> {
+  const qb = ctx.requests
+    .createQueryBuilder('r')
+    .where('r.deviceId = :deviceId', { deviceId })
+    .andWhere(
+      `(r.state = 'overdue' OR (r.state IN ('approved','active') AND daterange(r.from_date, r.to_date, '[]') && daterange(:from, :to, '[]')))`,
+      { from: fromDate, to: toDate },
+    );
+  if (excludeId) qb.andWhere('r.id != :excludeId', { excludeId });
+  return qb.getOne();
+}
+
 export class CreateRequestCommand {
   constructor(
     readonly actor: Actor,
@@ -92,7 +113,14 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
       // Config flag (GOALS.md): 'all' = everything needs approval (launch),
       // 'busy_only' = a free device auto-approves.
       const mode = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
-      if (mode?.value === 'busy_only' && device.holderId === null) {
+      // Pre-check instead of relying on the constraint: a constraint hit here
+      // would roll back the whole transaction and the tester's request would
+      // vanish. On conflict the request simply stays pending for staff.
+      const busy =
+        mode?.value === 'busy_only' &&
+        (device.holderId !== null ||
+          (await conflictingBooking(ctx, device.id, data.fromDate, data.toDate, request.id)));
+      if (mode?.value === 'busy_only' && !busy) {
         transition(request, 'approved');
         try {
           await ctx.requests.save(request);
@@ -128,6 +156,18 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
   async execute({ actor, requestId, decision }: DecideRequestCommand): Promise<DeviceRequest> {
     return this.db.withTransaction(async (ctx) => {
       const request = await loadRequest(ctx, requestId);
+      if (decision === 'approved') {
+        // The exclusion constraint misses an overdue loan (its range is in
+        // the past) — but the device is physically out until it comes back.
+        const clash = await conflictingBooking(
+          ctx, request.deviceId, request.fromDate, request.toDate, request.id,
+        );
+        if (clash?.state === 'overdue') {
+          throw new ConflictException(
+            'This device is overdue with its current holder — check it in before approving new bookings',
+          );
+        }
+      }
       const old = transition(request, decision);
       request.decidedById = actor.id;
       try {
@@ -189,6 +229,12 @@ export class OverrideTimeHandler implements ICommandHandler<OverrideTimeCommand>
       }
       if (fromDate > toDate) {
         throw new BadRequestException('The "from" date must not be after the "to" date');
+      }
+      const clash = await conflictingBooking(ctx, request.deviceId, fromDate, toDate, request.id);
+      if (clash?.state === 'overdue') {
+        throw new ConflictException(
+          'This device is overdue with its current holder — check it in before moving bookings onto it',
+        );
       }
       const old = `${request.fromDate} – ${request.toDate}`;
       request.fromDate = fromDate;

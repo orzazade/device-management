@@ -14,7 +14,12 @@ function makeCtx(headers: Record<string, string>, req: any = {}) {
   } as any;
 }
 
-function makeGuard(opts: { isPublic?: boolean; roles?: string[]; valid?: boolean }) {
+function makeGuard(opts: {
+  isPublic?: boolean;
+  roles?: string[];
+  valid?: boolean;
+  dbUser?: { id: string; name: string; email: string; role: string; active: boolean } | null;
+}) {
   const reflector = {
     getAllAndOverride: (key: string) =>
       key === 'isPublic' ? (opts.isPublic ?? false) : opts.roles,
@@ -25,7 +30,12 @@ function makeGuard(opts: { isPublic?: boolean; roles?: string[]; valid?: boolean
       return user;
     },
   } as any;
-  return new AuthGuard(jwt, reflector);
+  const dbUser =
+    opts.dbUser === undefined
+      ? { id: user.sub, name: user.name, email: user.email, role: user.role, active: true }
+      : opts.dbUser;
+  const db = { users: () => ({ findOne: async () => dbUser }) } as any;
+  return new AuthGuard(jwt, reflector, db);
 }
 
 describe('AuthGuard', () => {
@@ -58,5 +68,32 @@ describe('AuthGuard', () => {
     const ctx = makeCtx({ authorization: 'Bearer x' });
     await expect(g.canActivate(ctx)).resolves.toBe(true);
     expect(ctx.req.user).toEqual(user);
+  });
+
+  it('rejects a token whose user was deactivated', async () => {
+    const g = makeGuard({
+      dbUser: { id: 'u1', name: 'Test', email: 't@x', role: 'tester', active: false },
+    });
+    await expect(g.canActivate(makeCtx({ authorization: 'Bearer x' }))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('rejects a token whose user was deleted', async () => {
+    const g = makeGuard({ dbUser: null });
+    await expect(g.canActivate(makeCtx({ authorization: 'Bearer x' }))).rejects.toThrow(
+      UnauthorizedException,
+    );
+  });
+
+  it('uses the CURRENT role from the DB, not the token claim', async () => {
+    // token says tester; DB says the user was promoted to manager
+    const g = makeGuard({
+      roles: ['manager'],
+      dbUser: { id: 'u1', name: 'Test', email: 't@x', role: 'manager', active: true },
+    });
+    const ctx = makeCtx({ authorization: 'Bearer x' });
+    await expect(g.canActivate(ctx)).resolves.toBe(true);
+    expect(ctx.req.user.role).toBe('manager');
   });
 });
