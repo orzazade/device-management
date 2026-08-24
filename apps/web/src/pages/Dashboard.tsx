@@ -1,6 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { useToast } from '../components/Toasts';
 import Chip from '../components/Chip';
 import RequestTable from '../components/RequestTable';
 import { api } from '../lib/api';
@@ -25,8 +24,6 @@ interface DashStats {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const qc = useQueryClient();
-  const toast = useToast();
   const devices = useQuery({
     queryKey: ['devices'],
     queryFn: () => api<DeviceRow[]>('/devices'),
@@ -36,19 +33,6 @@ export default function Dashboard() {
     queryKey: ['dashboard-stats'],
     queryFn: () => api<DashStats>('/reports/dashboard'),
     refetchInterval: 60000,
-  });
-  const handovers = useQuery({
-    queryKey: ['requests', 'pending-handover'],
-    queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
-  });
-  const confirmHandover = useMutation({
-    mutationFn: (id: string) => api(`/requests/${id}/handover`, { method: 'POST' }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['requests'] });
-      qc.invalidateQueries({ queryKey: ['devices'] });
-      toast('Handover confirmed');
-    },
-    onError: (e) => toast(e.message, 'error'),
   });
   const myRequests = useQuery({
     queryKey: ['requests', 'mine'],
@@ -84,8 +68,8 @@ export default function Dashboard() {
               </span>
             ))}
           </div>
-          <Link to="/loans" className="mt-1 inline-block font-semibold text-red-700">
-            Chase them on the Loans board →
+          <Link to="/requests" className="mt-1 inline-block font-semibold text-red-700">
+            Chase them on the Requests page →
           </Link>
         </div>
       )}
@@ -95,7 +79,7 @@ export default function Dashboard() {
         </Link>
         <Stat k={mine.length} label="In my hands" />
         {isStaff(user?.role) && (
-          <Link to="/approvals" className="text-inherit no-underline">
+          <Link to="/requests" className="text-inherit no-underline">
             <Stat k={pending.data?.length ?? '…'} label="Waiting for approval" />
           </Link>
         )}
@@ -103,24 +87,6 @@ export default function Dashboard() {
           <Stat k={stats.data?.openRepairs ?? '…'} label="In repair flow" />
         </Link>
       </div>
-      {(handovers.data?.length ?? 0) > 0 && (
-        <div className="mb-5">
-          <h2 className="mb-2 font-bold">Hand these over</h2>
-          <RequestTable
-            rows={handovers.data}
-            empty=""
-            actions={(r) => (
-              <button
-                onClick={() => confirmHandover.mutate(r.id)}
-                disabled={confirmHandover.isPending}
-                className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-              >
-                Confirm handover
-              </button>
-            )}
-          />
-        </div>
-      )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
         <div>
           <h2 className="mb-2 font-bold">My requests</h2>

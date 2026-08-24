@@ -4,11 +4,8 @@ import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from 'react-rout
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toasts';
 import { AuthProvider, useAuth, type Role } from './lib/auth';
-import Approvals from './pages/Approvals';
 import Audit from './pages/Audit';
 import Dashboard from './pages/Dashboard';
-import Handovers from './pages/Handovers';
-import Loans from './pages/Loans';
 import Requests from './pages/Requests';
 import DeviceDetail from './pages/DeviceDetail';
 import Devices from './pages/Devices';
@@ -57,11 +54,12 @@ export default function App() {
               <Route path="/devices" element={<Devices />} />
               <Route path="/devices/:id" element={<DeviceDetail />} />
               <Route path="/requests" element={<Requests />} />
-              <Route path="/handovers" element={<Handovers />} />
+              {/* Old bookmarks from before the lifecycle pages were merged. */}
+              <Route path="/handovers" element={<Navigate to="/requests" replace />} />
+              <Route path="/approvals" element={<Navigate to="/requests" replace />} />
+              <Route path="/loans" element={<Navigate to="/requests" replace />} />
               <Route path="/repairs" element={<Repairs />} />
               <Route element={<RequireRole roles={['admin', 'manager']} />}>
-                <Route path="/loans" element={<Loans />} />
-                <Route path="/approvals" element={<Approvals />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/users" element={<Users />} />

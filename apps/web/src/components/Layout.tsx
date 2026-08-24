@@ -132,10 +132,15 @@ export default function Layout() {
         <Section label="Lab" />
         <NavLink to="/" end className={linkCls}>Dashboard</NavLink>
         <NavLink to="/devices" className={linkCls}>Devices</NavLink>
-        <NavLink to="/requests" className={linkCls}>My requests</NavLink>
-        <NavLink to="/handovers" className={linkCls}>
-          Handovers
-          <Badge n={handovers.data?.length} />
+        <NavLink to="/requests" className={linkCls}>
+          Requests
+          <Badge
+            n={
+              (handovers.data?.length ?? 0) +
+              (approvals.data?.length ?? 0) +
+              (overdue.data?.length ?? 0)
+            }
+          />
         </NavLink>
         <NavLink to="/repairs" className={linkCls}>
           Repairs
@@ -144,14 +149,6 @@ export default function Layout() {
         {staff && (
           <>
             <Section label="Manage" />
-            <NavLink to="/approvals" className={linkCls}>
-              Approvals
-              <Badge n={approvals.data?.length} />
-            </NavLink>
-            <NavLink to="/loans" className={linkCls}>
-              Loans
-              <Badge n={overdue.data?.length} />
-            </NavLink>
             <NavLink to="/projects" className={linkCls}>Projects</NavLink>
             <NavLink to="/users" className={linkCls}>Users</NavLink>
             <NavLink to="/reports" className={linkCls}>Idle devices</NavLink>
