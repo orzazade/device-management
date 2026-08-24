@@ -12,6 +12,9 @@ export interface Me {
 interface AuthState {
   user: Me | null;
   loading: boolean;
+  /** true right after logging in with a factory-default password. */
+  mustChangePassword: boolean;
+  clearMustChange: () => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -23,6 +26,7 @@ export const isStaff = (r?: Role) => r === 'admin' || r === 'manager';
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   useEffect(() => {
     if (!tokenStore.get()) {
@@ -36,18 +40,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await api<{ token: string; user: Me }>('/auth/login', {
-      method: 'POST',
-      body: { email, password },
-    });
+    const res = await api<{ token: string; user: Me; mustChangePassword?: boolean }>(
+      '/auth/login',
+      { method: 'POST', body: { email, password } },
+    );
     tokenStore.set(res.token);
     setUser(res.user);
+    setMustChangePassword(!!res.mustChangePassword);
   };
 
   const logout = () => {
     tokenStore.clear();
     setUser(null);
+    setMustChangePassword(false);
   };
 
-  return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider
+      value={{
+        user,
+        loading,
+        mustChangePassword,
+        clearMustChange: () => setMustChangePassword(false),
+        login,
+        logout,
+      }}
+    >
+      {children}
+    </Ctx.Provider>
+  );
 }

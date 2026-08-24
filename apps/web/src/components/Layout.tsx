@@ -6,6 +6,7 @@ import { isStaff, useAuth } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
 import { useClickOutside } from '../lib/useClickOutside';
 import Bell from './Bell';
+import ChangePasswordModal from './ChangePasswordModal';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100 ${
@@ -36,11 +37,12 @@ const roleLabel: Record<string, string> = {
 };
 
 export default function Layout() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, mustChangePassword, clearMustChange } = useAuth();
   const nav = useNavigate();
   const staff = isStaff(user?.role);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const userMenuRef = useClickOutside<HTMLDivElement>(userOpen, () => setUserOpen(false));
   const [search, setSearch] = useState('');
   const handovers = useQuery({
@@ -178,6 +180,15 @@ export default function Layout() {
                   </div>
                 </div>
                 <button
+                  onClick={() => {
+                    setUserOpen(false);
+                    setShowPassword(true);
+                  }}
+                  className="w-full px-4 py-2.5 text-left font-semibold hover:bg-neutral-50"
+                >
+                  Change password…
+                </button>
+                <button
                   onClick={logout}
                   className="w-full px-4 py-2.5 text-left font-semibold text-red-700 hover:bg-neutral-50"
                 >
@@ -187,6 +198,15 @@ export default function Layout() {
             )}
           </div>
         </header>
+        {(showPassword || mustChangePassword) && (
+          <ChangePasswordModal
+            forced={mustChangePassword}
+            onClose={() => {
+              setShowPassword(false);
+              clearMustChange();
+            }}
+          />
+        )}
         <main className="min-w-0 flex-1">
           <div className="mx-auto w-full max-w-5xl p-6">
             <Outlet />
