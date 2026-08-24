@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Modal from '../components/Modal';
 import LoadFailed from '../components/LoadFailed';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -166,7 +167,8 @@ export default function Devices() {
                   {status === 'deleted' ? (
                     <button
                       onClick={() => restore.mutate(d.id)}
-                      className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
+                      disabled={restore.isPending}
+                      className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
                     >
                       Restore
                     </button>
@@ -198,10 +200,7 @@ export default function Devices() {
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
 
       {showCreate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={(e) => e.target === e.currentTarget && setShowCreate(false)}
-        >
+        <Modal onClose={() => setShowCreate(false)}>
           <VForm
             className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
@@ -273,7 +272,7 @@ export default function Devices() {
               </button>
             </div>
           </VForm>
-        </div>
+        </Modal>
       )}
     </div>
   );

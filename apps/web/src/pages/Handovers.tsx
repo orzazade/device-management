@@ -42,7 +42,8 @@ export default function Handovers() {
         actions={(r) => (
           <button
             onClick={() => confirm.mutate(r.id)}
-            className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white"
+            disabled={confirm.isPending}
+            className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
           >
             Confirm handover
           </button>

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Modal from '../components/Modal';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -260,10 +261,7 @@ export default function DeviceDetail() {
       </div>
 
       {showDamage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={(e) => e.target === e.currentTarget && setShowDamage(false)}
-        >
+        <Modal onClose={() => setShowDamage(false)}>
           <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => report.mutate(String(f.get('issue')))}
@@ -302,7 +300,7 @@ export default function DeviceDetail() {
               </button>
             </div>
           </VForm>
-        </div>
+        </Modal>
       )}
     </div>
   );

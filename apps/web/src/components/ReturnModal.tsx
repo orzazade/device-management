@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import Modal from './Modal';
 import { useToast } from './Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
@@ -35,10 +36,7 @@ export default function ReturnModal({
   });
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <Modal onClose={() => onClose()}>
       <VForm
         className="w-full max-w-md rounded-2xl bg-white p-6"
         onValidSubmit={(f) => {
@@ -111,6 +109,6 @@ export default function ReturnModal({
           </button>
         </div>
       </VForm>
-    </div>
+    </Modal>
   );
 }

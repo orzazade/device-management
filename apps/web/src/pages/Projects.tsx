@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Modal from '../components/Modal';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
@@ -97,7 +98,8 @@ export default function Projects() {
               {showDeleted ? (
                 <button
                   onClick={() => restoreProject.mutate(p.id)}
-                  className="rounded-lg border border-neutral-200 px-2.5 py-0.5 text-xs font-semibold text-neutral-600 hover:border-accent hover:text-accent"
+                  disabled={restoreProject.isPending}
+                  className="rounded-lg border border-neutral-200 px-2.5 py-0.5 text-xs font-semibold text-neutral-600 hover:border-accent hover:text-accent disabled:opacity-50"
                 >
                   Restore
                 </button>
@@ -120,10 +122,7 @@ export default function Projects() {
       )}
 
       {editFor && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={(e) => e.target === e.currentTarget && setEditFor(null)}
-        >
+        <Modal onClose={() => setEditFor(null)}>
           <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
@@ -163,7 +162,7 @@ export default function Projects() {
               </button>
             </div>
           </VForm>
-        </div>
+        </Modal>
       )}
 
       {confirmDelete && (
@@ -177,10 +176,7 @@ export default function Projects() {
       )}
 
       {show && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={(e) => e.target === e.currentTarget && setShow(false)}
-        >
+        <Modal onClose={() => setShow(false)}>
           <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
@@ -211,7 +207,7 @@ export default function Projects() {
               </button>
             </div>
           </VForm>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Modal from '../components/Modal';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import RangeCalendar, { type BookingRange, type DateRange } from '../components/RangeCalendar';
@@ -49,7 +50,7 @@ export default function Approvals() {
     onError: (e) => setError(e.message),
   });
 
-  const btn = 'rounded-lg px-3 py-1 text-xs font-semibold';
+  const btn = 'rounded-lg px-3 py-1 text-xs font-semibold disabled:opacity-50';
 
   return (
     <div>
@@ -69,13 +70,15 @@ export default function Approvals() {
           <span className="flex gap-1.5">
             <button
               onClick={() => act.mutate({ id: r.id, verb: 'approve' })}
+              disabled={act.isPending}
               className={`${btn} bg-accent text-white`}
             >
               Approve
             </button>
             <button
               onClick={() => act.mutate({ id: r.id, verb: 'reject' })}
-              className={`${btn} border border-neutral-300 text-red-700`}
+              disabled={act.isPending}
+              className={`${btn} border border-neutral-300 text-red-700 disabled:opacity-50`}
             >
               Reject
             </button>
@@ -93,10 +96,7 @@ export default function Approvals() {
       />
 
       {timeFor && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={(e) => e.target === e.currentTarget && setTimeFor(null)}
-        >
+        <Modal onClose={() => setTimeFor(null)}>
           <form
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onSubmit={(e) => {
@@ -141,7 +141,7 @@ export default function Approvals() {
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
     </div>
   );

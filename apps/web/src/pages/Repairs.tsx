@@ -75,7 +75,8 @@ export default function Repairs() {
                     {!['fixed', 'written_off'].includes(r.state) && (
                       <button
                         onClick={() => act.mutate({ id: r.id, verb: 'advance' })}
-                        className="mr-1.5 rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
+                        disabled={act.isPending}
+                        className="mr-1.5 rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
                       >
                         Advance →
                       </button>
@@ -84,7 +85,8 @@ export default function Repairs() {
                       user?.role === 'admin' && (
                         <button
                           onClick={() => act.mutate({ id: r.id, verb: 'write-off' })}
-                          className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold text-red-700"
+                          disabled={act.isPending}
+                          className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
                         >
                           Write off
                         </button>

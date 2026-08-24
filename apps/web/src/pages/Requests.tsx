@@ -48,7 +48,8 @@ export default function Requests() {
           r.state === 'pending' ? (
             <button
               onClick={() => cancel.mutate(r.id)}
-              className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
+              disabled={cancel.isPending}
+              className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
             >
               Cancel
             </button>

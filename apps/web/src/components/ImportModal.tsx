@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import Modal from './Modal';
 import { useRef, useState, type DragEvent } from 'react';
 import { api } from '../lib/api';
 import { useToast } from './Toasts';
@@ -74,10 +75,7 @@ export default function ImportModal({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <Modal onClose={() => onClose()}>
       <div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6">
         <h2 className="mb-1 text-lg font-bold">Import devices from Excel</h2>
         <p className="mb-4 text-neutral-500">
@@ -238,6 +236,6 @@ export default function ImportModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

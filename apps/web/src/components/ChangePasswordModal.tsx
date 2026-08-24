@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import Modal from './Modal';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { minLen, password, required } from '../lib/validate';
@@ -28,10 +29,7 @@ export default function ChangePasswordModal({
   });
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-5"
-      onClick={(e) => !forced && e.target === e.currentTarget && onClose()}
-    >
+    <Modal onClose={() => !forced && onClose()} z="z-[70]">
       <VForm
         className="w-full max-w-sm rounded-2xl bg-white p-6"
         onValidSubmit={(f) => {
@@ -94,6 +92,6 @@ export default function ChangePasswordModal({
           </button>
         </div>
       </VForm>
-    </div>
+    </Modal>
   );
 }

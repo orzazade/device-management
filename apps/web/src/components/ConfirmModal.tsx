@@ -1,4 +1,4 @@
-import { createPortal } from 'react-dom';
+import Modal from './Modal';
 
 export default function ConfirmModal({
   title,
@@ -15,14 +15,10 @@ export default function ConfirmModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  // Portal + type="button": this dialog is often rendered inside another
-  // form, and a bare <button> would submit it.
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-5"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6">
+  // Nothing typed in here — backdrop click may close it.
+  return (
+    <Modal onClose={onClose} closeOnBackdrop z="z-[60]">
+      <div className="w-full max-w-sm self-center rounded-2xl bg-white p-6">
         <h2 className="mb-2 text-lg font-bold">{title}</h2>
         <p className="mb-5 text-neutral-600">{body}</p>
         <div className="flex justify-end gap-2">
@@ -43,7 +39,6 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

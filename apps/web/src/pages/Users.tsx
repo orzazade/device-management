@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Modal from '../components/Modal';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
@@ -166,7 +167,8 @@ export default function Users() {
                     me?.role === 'admin' && (
                       <button
                         onClick={() => restore.mutate(u.id)}
-                        className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold"
+                        disabled={restore.isPending}
+                        className="rounded-lg border border-neutral-300 px-3 py-1 text-xs font-semibold disabled:opacity-50"
                       >
                         Restore
                       </button>
@@ -188,10 +190,7 @@ export default function Users() {
       </div>
 
       {editFor && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={(e) => e.target === e.currentTarget && setEditFor(null)}
-        >
+        <Modal onClose={() => setEditFor(null)}>
           <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
@@ -269,7 +268,7 @@ export default function Users() {
               </button>
             </div>
           </VForm>
-        </div>
+        </Modal>
       )}
 
       {confirmDelete && (
@@ -283,10 +282,7 @@ export default function Users() {
       )}
 
       {showCreate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-          onClick={(e) => e.target === e.currentTarget && setShowCreate(false)}
-        >
+        <Modal onClose={() => setShowCreate(false)}>
           <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
@@ -331,7 +327,7 @@ export default function Users() {
               </button>
             </div>
           </VForm>
-        </div>
+        </Modal>
       )}
     </div>
   );

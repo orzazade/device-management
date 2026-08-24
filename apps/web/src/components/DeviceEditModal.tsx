@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Modal from './Modal';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
@@ -67,10 +68,7 @@ export default function DeviceEditModal({
   );
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-5"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <Modal onClose={() => onClose()}>
       <VForm
         className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6"
         onValidSubmit={(f) => {
@@ -159,6 +157,6 @@ export default function DeviceEditModal({
           />
         )}
       </VForm>
-    </div>
+    </Modal>
   );
 }
