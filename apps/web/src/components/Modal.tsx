@@ -44,7 +44,11 @@ export default function Modal({
       className={`fixed inset-0 ${z} flex items-center justify-center bg-black/50 p-5`}
       onClick={(e) => closeOnBackdrop && e.target === e.currentTarget && onClose()}
     >
-      <div className="flex max-h-[90vh] w-full justify-center overflow-y-auto">{children}</div>
+      {/* items-start: a flex row would stretch the dialog to exactly 90vh and let
+          taller content spill past its own background instead of scrolling. */}
+      <div className="flex max-h-[90vh] w-full items-start justify-center overflow-y-auto">
+        {children}
+      </div>
     </div>,
     document.body,
   );

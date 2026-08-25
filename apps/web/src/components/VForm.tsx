@@ -96,6 +96,7 @@ export function VField({
   const [count, setCount] = useState(defaultValue.length);
   const errorRef = useRef<string | null>(null);
   errorRef.current = error;
+  const touched = useRef(false);
 
   useEffect(() => {
     if (!ctx) return;
@@ -124,8 +125,14 @@ export function VField({
     autoFocus,
     autoComplete,
     inputMode,
-    onBlur: () => setError(runRules(rules, ref.current?.value ?? '')),
+    // Leaving a field you never typed in is not a mistake yet — only submit
+    // (or a value you did type) may flag it. Otherwise opening a dropdown
+    // next to an empty box paints it red.
+    onBlur: () => {
+      if (touched.current || ref.current?.value) setError(runRules(rules, ref.current?.value ?? ''));
+    },
     onChange: () => {
+      touched.current = true;
       if (maxLength) setCount(ref.current?.value.length ?? 0);
       if (errorRef.current) setError(runRules(rules, ref.current?.value ?? ''));
     },
