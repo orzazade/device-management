@@ -13,30 +13,23 @@ export interface ImportReport {
   ok: number;
   errors: ImportRowError[];
   committed: boolean;
-  /** Headers present in the file that the importer does not read. */
-  unknownColumns?: string[];
+  /** Extra headers that were stored as free-form specs. */
+  specColumns?: string[];
 }
 
-/** One source of truth for spec columns: header → specs key. Bool columns
- * accept yes/true/1. Mirrors the web SPEC_FIELDS registry. */
-export const SPEC_COLUMNS: ReadonlyArray<{ header: string; key: string; bool?: boolean }> = [
-  { header: 'ram', key: 'ram' },
-  { header: 'storage', key: 'storage' },
-  { header: 'screen', key: 'screenSize' },
-  { header: '5g', key: 'fiveG', bool: true },
-  { header: 'esim', key: 'esim', bool: true },
-  { header: 'nfc', key: 'nfc', bool: true },
-  { header: 'specs', key: 'notes' },
-];
-
+/** Fixed columns the importer understands. Every OTHER column becomes a
+ * spec on the device, keyed by its header text ("RAM" → specs.RAM). */
 export const BASE_COLUMNS = [
   'brand', 'model', 'os', 'os_version', 'serial', 'imei', 'accessories', 'project',
 ];
 
+/** Example spec columns in the template — any header works. */
+const TEMPLATE_SPEC_EXAMPLES = ['RAM', 'Storage', 'Screen', '5G'];
+
 /**
  * Excel import (GOALS.md): dry run first, loud row-by-row errors, no silent
- * partial imports. Columns (header row): brand, model, os, os_version,
- * specs, serial, imei, accessories (comma-separated), project.
+ * partial imports. Fixed columns: brand, model, os, os_version, serial, imei,
+ * accessories (comma-separated), project. Extra columns = specs.
  */
 @Injectable()
 export class ImportService {
@@ -46,14 +39,13 @@ export class ImportService {
   async buildTemplate(): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Devices');
-    const headers = [...BASE_COLUMNS, ...SPEC_COLUMNS.map((c) => c.header)];
+    const headers = [...BASE_COLUMNS, ...TEMPLATE_SPEC_EXAMPLES];
     ws.addRow(headers);
     ws.getRow(1).font = { bold: true };
     const example: Record<string, string> = {
       brand: 'Samsung', model: 'Galaxy S24', os: 'Android', os_version: '14',
       serial: 'RF8T2001', imei: '353912100000002', accessories: 'Box, Cable, Charger',
-      project: '', ram: '8 GB', storage: '128 GB', screen: '6.2"',
-      '5g': 'yes', esim: 'yes', nfc: 'yes', specs: 'Test-only unit',
+      project: '', RAM: '8 GB', Storage: '128 GB', Screen: '6.2"', '5G': 'yes',
     };
     ws.addRow(headers.map((h) => example[h] ?? ''));
     const out = await wb.xlsx.writeBuffer();
@@ -79,8 +71,14 @@ export class ImportService {
     if (!ws) return { ok: 0, errors: [{ row: 0, message: 'File has no sheets' }], committed: false };
 
     const headers: Record<string, number> = {};
+    // Extra columns keep their exact header text as the spec name.
+    const specColumns: { name: string; col: number }[] = [];
     ws.getRow(1).eachCell((cell, col) => {
-      headers[String(cell.value).trim().toLowerCase()] = col;
+      const raw = (cell.text ?? String(cell.value ?? '')).trim();
+      if (!raw) return;
+      const key = raw.toLowerCase();
+      headers[key] = col;
+      if (!BASE_COLUMNS.includes(key)) specColumns.push({ name: raw, col: Number(col) });
     });
     for (const required of ['brand', 'model', 'os', 'serial']) {
       if (!headers[required]) {
@@ -150,15 +148,11 @@ export class ImportService {
         return;
       }
       seenSerials.add(serial);
-      const specs: Record<string, unknown> = {};
-      for (const { header, key, bool } of SPEC_COLUMNS) {
-        const v = cellStr(row, header);
-        if (!v) continue;
-        if (bool) {
-          specs[key] = ['yes', 'true', '1', 'y'].includes(v.toLowerCase());
-        } else {
-          specs[key] = v;
-        }
+      const specs: Record<string, string> = {};
+      for (const { name, col } of specColumns) {
+        const cell = row.getCell(col);
+        const v = (cell.text ?? (cell.value == null ? '' : String(cell.value))).trim();
+        if (v) specs[name] = v;
       }
       valid.push({
         brand,
@@ -176,9 +170,8 @@ export class ImportService {
       });
     });
 
-    const known = new Set([...BASE_COLUMNS, ...SPEC_COLUMNS.map((c) => c.header)]);
-    const unknownColumns = Object.keys(headers).filter((h) => !known.has(h));
-    if (!commit) return { ok: valid.length, errors, committed: false, unknownColumns };
+    const specNames = specColumns.map((c) => c.name);
+    if (!commit) return { ok: valid.length, errors, committed: false, specColumns: specNames };
 
     await this.db.withTransaction(async (ctx) => {
       for (const d of valid) {
@@ -198,6 +191,6 @@ export class ImportService {
         newValue: { imported: valid.length, rejectedRows: errors.map((e) => e.row) },
       });
     });
-    return { ok: valid.length, errors, committed: true, unknownColumns };
+    return { ok: valid.length, errors, committed: true, specColumns: specNames };
   }
 }

@@ -8,7 +8,7 @@ interface Report {
   ok: number;
   errors: { row: number; message: string }[];
   committed: boolean;
-  unknownColumns?: string[];
+  specColumns?: string[];
 }
 
 type Phase = 'pick' | 'checking' | 'report' | 'importing' | 'done';
@@ -83,16 +83,34 @@ export default function ImportModal({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={async () => {
-              const res = await fetch('/api/v1/devices/import/template', {
-                headers: { authorization: `Bearer ${tokenStore.get()}` },
-              });
-              if (!res.ok) return;
+              let res: Response;
+              try {
+                res = await fetch('/api/v1/devices/import/template', {
+                  headers: { authorization: `Bearer ${tokenStore.get()}` },
+                });
+              } catch {
+                toast('Could not reach the server to fetch the template', 'error');
+                return;
+              }
+              if (!res.ok) {
+                toast(`Template download failed (${res.status})`, 'error');
+                return;
+              }
+              // The anchor must be in the document and the blob URL must
+              // outlive the click, or some browsers quietly drop the download.
               const url = URL.createObjectURL(await res.blob());
               const a = document.createElement('a');
               a.href = url;
               a.download = 'devicedesk-import-template.xlsx';
+              a.rel = 'noopener';
+              a.style.display = 'none';
+              document.body.appendChild(a);
               a.click();
-              URL.revokeObjectURL(url);
+              setTimeout(() => {
+                a.remove();
+                URL.revokeObjectURL(url);
+              }, 2000);
+              toast('Template downloaded — check your Downloads folder');
             }}
             className="font-semibold text-accent"
           >
@@ -169,10 +187,10 @@ export default function ImportModal({ onClose }: { onClose: () => void }) {
                   <span className="mr-2 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
                     ✓ {report.ok} rows OK
                   </span>
-                  {(report.unknownColumns?.length ?? 0) > 0 && (
-                  <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    Ignored columns (not part of the template):{' '}
-                    <code className="font-mono">{report.unknownColumns!.join(', ')}</code>
+                  {(report.specColumns?.length ?? 0) > 0 && (
+                  <p className="mb-2 rounded-lg bg-neutral-100 px-3 py-2 text-xs text-neutral-700">
+                    Extra columns saved as specs:{' '}
+                    <code className="font-mono">{report.specColumns!.join(', ')}</code>
                   </p>
                 )}
                 {report.errors.length > 0 && (

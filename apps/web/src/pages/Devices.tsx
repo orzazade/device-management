@@ -7,7 +7,9 @@ import Chip from '../components/Chip';
 import ImportModal from '../components/ImportModal';
 import RequestModal from '../components/RequestModal';
 import SpecFields from '../components/SpecFields';
-import { collectSpecs } from '../lib/specs';
+import { collectSpecs, specsToPairs } from '../lib/specs';
+
+const isFlag = (v: string) => /^(yes|no|true|false)$/i.test(v);
 import { VForm, VField } from '../components/VForm';
 import { imei, required, serial } from '../lib/validate';
 import { useToast } from '../components/Toasts';
@@ -174,11 +176,13 @@ export default function Devices() {
                   {d.damageNote && <span title={d.damageNote}> 🛠</span>}
                   <br />
                   <span className="font-mono text-xs text-neutral-500">{d.serial}</span>
-                  {Boolean(d.specs?.ram || d.specs?.storage || d.specs?.screenSize) && (
+                  {specsToPairs(d.specs).length > 0 && (
                     <span className="block text-xs text-neutral-500">
-                      {[d.specs?.ram, d.specs?.storage, d.specs?.screenSize]
-                        .filter(Boolean)
-                        .map(String)
+                      {[...specsToPairs(d.specs)]
+                        // Real values (8 GB) tell more at a glance than yes/no flags.
+                        .sort((a, b) => Number(isFlag(a.value)) - Number(isFlag(b.value)))
+                        .slice(0, 3)
+                        .map((p) => (p.value ? `${p.key} ${p.value}` : p.key))
                         .join(' · ')}
                     </span>
                   )}

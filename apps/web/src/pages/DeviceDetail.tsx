@@ -7,7 +7,7 @@ import ChangeDiff from '../components/ChangeDiff';
 import LoadFailed from '../components/LoadFailed';
 import { VForm, VField } from '../components/VForm';
 import { minLen, required } from '../lib/validate';
-import { SPEC_FIELDS } from '../lib/specs';
+import { specsToPairs } from '../lib/specs';
 import Chip from '../components/Chip';
 import DeviceEditModal from '../components/DeviceEditModal';
 import RequestModal from '../components/RequestModal';
@@ -193,30 +193,14 @@ export default function DeviceDetail() {
         {tab === 'specs' && (
           <div className="border-t border-neutral-100 p-4 pt-3">
             <div className="flex flex-wrap gap-1.5">
-              {SPEC_FIELDS.filter(
-                (def) =>
-                  d.specs?.[def.key] != null &&
-                  (def.type !== 'bool' || d.specs[def.key] === true),
-              ).map((def) =>
-                def.type === 'bool' ? (
-                  <span
-                    key={def.key}
-                    className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800"
-                  >
-                    ✓ {def.label}
-                  </span>
-                ) : (
-                  <span
-                    key={def.key}
-                    className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs"
-                  >
-                    <span className="text-neutral-500">{def.label}:</span>{' '}
-                    <b>{String(d.specs[def.key])}</b>
-                  </span>
-                ),
-              )}
+              {specsToPairs(d.specs).map((p) => (
+                <span key={p.key} className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs">
+                  <span className="text-neutral-500">{p.key}{p.value ? ':' : ''}</span>
+                  {p.value ? <> <b>{p.value}</b></> : null}
+                </span>
+              ))}
             </div>
-            {!SPEC_FIELDS.some((def) => d.specs?.[def.key] != null) && (
+            {specsToPairs(d.specs).length === 0 && (
               <p className="text-neutral-400">
                 No specs recorded yet — add them via Edit so testers can find this device.
               </p>

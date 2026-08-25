@@ -3,7 +3,7 @@ import Modal from './Modal';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { SPEC_FIELDS, collectSpecs } from '../lib/specs';
+import { collectSpecs } from '../lib/specs';
 import { imei, required } from '../lib/validate';
 import { VForm, VField } from './VForm';
 import type { DeviceRow, ProjectRow } from '../lib/types';
@@ -76,15 +76,7 @@ export default function DeviceEditModal({
             model: f.get('model'),
             os: f.get('os'),
             osVersion: f.get('osVersion') || '',
-            // Unknown spec keys (imported or added later) survive the edit.
-            specs: {
-              ...Object.fromEntries(
-                Object.entries(device.specs ?? {}).filter(
-                  ([k]) => !SPEC_FIELDS.some((def) => def.key === k),
-                ),
-              ),
-              ...collectSpecs(f),
-            },
+            specs: collectSpecs(f),
             imei: f.get('imei') || '',
             accessories: String(f.get('accessories') || '')
               .split(',')

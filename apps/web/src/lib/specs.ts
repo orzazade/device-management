@@ -1,33 +1,32 @@
-/** One source of truth for device specs — the form, the detail page, the
- * list line and the Excel importer all read this list. Deliberately short:
- * only what decides which phone a tester picks. */
-export interface SpecDef {
+/** Specs are free key/value pairs — the lab decides what matters per device.
+ * Stored as { "RAM": "8 GB", "5G": "yes" }; keys are the labels people typed. */
+export interface SpecPair {
   key: string;
-  label: string;
-  type: 'text' | 'bool';
-  placeholder?: string;
+  value: string;
 }
 
-export const SPEC_FIELDS: SpecDef[] = [
-  { key: 'ram', label: 'RAM', type: 'text', placeholder: '12 GB' },
-  { key: 'storage', label: 'Storage', type: 'text', placeholder: '256 GB' },
-  { key: 'screenSize', label: 'Screen size', type: 'text', placeholder: '6.7"' },
-  { key: 'fiveG', label: '5G', type: 'bool' },
-  { key: 'esim', label: 'eSIM', type: 'bool' },
-  { key: 'nfc', label: 'NFC', type: 'bool' },
-  { key: 'notes', label: 'Notes', type: 'text', placeholder: 'Anything testers should know' },
+/** Offered as autocomplete so common names stay consistent across devices. */
+export const SPEC_SUGGESTIONS = [
+  'RAM', 'Storage', 'Screen', 'Chipset', 'Battery', '5G', 'eSIM', 'NFC', 'Color', 'Notes',
 ];
 
-/** Reads spec_* inputs from a submitted form into a clean specs object. */
-export function collectSpecs(f: FormData): Record<string, unknown> {
-  const specs: Record<string, unknown> = {};
-  for (const def of SPEC_FIELDS) {
-    if (def.type === 'bool') {
-      if (f.get(`spec_${def.key}`) === 'on') specs[def.key] = true;
-    } else {
-      const v = String(f.get(`spec_${def.key}`) ?? '').trim();
-      if (v) specs[def.key] = v;
-    }
+export function specsToPairs(specs: Record<string, unknown> | undefined): SpecPair[] {
+  return Object.entries(specs ?? {}).map(([key, v]) => ({
+    key,
+    value: v === true ? 'yes' : v === false ? 'no' : v == null ? '' : String(v),
+  }));
+}
+
+/** Reads spec_k_N / spec_v_N inputs from a submitted form. Empty names are
+ * dropped; a name with no value is kept as '' so "has NFC" style flags work. */
+export function collectSpecs(f: FormData): Record<string, string> {
+  const specs: Record<string, string> = {};
+  for (const [name, raw] of f.entries()) {
+    const m = /^spec_k_(\d+)$/.exec(name);
+    if (!m) continue;
+    const key = String(raw).trim();
+    if (!key) continue;
+    specs[key] = String(f.get(`spec_v_${m[1]}`) ?? '').trim();
   }
   return specs;
 }
