@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-accent: #7a2e8f;
-  --color-accent-soft: #f3e8f7;
+  /* Azercell purple */
+  --color-accent: #5c2d91;
+  --color-accent-soft: #eee7f4;
   /* Page ground — separate from neutral-100 so dark mode can keep faint
    * borders light-ish while the page itself goes properly dark. */
   --color-ground: #f5f5f5;
@@ -78,6 +79,7 @@ input[type='radio'] {
 }
 
 /* ---------- Eclipse theme switch ---------- */
+@layer components {
 .eclipse {
   position: relative;
   width: 56px;
@@ -145,4 +147,22 @@ input[type='radio'] {
   body {
     transition-duration: 0.01ms;
   }
+}
+}
+
+/* ---------- Brand heartbeat loader ---------- */
+@keyframes heartbeat {
+  0%, 100% { opacity: 0.15; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+.heartbeat {
+  animation: heartbeat 1.4s ease-in-out infinite;
+  transform-origin: center;
+}
+/* The colour logo is one purple; lift it on dark grounds. */
+[data-theme='dark'] .brand-logo {
+  filter: brightness(1.75) saturate(0.85);
+}
+@media (prefers-reduced-motion: reduce) {
+  .heartbeat { animation-duration: 3s; }
 }

@@ -8,6 +8,8 @@ import { useClickOutside } from '../lib/useClickOutside';
 import Bell from './Bell';
 import ChangePasswordModal from './ChangePasswordModal';
 import ThemeToggle from './ThemeToggle';
+import AzercellMark from './AzercellMark';
+import BrandLoader from './BrandLoader';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100 ${
@@ -80,9 +82,9 @@ export default function Layout() {
   useEffect(() => {
     const name = location.pathname === '/' ? 'Dashboard'
       : location.pathname.slice(1).split('/')[0].replace(/^\w/, (c) => c.toUpperCase());
-    document.title = `${name} · DeviceDesk`;
+    document.title = `${name} · Azercell Device Manager`;
   });
-  if (loading) return <p className="p-10 text-neutral-400">loading…</p>;
+  if (loading) return <BrandLoader />;
   if (!user && sessionCheckFailed)
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -113,8 +115,16 @@ export default function Layout() {
       }`}
     >
       <div className="flex items-start justify-between border-b border-neutral-200 px-4 py-4">
-        <div>
-        <b className="text-base">DeviceDesk</b>
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5c2d91] text-white shadow-sm">
+            <AzercellMark className="w-6" />
+          </span>
+          <span className="leading-tight">
+            <span className="block text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+              Azercell
+            </span>
+            <b className="block text-[15px]">Device Manager</b>
+          </span>
         </div>
         {menuOpen && (
           <button
