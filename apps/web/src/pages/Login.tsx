@@ -44,10 +44,12 @@ export default function Login() {
           }
         }}
       >
-        <div className="mb-7 inline-flex flex-col items-end">
-          <img src="/azercell-logo.svg" alt="Azercell" className="brand-logo h-12" />
+        {/* Logo keeps its official colour (#5c2d91); the line under it uses that
+            same purple and shares the wrapper's dark-mode lift, so they always match. */}
+        <div className="brand-logo mb-7 inline-flex flex-col items-end text-[#5c2d91]">
+          <img src="/azercell-logo.svg" alt="Azercell" className="h-12" />
           {/* The wordmark is the right 64% of the logo; the line sits under exactly that. */}
-          <span className="mt-0.5 w-[64%] whitespace-nowrap text-right text-[14px] font-medium leading-none tracking-tight text-accent">
+          <span className="mt-0.5 w-[64%] whitespace-nowrap text-right text-[14px] font-medium leading-none tracking-tight">
             Device Manager
           </span>
         </div>

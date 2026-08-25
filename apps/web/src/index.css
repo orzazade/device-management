@@ -150,6 +150,11 @@ input[type='radio'] {
 }
 }
 
+/* The colour logo is one purple; lift it on dark grounds. */
+[data-theme='dark'] .brand-logo {
+  filter: brightness(1.75) saturate(0.85);
+}
+
 /* ---------- Brand heartbeat loader ---------- */
 @keyframes heartbeat {
   0%, 100% { opacity: 0.15; transform: scale(0.94); }
@@ -158,10 +163,6 @@ input[type='radio'] {
 .heartbeat {
   animation: heartbeat 1.4s ease-in-out infinite;
   transform-origin: center;
-}
-/* The colour logo is one purple; lift it on dark grounds. */
-[data-theme='dark'] .brand-logo {
-  filter: brightness(1.75) saturate(0.85);
 }
 @media (prefers-reduced-motion: reduce) {
   .heartbeat { animation-duration: 3s; }
