@@ -35,7 +35,7 @@ export default function Login() {
             await login(String(f.get('email')), String(f.get('password')));
             // One heartbeat of the brand before the app appears.
             setEntering(true);
-            setTimeout(() => nav(from), 1400);
+            setTimeout(() => nav(from), 2000);
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Login failed';
             setError(msg.includes('fetch') ? 'Can’t reach the server — check the connection and try again' : msg);

@@ -1,7 +1,5 @@
-import AzercellMark from './AzercellMark';
-
-/** Full-screen "heartbeat" — the mark breathes in and out while the app
- * gets ready (session check, right after sign-in). */
+/** Full-screen "heartbeat" — the full Azercell logo breathes in and out
+ * while the app gets ready (session check, right after sign-in). */
 export default function BrandLoader({ label = 'Loading…' }: { label?: string }) {
   return (
     <div
@@ -9,7 +7,7 @@ export default function BrandLoader({ label = 'Loading…' }: { label?: string }
       aria-label={label}
       className="fixed inset-0 z-[60] flex items-center justify-center bg-ground"
     >
-      <AzercellMark className="heartbeat w-24 text-accent" />
+      <img src="/azercell-logo.svg" alt="Azercell" className="brand-logo heartbeat w-56" />
     </div>
   );
 }
