@@ -114,9 +114,6 @@ export default function Layout() {
       <div className="flex items-start justify-between border-b border-neutral-200 px-4 py-4">
         <div>
         <b className="text-base">DeviceDesk</b>
-        <small className="block text-[10.5px] uppercase tracking-wider text-neutral-500">
-          QA Device Lab
-        </small>
         </div>
         {menuOpen && (
           <button
