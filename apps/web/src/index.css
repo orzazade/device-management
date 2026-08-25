@@ -53,8 +53,9 @@ input[type='radio'] {
   --color-neutral-600: #c4bacf;
   --color-neutral-700: #d9d1e3;
   --color-neutral-900: #f1ecf6;
-  --color-accent: #c48ad6;
-  --color-accent-soft: #2e2338;
+  /* Azercell violet, lights up: same hue as #5c2d91, readable on dark. */
+  --color-accent: #9b74d9;
+  --color-accent-soft: #2a2140;
   --color-red-50: #3a1a1f;
   --color-red-100: #4a2028;
   --color-red-200: #5c2a33;
@@ -150,10 +151,12 @@ input[type='radio'] {
 }
 }
 
-/* The colour logo is one purple; lift it on dark grounds. */
-[data-theme='dark'] .brand-logo {
-  filter: brightness(1.75) saturate(0.85);
-}
+/* The logo ships as two files — official purple, and the same artwork in
+ * the dark-mode violet — so it always matches the accent exactly. */
+.brand-logo .logo-dark { display: none; }
+[data-theme='dark'] .brand-logo .logo-light { display: none; }
+[data-theme='dark'] .brand-logo .logo-dark { display: block; }
+[data-theme='dark'] .brand-logo { color: #9b74d9; }
 
 /* ---------- Brand heartbeat loader ---------- */
 @keyframes heartbeat {
