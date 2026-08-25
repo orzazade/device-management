@@ -35,6 +35,10 @@ export default function RequestModal({
     queryFn: () => api<UserRow[]>('/users'),
     enabled: isStaff(user?.role),
   });
+  const projects = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api<{ id: string; name: string }[]>('/projects'),
+  });
   const bookings = useQuery({
     queryKey: ['device-bookings', device.id],
     queryFn: () => api<BookingRange[]>(`/devices/${device.id}/bookings`),
@@ -60,8 +64,13 @@ export default function RequestModal({
             setError('Pick a free time range in the calendar');
             return;
           }
+          if (!f.get('projectId')) {
+            setError('Pick the project this device is for');
+            return;
+          }
           create.mutate({
             deviceId: device.id,
+            projectId: String(f.get('projectId')),
             reason: String(f.get('reason')),
             fromDate: range.from,
             toDate: range.to,
@@ -83,6 +92,33 @@ export default function RequestModal({
             over.
           </div>
         )}
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs font-semibold text-neutral-500">Project</span>
+          {projects.isError ? (
+            <LoadFailed what="projects" onRetry={() => projects.refetch()} />
+          ) : (
+            <select
+              name="projectId"
+              required
+              defaultValue={device.project?.id ?? ''}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+            >
+              <option value="" disabled>
+                {projects.isLoading ? 'loading…' : 'Which project is this for?'}
+              </option>
+              {projects.data?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {projects.data?.length === 0 && (
+            <span className="mt-1 block text-xs text-amber-700">
+              No projects yet — ask a manager to add one under Projects.
+            </span>
+          )}
+        </label>
         <div className="mb-3">
           <VField
             name="reason"

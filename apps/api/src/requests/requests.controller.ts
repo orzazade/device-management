@@ -31,6 +31,10 @@ class CreateRequestDto {
   @IsUUID()
   deviceId: string;
 
+  /** Which project the device is borrowed for. */
+  @IsUUID()
+  projectId: string;
+
   @IsString()
   @MinLength(5)
   reason: string;
@@ -98,6 +102,7 @@ const pub = (r: DeviceRequest) => ({
     : { id: r.deviceId },
   requester: r.requester ? { id: r.requester.id, name: r.requester.name } : { id: r.requesterId },
   createdById: r.createdById,
+  project: r.project ? { id: r.project.id, name: r.project.name } : null,
   reason: r.reason,
   fromDate: r.fromDate,
   toDate: r.toDate,
@@ -128,6 +133,7 @@ export class RequestsController {
       new CreateRequestCommand(actor(req), {
         deviceId: dto.deviceId,
         requesterId,
+        projectId: dto.projectId,
         reason: dto.reason,
         fromDate: dto.fromDate,
         toDate: dto.toDate,
@@ -149,6 +155,7 @@ export class RequestsController {
       .leftJoinAndSelect('r.device', 'device')
       .leftJoinAndSelect('device.holder', 'deviceHolder')
       .leftJoinAndSelect('r.requester', 'requester')
+      .leftJoinAndSelect('r.project', 'project')
       .orderBy('r.createdAt', 'DESC');
     // "all" is staff-only; everyone else always sees just their own.
     if (scope !== 'all' || !staff(req.user)) {
@@ -165,7 +172,7 @@ export class RequestsController {
       .requests()
       .find({
         where: { state: 'approved' },
-        relations: { device: { holder: true }, requester: true },
+        relations: { device: { holder: true }, requester: true, project: true },
         order: { createdAt: 'DESC' },
       });
     const mine = all.filter(
@@ -246,7 +253,7 @@ export class RequestsController {
     return this.db.withTransaction(async (ctx) => {
       const r = await ctx.requests.findOne({
         where: { id },
-        relations: { device: true, requester: true },
+        relations: { device: true, requester: true, project: true },
       });
       if (!r) throw new NotFoundException('Request not found');
       if (r.requesterId !== req.user.sub) {
@@ -293,7 +300,7 @@ export class RequestsController {
   private async reload(id: string) {
     const r = await this.db.requests().findOne({
       where: { id },
-      relations: { device: { holder: true }, requester: true },
+      relations: { device: { holder: true }, requester: true, project: true },
       withDeleted: true,
     });
     return pub(r!);

@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Device } from './device.entity';
+import { Project } from './project.entity';
 import { User } from './user.entity';
 
 export type RequestState =
@@ -53,6 +54,14 @@ export class DeviceRequest {
   /** Who created it (differs from requester for on-behalf requests). */
   @Column({ type: 'uuid' })
   createdById: string;
+
+  /** Which project the device is borrowed for. Old rows may have none. */
+  @Column({ type: 'uuid', nullable: true })
+  projectId: string | null;
+
+  @ManyToOne(() => Project)
+  @JoinColumn({ name: 'project_id' })
+  project: Project | null;
 
   @Column()
   reason: string;

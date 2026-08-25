@@ -45,6 +45,7 @@ export default function RequestTable({
               <div className="mt-0.5 text-xs text-neutral-500">{r.decisionNote}</div>
             )}
             <div className="mt-1 text-sm">{r.reason}</div>
+            {r.project && <div className="text-xs text-neutral-500">for {r.project.name}</div>}
             {actions && (
               <div className="mt-2.5 [&_button]:min-h-10 [&_button]:flex-1 [&_span]:flex [&_span]:w-full [&_span]:gap-2">
                 {actions(r)}
@@ -91,7 +92,10 @@ export default function RequestTable({
                 <br />
                 {r.toDate}
               </td>
-              <td className="max-w-64 px-4 py-2.5">{r.reason}</td>
+              <td className="max-w-64 px-4 py-2.5">
+                {r.reason}
+                {r.project && <div className="text-xs text-neutral-500">for {r.project.name}</div>}
+              </td>
               <td className="px-4 py-2.5">
                 <Chip status={r.state} />
                 {(r.state === 'rejected' || r.state === 'cancelled') && r.decisionNote && (

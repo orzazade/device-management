@@ -11,6 +11,7 @@ export interface RequestRow {
   };
   requester: { id: string; name?: string };
   createdById: string;
+  project?: { id: string; name: string } | null;
   reason: string;
   fromDate: string;
   toDate: string;

@@ -66,6 +66,7 @@ export class CreateRequestCommand {
     readonly data: {
       deviceId: string;
       requesterId: string;
+      projectId: string;
       reason: string;
       fromDate: string;
       toDate: string;
@@ -95,10 +96,13 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         );
       }
 
+            const project = await ctx.projects.findOne({ where: { id: data.projectId } });
+      if (!project) throw new BadRequestException('Pick a project that exists');
       const request = await ctx.requests.save({
         deviceId: data.deviceId,
         requesterId: data.requesterId,
         createdById: actor.id!,
+        projectId: data.projectId,
         reason: data.reason,
         fromDate: data.fromDate,
         toDate: data.toDate,
