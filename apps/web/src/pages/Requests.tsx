@@ -28,6 +28,7 @@ export default function Requests() {
   // Desk modals (staff)
   const [timeFor, setTimeFor] = useState<RequestRow | null>(null);
   const [rejectFor, setRejectFor] = useState<RequestRow | null>(null);
+  const [cantFor, setCantFor] = useState<RequestRow | null>(null);
   const [overrideRange, setOverrideRange] = useState<DateRange>({ from: null, to: null });
   const [returnFor, setReturnFor] = useState<RequestRow | null>(null);
   // My-requests modals (everyone)
@@ -42,18 +43,6 @@ export default function Requests() {
     queryKey: ['requests', 'mine'],
     queryFn: () => api<RequestRow[]>('/requests'),
   });
-  // Deep link from a notification: a rejected/cancelled/returned request
-  // lives under "All", so pick that tab for the reader and scroll to it.
-  useEffect(() => {
-    if (!focusId || !mine.data) return;
-    const row = mine.data.find((r) => r.id === focusId);
-    if (row && CLOSED.includes(row.state)) setFilter('all');
-    setTimeout(
-      () => document.getElementById(`req-${focusId}`)?.scrollIntoView({ block: 'center' }),
-      50,
-    );
-  }, [focusId, mine.data]);
-
   const handovers = useQuery({
     queryKey: ['requests', 'pending-handover'],
     queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
@@ -64,6 +53,19 @@ export default function Requests() {
     enabled: staffUser,
     refetchInterval: 60000,
   });
+  // Deep link from a notification: a rejected/cancelled/returned request
+  // lives under "All", so pick that tab for the reader and scroll to it.
+  useEffect(() => {
+    const rows = staffUser ? all.data : mine.data;
+    if (!focusId || !rows) return;
+    const row = rows.find((r) => r.id === focusId);
+    if (row && CLOSED.includes(row.state)) setFilter('all');
+    setTimeout(
+      () => document.getElementById(`req-${focusId}`)?.scrollIntoView({ block: 'center' }),
+      50,
+    );
+  }, [focusId, mine.data, all.data, staffUser]);
+
   const settings = useQuery({
     queryKey: ['settings'],
     queryFn: () => api<{ approvalMode: string }>('/settings'),
@@ -118,10 +120,13 @@ export default function Requests() {
   });
 
   const cantHandOver = useMutation({
-    mutationFn: (id: string) => api(`/requests/${id}/cancel`, { method: 'POST' }),
+    mutationFn: ({ id, note }: { id: string; note: string }) =>
+      api(`/requests/${id}/cancel`, { method: 'POST', body: { note } }),
     onSuccess: () => {
       invalidate();
-      toast('Request cancelled — the requester is notified');
+      setCantFor(null);
+      setError(null);
+      toast('Request cancelled — the requester sees your reason');
     },
     onError: (e) => setError(e.message),
   });
@@ -170,6 +175,10 @@ export default function Requests() {
   const approvedElsewhere = staffUser
     ? (all.data?.filter((r) => r.state === 'approved' && !handoverIds.has(r.id)) ?? [])
     : [];
+
+  // Staff read the whole lab; testers read their own. Closed rows stay
+  // visible under "All" for everyone — nothing vanishes after a decision.
+  const listRows = staffUser ? all : mine;
 
   const section = (title: string, hint: string | null, body: ReactNode) => (
     <div className="mb-6">
@@ -246,7 +255,7 @@ export default function Requests() {
             actions={(r) => (
               <span className="flex gap-1.5">
                 <button
-                  onClick={() => cantHandOver.mutate(r.id)}
+                  onClick={() => setCantFor(r)}
                   disabled={cantHandOver.isPending}
                   className={`${btn} border border-neutral-300`}
                 >
@@ -313,7 +322,7 @@ export default function Requests() {
         )}
 
       <div className="mb-2 flex items-center gap-3">
-        <h2 className="font-bold">My requests</h2>
+        <h2 className="font-bold">{staffUser ? 'All requests' : 'My requests'}</h2>
         <div className="flex gap-1.5">
           {(['open', 'all'] as const).map((t) => (
             <button
@@ -331,15 +340,16 @@ export default function Requests() {
       <RequestTable
         rows={
           filter === 'open'
-            ? mine.data?.filter((r) => !CLOSED.includes(r.state))
-            : mine.data
+            ? listRows.data?.filter((r) => !CLOSED.includes(r.state))
+            : listRows.data
         }
         highlightId={focusId ?? undefined}
-        error={mine.isError}
-        onRetry={() => mine.refetch()}
+        error={listRows.isError}
+        onRetry={() => listRows.refetch()}
         empty={filter === 'open' ? 'Nothing open. Find a device and ask for it.' : 'No requests yet.'}
         actions={(r) =>
-          r.state === 'pending' || r.state === 'approved' ? (
+          // Personal actions only on your own rows; desk actions live above.
+          r.requester.id !== user?.id ? null : r.state === 'pending' || r.state === 'approved' ? (
             <button
               onClick={() => (r.state === 'approved' ? setConfirmCancel(r) : cancel.mutate(r.id))}
               disabled={cancel.isPending}
@@ -438,6 +448,52 @@ export default function Requests() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {cantFor && (
+        <Modal onClose={() => setCantFor(null)}>
+          <VForm
+            className="w-full max-w-md rounded-2xl bg-white p-6"
+            onValidSubmit={(f) =>
+              cantHandOver.mutate({ id: cantFor.id, note: String(f.get('note')) })
+            }
+          >
+            <h2 className="mb-1 text-lg font-bold">
+              Can’t hand over {cantFor.device.brand} {cantFor.device.model}?
+            </h2>
+            <p className="mb-3 text-neutral-500">
+              This cancels the booking. {cantFor.requester.name} and the lab desk will see your reason.
+            </p>
+            <div className="mb-3">
+              <VField
+                name="note"
+                label="Reason"
+                textarea
+                rows={2}
+                maxLength={300}
+                autoFocus
+                placeholder="e.g. I still need it for the release test until Friday"
+                rules={[required('Say why the handover can’t happen'), minLen(5)]}
+              />
+            </div>
+            {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCantFor(null)}
+                className="rounded-lg border border-neutral-300 px-4 py-2 font-semibold"
+              >
+                Back
+              </button>
+              <button
+                disabled={cantHandOver.isPending}
+                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
+              >
+                {cantHandOver.isPending ? 'Cancelling…' : 'Cancel the booking'}
+              </button>
+            </div>
+          </VForm>
         </Modal>
       )}
 

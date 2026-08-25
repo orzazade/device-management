@@ -41,7 +41,7 @@ export default function RequestTable({
                 🛠 {r.device.damageNote}
               </div>
             )}
-            {r.state === 'rejected' && r.decisionNote && (
+            {(r.state === 'rejected' || r.state === 'cancelled') && r.decisionNote && (
               <div className="mt-0.5 text-xs text-neutral-500">{r.decisionNote}</div>
             )}
             <div className="mt-1 text-sm">{r.reason}</div>
@@ -94,7 +94,7 @@ export default function RequestTable({
               <td className="max-w-64 px-4 py-2.5">{r.reason}</td>
               <td className="px-4 py-2.5">
                 <Chip status={r.state} />
-                {r.state === 'rejected' && r.decisionNote && (
+                {(r.state === 'rejected' || r.state === 'cancelled') && r.decisionNote && (
                   <div className="mt-1 max-w-44 text-xs text-neutral-500">{r.decisionNote}</div>
                 )}
               </td>

@@ -13,15 +13,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import {
-  IsArray,
-  IsBoolean,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Matches,
-  MinLength,
-} from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 import { AuthUser, Roles } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { DeviceRequest } from '../entities/device-request.entity';
@@ -59,6 +51,13 @@ class RejectDto {
   @IsString()
   @MinLength(5)
   note: string;
+}
+
+class CancelDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  note?: string;
 }
 
 class TimeDto {
@@ -280,9 +279,13 @@ export class RequestsController {
   }
 
   @Post(':id/cancel')
-  async cancel(@Param('id') id: string, @Req() req: { user: AuthUser }) {
+  async cancel(
+    @Param('id') id: string,
+    @Body() dto: CancelDto,
+    @Req() req: { user: AuthUser },
+  ) {
     await this.bus.execute(
-      new CancelRequestCommand(actor(req), id, req.user.sub, staff(req.user)),
+      new CancelRequestCommand(actor(req), id, req.user.sub, staff(req.user), dto?.note),
     );
     return this.reload(id);
   }

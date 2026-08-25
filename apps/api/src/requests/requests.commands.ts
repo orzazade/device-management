@@ -507,6 +507,8 @@ export class CancelRequestCommand {
     readonly requestId: string,
     readonly byUserId: string,
     readonly byStaff: boolean,
+    /** Required when someone other than the requester cancels. */
+    readonly note?: string,
   ) {}
 }
 
@@ -514,20 +516,29 @@ export class CancelRequestCommand {
 export class CancelRequestHandler implements ICommandHandler<CancelRequestCommand> {
   constructor(private readonly db: AppDbContext) {}
 
-  async execute({ actor, requestId, byUserId, byStaff }: CancelRequestCommand): Promise<DeviceRequest> {
+  async execute({ actor, requestId, byUserId, byStaff, note }: CancelRequestCommand): Promise<DeviceRequest> {
     return this.db.withTransaction(async (ctx) => {
       const request = await loadRequest(ctx, requestId);
-      if (request.requesterId !== byUserId && request.createdById !== byUserId && !byStaff) {
-        throw new ForbiddenException('Only the requester (or staff) can cancel this request');
+      const isOwner = request.requesterId === byUserId || request.createdById === byUserId;
+      // The person holding the device may refuse an approved handover.
+      const isHolder =
+        request.state === 'approved' && !!request.device?.holderId && request.device.holderId === byUserId;
+      if (!isOwner && !isHolder && !byStaff) {
+        throw new ForbiddenException('Only the requester, the current holder or staff can cancel this request');
+      }
+      const reason = (note ?? '').trim();
+      if (!isOwner && reason.length < 5) {
+        throw new BadRequestException('Give the requester a reason (at least 5 characters)');
       }
       const old = transition(request, 'cancelled');
+      if (reason) request.decisionNote = reason;
       await ctx.requests.save(request);
       await writeAudit(ctx.manager, actor, {
         entityType: 'request',
         entityId: request.id,
         action: 'cancelled',
         oldValue: { state: old },
-        newValue: { state: 'cancelled' },
+        newValue: { state: 'cancelled', ...(reason ? { note: reason } : {}) },
       });
       const name = `${request.device?.brand} ${request.device?.model}`;
       const cancelledBySelf = byUserId === request.requesterId;
@@ -539,11 +550,11 @@ export class CancelRequestHandler implements ICommandHandler<CancelRequestComman
           targets.delete(byUserId);
           await notify(ctx.manager, 'request_cancelled', [...targets],
             `${request.requester?.name ?? 'The requester'} cancelled their ${old} request for ${name}`,
-            { requestId: request.id }, '/approvals');
+            { requestId: request.id }, '/requests');
         }
       } else {
         await notify(ctx.manager, 'request_cancelled', [request.requesterId],
-          `Your request for ${name} was cancelled by ${actor.name}`,
+          `Your request for ${name} was cancelled by ${actor.name}: ${reason}`,
           { requestId: request.id }, '/requests');
       }
       return request;
