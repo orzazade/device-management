@@ -9,12 +9,15 @@ export default function RequestTable({
   empty = 'Nothing here.',
   error = false,
   onRetry,
+  highlightId,
 }: {
   rows: RequestRow[] | undefined;
   actions?: (r: RequestRow) => ReactNode;
   empty?: string;
   error?: boolean;
   onRetry?: () => void;
+  /** Row to spotlight (deep link from a notification). */
+  highlightId?: string;
 }) {
   if (error && onRetry) return <LoadFailed what="requests" onRetry={onRetry} />;
   const empty_ = rows?.length === 0;
@@ -23,7 +26,7 @@ export default function RequestTable({
       {/* Phones get cards with real tap targets; the table is md+. */}
       <div className="md:hidden">
         {rows?.map((r) => (
-          <div key={r.id} className="border-b border-neutral-100 p-4 last:border-0">
+          <div key={r.id} id={`req-${r.id}`} className={`border-b border-neutral-100 p-4 last:border-0 ${r.id === highlightId ? 'bg-accent-soft' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               <b>
                 {r.device.brand} {r.device.model}
@@ -65,7 +68,7 @@ export default function RequestTable({
         </thead>
         <tbody>
           {rows?.map((r) => (
-            <tr key={r.id} className="border-b border-neutral-100 align-top last:border-0">
+            <tr key={r.id} id={`req-${r.id}`} className={`border-b border-neutral-100 align-top last:border-0 ${r.id === highlightId ? 'bg-accent-soft' : ''}`}>
               <td className="px-4 py-2.5">
                 <b>
                   {r.device.brand} {r.device.model}

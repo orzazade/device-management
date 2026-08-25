@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toasts';
-import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import Modal from '../components/Modal';
 import ConfirmModal from '../components/ConfirmModal';
 import RangeCalendar, { type BookingRange, type DateRange } from '../components/RangeCalendar';
@@ -12,6 +12,8 @@ import { minLen, required } from '../lib/validate';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
+
+const CLOSED = ['returned', 'rejected', 'cancelled'];
 
 /** The whole request lifecycle on one page. Sections follow the flow:
  * approve → hand over → out → back. Testers see only the parts that
@@ -33,11 +35,25 @@ export default function Requests() {
   const [confirmCancel, setConfirmCancel] = useState<RequestRow | null>(null);
   const [offerReturn, setOfferReturn] = useState<RequestRow | null>(null);
   const [filter, setFilter] = useState<'open' | 'all'>('open');
+  const [params] = useSearchParams();
+  const focusId = params.get('id');
 
   const mine = useQuery({
     queryKey: ['requests', 'mine'],
     queryFn: () => api<RequestRow[]>('/requests'),
   });
+  // Deep link from a notification: a rejected/cancelled/returned request
+  // lives under "All", so pick that tab for the reader and scroll to it.
+  useEffect(() => {
+    if (!focusId || !mine.data) return;
+    const row = mine.data.find((r) => r.id === focusId);
+    if (row && CLOSED.includes(row.state)) setFilter('all');
+    setTimeout(
+      () => document.getElementById(`req-${focusId}`)?.scrollIntoView({ block: 'center' }),
+      50,
+    );
+  }, [focusId, mine.data]);
+
   const handovers = useQuery({
     queryKey: ['requests', 'pending-handover'],
     queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
@@ -315,9 +331,10 @@ export default function Requests() {
       <RequestTable
         rows={
           filter === 'open'
-            ? mine.data?.filter((r) => !['returned', 'rejected', 'cancelled'].includes(r.state))
+            ? mine.data?.filter((r) => !CLOSED.includes(r.state))
             : mine.data
         }
+        highlightId={focusId ?? undefined}
         error={mine.isError}
         onRetry={() => mine.refetch()}
         empty={filter === 'open' ? 'Nothing open. Find a device and ask for it.' : 'No requests yet.'}

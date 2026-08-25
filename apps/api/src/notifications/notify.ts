@@ -18,6 +18,9 @@ export async function notify(
   /** In-app deeplink: where clicking this notification should take the user. */
   link?: string,
 ): Promise<void> {
+  // A bare /requests link lands on the "Open" list, which hides rejected,
+  // cancelled and returned rows — the page needs the id to pick the tab.
+  if (link === '/requests' && meta.requestId) link = `/requests?id=${meta.requestId}`;
   if (link) meta = { ...meta, link };
   const ids = [...new Set(userIds)].filter(Boolean);
   if (!ids.length) return;
