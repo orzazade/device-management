@@ -3,37 +3,18 @@ import { useEffect, useState } from 'react';
 const KEY = 'devicedesk.theme';
 type Theme = 'light' | 'dark';
 
-const systemTheme = (): Theme =>
-  matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-
-const current = (): Theme =>
-  (document.documentElement.dataset.theme as Theme | undefined) ?? systemTheme();
+/** Light unless the person explicitly chose dark (index.html applies the same
+ * rule before first paint). */
+const current = (): Theme => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 
 /** Eclipse switch: the sun slides behind a shadow disc and a moon is left
- * glowing. Until first use it follows the phone/PC setting; a click makes
- * the choice explicit and remembers it. */
+ * glowing. The choice is remembered on this device. */
 export default function ThemeToggle({ className = '' }: { className?: string }) {
   const [theme, setTheme] = useState<Theme>(() => current());
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-
-  useEffect(() => {
-    // No explicit choice yet → keep tracking the system setting.
-    const mq = matchMedia('(prefers-color-scheme: dark)');
-    const follow = () => {
-      let saved: string | null = null;
-      try {
-        saved = localStorage.getItem(KEY);
-      } catch {
-        /* storage blocked — nothing to read */
-      }
-      if (!saved) setTheme(mq.matches ? 'dark' : 'light');
-    };
-    mq.addEventListener('change', follow);
-    return () => mq.removeEventListener('change', follow);
-  }, []);
 
   const flip = () => {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';

@@ -9,12 +9,14 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#5c2d91" />
     <script>
-      // Apply the saved theme before React paints, so there is no light flash.
+      // Apply the saved theme before React paints, so there is no flash.
+      // Default is light; dark only when the person chose it.
       try {
-        var t = localStorage.getItem('devicedesk.theme');
-        if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.dataset.theme = t;
-      } catch (e) {}
+        document.documentElement.dataset.theme =
+          localStorage.getItem('devicedesk.theme') === 'dark' ? 'dark' : 'light';
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
     </script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" />
   </head>
