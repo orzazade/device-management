@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import BrandLoader from '../components/BrandLoader';
+import BrandLockup from '../components/BrandLockup';
 import ThemeToggle from '../components/ThemeToggle';
 import { VForm, VField } from '../components/VForm';
 import { useAuth } from '../lib/auth';
@@ -13,11 +14,9 @@ export default function Login() {
   const from = (location.state as { from?: string } | null)?.from ?? '/';
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [entering, setEntering] = useState(false);
 
   // No form flash for someone who is already signed in (F193).
   if (loading) return <BrandLoader />;
-  if (entering) return <BrandLoader label="Signing you in…" />;
   if (user) return <Navigate to={from} replace />;
   const expired = new URLSearchParams(location.search).get('expired') === '1';
 
@@ -33,9 +32,7 @@ export default function Login() {
           setError(null);
           try {
             await login(String(f.get('email')), String(f.get('password')));
-            // One heartbeat of the brand before the app appears.
-            setEntering(true);
-            setTimeout(() => nav(from), 2000);
+            nav(from); // the app shell shows the brand splash from here
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Login failed';
             setError(msg.includes('fetch') ? 'Can’t reach the server — check the connection and try again' : msg);
@@ -44,15 +41,7 @@ export default function Login() {
           }
         }}
       >
-        {/* Logo keeps its official colour (#5c2d91); the line under it uses that
-            same purple and shares the wrapper's dark-mode lift, so they always match. */}
-        <div className="brand-logo mb-7 inline-flex flex-col items-end text-[#5c2d91]">
-          <img src="/azercell-logo.svg" alt="Azercell" className="h-12" />
-          {/* The wordmark is the right 64% of the logo; the line sits under exactly that. */}
-          <span className="mt-0.5 w-[64%] whitespace-nowrap text-right text-[14px] font-medium leading-none tracking-tight">
-            Device Manager
-          </span>
-        </div>
+        <BrandLockup className="mb-7" />
         {expired && (
           <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
             Your session expired — sign in again to continue.

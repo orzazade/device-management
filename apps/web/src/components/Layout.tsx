@@ -8,7 +8,7 @@ import { useClickOutside } from '../lib/useClickOutside';
 import Bell from './Bell';
 import ChangePasswordModal from './ChangePasswordModal';
 import ThemeToggle from './ThemeToggle';
-import AzercellMark from './AzercellMark';
+import BrandLockup from './BrandLockup';
 import BrandLoader from './BrandLoader';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
@@ -49,6 +49,13 @@ export default function Layout() {
   const [showPassword, setShowPassword] = useState(false);
   const userMenuRef = useClickOutside<HTMLDivElement>(userOpen, () => setUserOpen(false));
   const [search, setSearch] = useState('');
+  // Brand splash on every load of the app shell: at least 2s of the logo
+  // before the page shows, whether that load came from a reload or sign-in.
+  const [booting, setBooting] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setBooting(false), 2000);
+    return () => clearTimeout(t);
+  }, []);
   const handovers = useQuery({
     queryKey: ['requests', 'pending-handover'],
     queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
@@ -84,7 +91,7 @@ export default function Layout() {
       : location.pathname.slice(1).split('/')[0].replace(/^\w/, (c) => c.toUpperCase());
     document.title = `${name} · Azercell Device Manager`;
   });
-  if (loading) return <BrandLoader />;
+  if (loading || booting) return <BrandLoader />;
   if (!user && sessionCheckFailed)
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -115,17 +122,7 @@ export default function Layout() {
       }`}
     >
       <div className="flex items-start justify-between border-b border-neutral-200 px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5c2d91] text-white shadow-sm">
-            <AzercellMark className="w-6" />
-          </span>
-          <span className="leading-tight">
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-              Azercell
-            </span>
-            <b className="block text-[15px]">Device Manager</b>
-          </span>
-        </div>
+        <BrandLockup logoClass="h-10" textClass="text-[11.5px]" />
         {menuOpen && (
           <button
             aria-label="Close menu"
