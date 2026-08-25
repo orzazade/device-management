@@ -46,7 +46,8 @@ export default function Login() {
       >
         <div className="mb-7 inline-flex flex-col items-end">
           <img src="/azercell-logo.svg" alt="Azercell" className="brand-logo h-12" />
-          <span className="mt-1 pr-0.5 text-[17px] font-medium leading-none text-accent">
+          {/* The wordmark is the right 64% of the logo; the line sits under exactly that. */}
+          <span className="mt-0.5 w-[64%] whitespace-nowrap text-right text-[14px] font-medium leading-none tracking-tight text-accent">
             Device Manager
           </span>
         </div>
