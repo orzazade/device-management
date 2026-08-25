@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import ThemeToggle from '../components/ThemeToggle';
 import { VForm, VField } from '../components/VForm';
 import { useAuth } from '../lib/auth';
 import { email, required } from '../lib/validate';
@@ -19,6 +20,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
+      <ThemeToggle className="fixed right-4 top-4" />
       <VForm
         className="w-full max-w-90 rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
         onValidSubmit={async (f) => {

@@ -7,6 +7,7 @@ import type { RequestRow } from '../lib/requests';
 import { useClickOutside } from '../lib/useClickOutside';
 import Bell from './Bell';
 import ChangePasswordModal from './ChangePasswordModal';
+import ThemeToggle from './ThemeToggle';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100 ${
@@ -193,6 +194,7 @@ export default function Layout() {
             />
           </form>
           <div className="flex-1" />
+          <ThemeToggle />
           <Bell />
           <div className="relative" ref={userMenuRef}>
             <button

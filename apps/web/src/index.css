@@ -3,12 +3,16 @@
 @theme {
   --color-accent: #7a2e8f;
   --color-accent-soft: #f3e8f7;
+  /* Page ground — separate from neutral-100 so dark mode can keep faint
+   * borders light-ish while the page itself goes properly dark. */
+  --color-ground: #f5f5f5;
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 body {
-  @apply bg-neutral-100 text-neutral-900 font-sans text-sm;
+  @apply bg-ground text-neutral-900 font-sans text-sm;
+  transition: background-color 0.45s ease, color 0.45s ease;
 }
 
 @keyframes toast-in {
@@ -29,4 +33,116 @@ body {
 input[type='checkbox'],
 input[type='radio'] {
   accent-color: var(--color-accent, #6d28d9);
+}
+
+/* ---------- Dark theme: one palette swap, every component follows ----------
+ * Tailwind v4 compiles bg-white / text-neutral-500 / … to CSS variables, so
+ * redefining the variables here re-skins the whole app. Neutrals carry a
+ * slight violet bias to sit with the brand accent. */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-ground: #121016;
+  --color-white: #1b1822;
+  --color-neutral-50: #221e2b;
+  --color-neutral-100: #26212f;
+  --color-neutral-200: #2f2939;
+  --color-neutral-300: #3c3548;
+  --color-neutral-400: #7f7590;
+  --color-neutral-500: #aaa0b6;
+  --color-neutral-600: #c4bacf;
+  --color-neutral-700: #d9d1e3;
+  --color-neutral-900: #f1ecf6;
+  --color-accent: #c48ad6;
+  --color-accent-soft: #2e2338;
+  --color-red-50: #3a1a1f;
+  --color-red-100: #4a2028;
+  --color-red-200: #5c2a33;
+  --color-red-300: #7a3542;
+  --color-red-400: #e0707f;
+  --color-red-500: #ef8a96;
+  --color-red-600: #d0505f;
+  --color-red-700: #f4a0aa;
+  --color-red-800: #f7b7be;
+  --color-amber-50: #3a2c10;
+  --color-amber-100: #4a3814;
+  --color-amber-200: #5c4618;
+  --color-amber-300: #7a5d1c;
+  --color-amber-600: #e5b34a;
+  --color-amber-700: #f0c463;
+  --color-amber-800: #f5d38a;
+  --color-green-50: #12301c;
+  --color-green-100: #143d25;
+  --color-green-500: #3fb865;
+  --color-green-700: #86efac;
+  --color-green-800: #9cf3bb;
+}
+
+/* ---------- Eclipse theme switch ---------- */
+.eclipse {
+  position: relative;
+  width: 56px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--color-neutral-200);
+  background: var(--color-white);
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+  transition: background 0.45s ease, border-color 0.45s ease;
+}
+.eclipse .corona {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: radial-gradient(circle at 75% 50%, rgba(196, 138, 214, 0.45), transparent 42%);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.eclipse .disc {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffb627;
+  box-shadow: 0 0 10px 2px rgba(255, 182, 39, 0.55);
+  transition:
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.6s ease,
+    background 0.6s ease;
+}
+.eclipse .shadow {
+  position: absolute;
+  top: 3px;
+  left: -22px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-white);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), background 0.45s ease;
+}
+.eclipse[aria-checked='true'] .disc {
+  transform: translateX(28px);
+  background: #ece8f4;
+  box-shadow: 0 0 14px 3px rgba(196, 138, 214, 0.55);
+}
+.eclipse[aria-checked='true'] .shadow {
+  transform: translateX(46px);
+}
+.eclipse[aria-checked='true'] .corona {
+  opacity: 1;
+}
+.eclipse:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .eclipse .disc,
+  .eclipse .shadow,
+  .eclipse .corona,
+  body {
+    transition-duration: 0.01ms;
+  }
 }
