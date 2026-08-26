@@ -36,7 +36,7 @@ Decided 2026-08-24 with the user. TypeScript everywhere.
 - **TanStack Query** for server state — no Redux; server data is the state
 - **React Router** for pages
 - **Tailwind CSS v4** + **shadcn/ui** for components (same family as portfolio)
-- Same-origin `/api` — no CORS in production (Traefik routes one host)
+- Same-origin `/api` — no CORS in production (the reverse proxy routes one host)
 
 ## Testing
 
@@ -58,10 +58,10 @@ pnpm workspaces, one lockfile.
 
 ## Deploy
 
-- Two images to **ghcr.io/orzazade**: `device-mgmt-api`, `device-mgmt-web`
-  (nginx static); Redis from the standard image
-- **scifilab K3s** via the existing Flux image-automation pipeline; Traefik +
-  cert-manager; secrets via SOPS in the `infrastructure` repo
-- Host: **devices.scifilab.space** first; Azercell infra later — the app only
-  needs "somewhere to run 3 containers + Postgres", nothing scifilab-specific
-  baked in
+- Two images: `device-mgmt-api`, `device-mgmt-web` (nginx static); Redis from
+  the standard image
+- Any container host works (Kubernetes, Docker Compose, Swarm) behind a
+  reverse proxy with TLS — see `DEPLOY.md`
+- Demoed on a temporary private server; Azercell infrastructure for real use —
+  the app only needs "somewhere to run 3 containers + Postgres", nothing
+  host-specific baked in

@@ -1,7 +1,7 @@
 # ROADMAP — Device Management
 
-Build in vertical slices. Every slice ends **deployed to
-devices.scifilab.space and clickable** — never weeks of invisible backend.
+Build in vertical slices. Every slice ends **deployed to the demo host and
+clickable** — never weeks of invisible backend.
 A slice is done only when its tests pass and it runs live.
 
 ## S0 — Walking skeleton (infrastructure proof)
@@ -10,12 +10,12 @@ A slice is done only when its tests pass and it runs live.
 - Postgres + Redis in docker-compose for local dev
 - TypeORM wired: `AppDbContext`, `withTransaction`, SnakeNamingStrategy,
   first migration runs
-- Dockerfiles for both apps; GitHub Actions CI (lint, test, build, push to
-  ghcr.io/orzazade); Flux manifests in the `infrastructure` repo
+- Dockerfiles for both apps; GitHub Actions CI (lint, test, build, push
+  images to the repo owner's GHCR); deployment manifests live with the hosting
 - Live proof: web page shows "ok" + api `/api/v1/health` shows db + redis up
 
 Smallest possible slice that proves the whole pipe: code → CI → image →
-Flux → cluster → URL. Everything after this is just features.
+deploy → cluster → URL. Everything after this is just features.
 
 ## S1 — Users, auth, roles
 
@@ -81,5 +81,5 @@ Flux → cluster → URL. Everything after this is just features.
 
 Auth before devices (everything needs identity + audit). Devices before
 requests (can't book what doesn't exist). The request flow (S3) is the
-earliest moment the tool is genuinely useful — after S3 the wife's team can
+earliest moment the tool is genuinely useful — after S3 the QA team can
 pilot it for real; S4-S7 make it trustworthy.

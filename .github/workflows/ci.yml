@@ -45,7 +45,7 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/orzazade/device-mgmt-${{ matrix.app }}:latest
-            ghcr.io/orzazade/device-mgmt-${{ matrix.app }}:sha-${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/device-mgmt-${{ matrix.app }}:latest
+            ghcr.io/${{ github.repository_owner }}/device-mgmt-${{ matrix.app }}:sha-${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,scope=${{ matrix.app }},mode=max

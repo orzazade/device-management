@@ -5,7 +5,7 @@ Internal tool for Azercell QA: a lending library for physical test devices
 hand it over, return it. Full audit trail.
 
 Scale: ~100 devices, ~100 users. One company, internal only.
-Built first on our own hosting (scifilab K3s); moves to Azercell infra later.
+Built and demoed on a temporary private server; moves to Azercell infrastructure for real use.
 No deadline; quality over speed.
 
 ## Users and roles

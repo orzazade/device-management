@@ -1,33 +1,37 @@
-# DeviceDesk — Device Management
+# Azercell Device Manager
 
-Internal lending library for Azercell QA test devices. Docs-first:
-`docs/GOALS.md` → `ARCH.md` → `STACK.md` → `ROADMAP.md`.
+Internal lending library for QA test devices (phones, tablets): find a free
+device, request it for a date range, get approval, hand it over, return it.
+Every action is audited.
 
-## Status (2026-08-24)
+Docs: `docs/GOALS.md` → `docs/ARCH.md` → `docs/STACK.md` → `docs/ROADMAP.md`.
+Deployment: **`DEPLOY.md`**.
 
-All roadmap slices **S0–S7 built and verified locally** against the clickable
-mockup (`mockups/index.html`):
+## What's inside
 
-- S0 walking skeleton (deployed once to devices.scifilab.space to prove the pipe)
-- S1 auth (JWT, pluggable identity), roles Admin/Manager/Tester, append-only audit
-- S2 devices + projects, search/filters, Excel import with dry-run
-- S3 request flow: request → approve → handover → active; Postgres exclusion
-  constraint blocks double-booking
-- S4 return check-in (accessory checklist, damage path), hourly overdue scan
-- S5 notifications: event→channel rules, in-app bell, email outbox + sender
-- S6 repair lifecycle: reported → repair requested → in repair → fixed/written off
-- S7 idle-device report, mobile pass
+| Path | What |
+|---|---|
+| `apps/api` | NestJS (Fastify) API — rules, auth, jobs, migrations |
+| `apps/web` | React + Vite single-page app, served by nginx |
+| `deploy/nginx.conf` | nginx config baked into the web image |
+| `docker-compose.yml` | Postgres + Redis for local development |
+| `env.example` | Every environment variable the API reads |
+| `.github/workflows/ci.yml` | lint → test → build → push images |
 
-**S1–S7 are committed locally and NOT yet pushed/deployed** (by decision —
-push to main auto-deploys via CI + Flux).
-
-## Local dev
+## Run locally
 
 ```bash
 docker compose up -d      # postgres :5433, redis :6380
 pnpm install
-pnpm dev:api              # NestJS on :8080 (migrations run on boot)
-pnpm dev:web              # Vite on :5173, proxies /api
+pnpm dev:api              # API on :8080 (migrations run on boot)
+pnpm dev:web              # web on :5173, proxies /api to :8080
 ```
 
-Seed login: `admin@devicedesk.local` / `admin123` (change after first login).
+First login: `admin@devicedesk.local` / `admin123` — the app forces a new
+password on first sign-in.
+
+## Roles
+
+- **Admin** — everything, incl. users and settings
+- **Manager** — approve, hand over, check in, projects, reports, audit log
+- **Tester** — request, extend, return devices
