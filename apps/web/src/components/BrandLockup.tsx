@@ -1,4 +1,4 @@
-/** Official Azercell logo with "Device Manager" set exactly under the
+/** Official Azercell logo with "Device Management" set exactly under the
  * wordmark (the right 64% of the logo). One component, used on the login
  * card and in the sidebar, so the two never drift apart. */
 export default function BrandLockup({
@@ -19,7 +19,7 @@ export default function BrandLockup({
       <span
         className={`mt-0.5 w-[64%] whitespace-nowrap text-right font-medium leading-none tracking-tight ${textClass}`}
       >
-        Device Manager
+        Device Management
       </span>
     </div>
   );

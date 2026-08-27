@@ -1,4 +1,4 @@
-# Deploying Azercell Device Manager
+# Deploying Azercell Device Management
 
 Three containers + one database. No vendor-specific parts.
 
