@@ -6,6 +6,7 @@ import { AppDbContext } from '../db/app-db-context';
 import { EmailOutbox } from '../entities/notification.entity';
 import { writeAudit } from '../audit/audit';
 import { notify, staffIds } from '../notifications/notify';
+import { localDay, localDayOffset } from '../dates';
 
 const SYSTEM_ACTOR = { id: null, name: 'system' };
 export const SCHEDULER_QUEUE = 'scheduler';
@@ -70,7 +71,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   /** Approved but never collected: after 2 days past the start date the
    * promise expires, freeing the device's calendar. */
   async expireStaleApprovals(): Promise<number> {
-    const cutoff = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    const cutoff = localDayOffset(-2);
     const stale = await this.db
       .requests()
       .createQueryBuilder('r')
@@ -106,7 +107,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   /** Marks active requests past their to-date as overdue. Returns count. */
   async scanOverdue(byActor?: { id: string | null; name: string }): Promise<number> {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDay();
     const late = await this.db
       .requests()
       .createQueryBuilder('r')
@@ -176,7 +177,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
 
   /** Reminds holders the day before a return is due. De-duped per request/day. */
   async scanDueSoon(): Promise<number> {
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const tomorrow = localDayOffset(1);
     const due = await this.db
       .requests()
       .createQueryBuilder('r')
