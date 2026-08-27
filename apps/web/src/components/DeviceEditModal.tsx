@@ -28,6 +28,11 @@ export default function DeviceEditModal({
     queryFn: () => api<ProjectRow[]>('/projects'),
   });
   const squads = useQuery({ queryKey: ['squads'], queryFn: () => api<ProjectRow[]>('/projects?kind=squad') });
+  // Controlled, not defaultValue: the option lists arrive a render later, and
+  // an uncontrolled <select> keeps the empty value it settled on before they
+  // did — which used to clear the device's grouping on save.
+  const [projectId, setProjectId] = useState(device.project?.id ?? '');
+  const [squadId, setSquadId] = useState(device.squad?.id ?? '');
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -132,7 +137,8 @@ export default function DeviceEditModal({
             <span className="mb-1 block text-xs font-semibold text-neutral-500">Project</span>
             <select
               name="projectId"
-              defaultValue={device.project?.id ?? ''}
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2"
             >
               <option value="">— none —</option>
@@ -147,7 +153,8 @@ export default function DeviceEditModal({
             <span className="mb-1 block text-xs font-semibold text-neutral-500">Squad</span>
             <select
               name="squadId"
-              defaultValue={device.squad?.id ?? ''}
+              value={squadId}
+              onChange={(e) => setSquadId(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2"
             >
               <option value="">— none —</option>
