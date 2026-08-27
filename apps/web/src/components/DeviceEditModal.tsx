@@ -27,6 +27,7 @@ export default function DeviceEditModal({
     queryKey: ['projects'],
     queryFn: () => api<ProjectRow[]>('/projects'),
   });
+  const squads = useQuery({ queryKey: ['squads'], queryFn: () => api<ProjectRow[]>('/projects?kind=squad') });
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -71,6 +72,10 @@ export default function DeviceEditModal({
       <VForm
         className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6"
         onValidSubmit={(f) => {
+          if (!f.get('projectId') && !f.get('squadId')) {
+            setError('Pick a project or a squad for the device');
+            return;
+          }
           save.mutate({
             brand: f.get('brand'),
             model: f.get('model'),
@@ -83,6 +88,7 @@ export default function DeviceEditModal({
               .map((a) => a.trim())
               .filter(Boolean),
             projectId: f.get('projectId') || null,
+            squadId: f.get('squadId') || null,
             ...(f.get('status') && f.get('status') !== device.status
               ? { status: String(f.get('status')) }
               : {}),
@@ -131,6 +137,21 @@ export default function DeviceEditModal({
             >
               <option value="">— none —</option>
               {projects.data?.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-neutral-500">Squad</span>
+            <select
+              name="squadId"
+              defaultValue={device.squad?.id ?? ''}
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+            >
+              <option value="">— none —</option>
+              {squads.data?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>

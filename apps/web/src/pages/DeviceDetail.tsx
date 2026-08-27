@@ -115,7 +115,7 @@ export default function DeviceDetail() {
             onClick={() => setShowDamage(true)}
             className="rounded-lg border border-neutral-300 bg-white px-4 py-2 font-semibold text-red-700"
           >
-            Report damage
+            Send to repair…
           </button>
         )}
         {isStaff(user?.role) && (
@@ -186,6 +186,8 @@ export default function DeviceDetail() {
             <dd>{d.holder?.name ?? '— (lab desk)'}</dd>
             <dt className="text-neutral-500">Project</dt>
             <dd>{d.project?.name ?? '—'}</dd>
+            <dt className="text-neutral-500">Squad</dt>
+            <dd>{d.squad?.name ?? '—'}</dd>
             <dt className="text-neutral-500">Accessories</dt>
             <dd>{d.accessories.length ? d.accessories.join(' · ') : 'none'}</dd>
           </dl>
@@ -287,9 +289,13 @@ export default function DeviceDetail() {
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => report.mutate(String(f.get('issue')))}
           >
-            <h2 className="mb-4 text-lg font-bold">
-              Report damage — {d.brand} {d.model}
+            <h2 className="mb-1 text-lg font-bold">
+              Send to repair — {d.brand} {d.model}
             </h2>
+            <p className="mb-4 text-neutral-500">
+              Describe what's wrong. The lab desk takes it from there — follow the progress on
+              the Repairs page.
+            </p>
             <div className="mb-3">
               <VField
                 name="issue"
@@ -298,8 +304,8 @@ export default function DeviceDetail() {
                 rows={3}
                 maxLength={300}
                 autoFocus
-                placeholder="Describe the damage"
-                rules={[required('Describe the damage'), minLen(5)]}
+                placeholder="e.g. Screen cracked, battery drains in an hour"
+                rules={[required('Describe the problem'), minLen(5)]}
               />
             </div>
             {damageError && (
@@ -317,7 +323,7 @@ export default function DeviceDetail() {
                 disabled={report.isPending}
                 className="rounded-lg bg-accent px-4 py-2 font-semibold text-white disabled:opacity-50"
               >
-                Report
+                Send to repair
               </button>
             </div>
           </VForm>

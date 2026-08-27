@@ -62,6 +62,7 @@ export default function Devices() {
   });
   const all = useQuery({ queryKey: ['devices'], queryFn: () => api<DeviceRow[]>('/devices') });
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api<ProjectRow[]>('/projects') });
+  const squads = useQuery({ queryKey: ['squads'], queryFn: () => api<ProjectRow[]>('/projects?kind=squad') });
 
   const brands = useMemo(() => [...new Set(all.data?.map((d) => d.brand) ?? [])].sort(), [all.data]);
   const oses = useMemo(() => [...new Set(all.data?.map((d) => d.os) ?? [])].sort(), [all.data]);
@@ -209,7 +210,7 @@ export default function Devices() {
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2.5">{d.project?.name ?? '—'}</td>
+                <td className="px-4 py-2.5">{[d.project?.name, d.squad?.name].filter(Boolean).join(' · ') || '—'}</td>
                 <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                   {status === 'deleted' ? (
                     <button
@@ -251,6 +252,10 @@ export default function Devices() {
           <VForm
             className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
+              if (!f.get('projectId') && !f.get('squadId')) {
+                setError('Pick a project or a squad for the device');
+                return;
+              }
               create.mutate({
                 brand: f.get('brand'),
                 model: f.get('model'),
@@ -264,6 +269,7 @@ export default function Devices() {
                   .map((a) => a.trim())
                   .filter(Boolean),
                 projectId: f.get('projectId') || undefined,
+                squadId: f.get('squadId') || undefined,
               });
             }}
           >
@@ -292,17 +298,32 @@ export default function Devices() {
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2"
               />
             </label>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Project</span>
-              <select name="projectId" className="w-full rounded-lg border border-neutral-300 px-3 py-2">
-                <option value="">— none —</option>
-                {projects.data?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-neutral-500">Project</span>
+                <select name="projectId" className="w-full rounded-lg border border-neutral-300 px-3 py-2">
+                  <option value="">— none —</option>
+                  {projects.data?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-neutral-500">Squad</span>
+                <select name="squadId" className="w-full rounded-lg border border-neutral-300 px-3 py-2">
+                  <option value="">— none —</option>
+                  {squads.data?.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-neutral-500">Pick a project or a squad — at least one.</p>
+            {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"

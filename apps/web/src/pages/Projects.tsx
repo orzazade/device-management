@@ -11,24 +11,26 @@ import type { ProjectRow } from '../lib/types';
 export default function Projects() {
   const qc = useQueryClient();
   const toast = useToast();
-  const [show, setShow] = useState(false);
+  const [showKind, setShowKind] = useState<'project' | 'squad' | null>(null);
   const [editFor, setEditFor] = useState<ProjectRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ProjectRow | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const projects = useQuery({
     queryKey: ['projects', showDeleted],
-    queryFn: () => api<ProjectRow[]>(showDeleted ? '/projects?deleted=true' : '/projects'),
+    queryFn: () =>
+      api<ProjectRow[]>(showDeleted ? '/projects?deleted=true&kind=all' : '/projects?kind=all'),
   });
 
   const create = useMutation({
-    mutationFn: (body: { name: string; description: string }) =>
+    mutationFn: (body: { name: string; description: string; kind: 'project' | 'squad' }) =>
       api('/projects', { method: 'POST', body }),
-    onSuccess: () => {
+    onSuccess: (_d, body) => {
       qc.invalidateQueries({ queryKey: ['projects'] });
-      setShow(false);
+      qc.invalidateQueries({ queryKey: ['squads'] });
+      setShowKind(null);
       setError(null);
-      toast('Project created');
+      toast(body.kind === 'squad' ? 'Squad created' : 'Project created');
     },
     onError: (e) => setError(e.message),
   });
@@ -38,6 +40,7 @@ export default function Projects() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] });
       qc.invalidateQueries({ queryKey: ['devices'] });
+      qc.invalidateQueries({ queryKey: ['squads'] });
       setConfirmDelete(null);
       setEditFor(null);
       toast('Project deleted — its devices lost the tag');
@@ -72,7 +75,7 @@ export default function Projects() {
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-xl font-bold">Projects</h1>
+        <h1 className="text-xl font-bold">Projects &amp; Squads</h1>
         <div className="flex-1" />
         <label className="flex items-center gap-1.5 text-neutral-500">
           <input
@@ -83,7 +86,13 @@ export default function Projects() {
           Show deleted
         </label>
         <button
-          onClick={() => setShow(true)}
+          onClick={() => setShowKind('squad')}
+          className="rounded-lg border border-neutral-300 bg-white px-4 py-2 font-semibold"
+        >
+          New squad
+        </button>
+        <button
+          onClick={() => setShowKind('project')}
           className="rounded-lg bg-accent px-4 py-2 font-semibold text-white hover:brightness-110"
         >
           New project
@@ -94,7 +103,14 @@ export default function Projects() {
         {projects.data?.map((p) => (
           <div key={p.id} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
-              <div className="font-bold">{p.name}</div>
+              <div className="font-bold">
+                {p.name}
+                {p.kind === 'squad' && (
+                  <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">
+                    Squad
+                  </span>
+                )}
+              </div>
               {showDeleted ? (
                 <button
                   onClick={() => restoreProject.mutate(p.id)}
@@ -120,7 +136,7 @@ export default function Projects() {
         ))}
       </div>
       {projects.data?.length === 0 && (
-        <p className="text-neutral-400">No projects yet. Create the first one.</p>
+        <p className="text-neutral-400">No projects or squads yet. Create the first one.</p>
       )}
 
       {editFor && (
@@ -135,7 +151,7 @@ export default function Projects() {
               });
             }}
           >
-            <h2 className="mb-4 text-lg font-bold">Edit project</h2>
+            <h2 className="mb-4 text-lg font-bold">Edit {editFor.kind === 'squad' ? 'squad' : 'project'}</h2>
             <VField name="name" label="Name" className="mb-3" defaultValue={editFor.name}
               rules={[required('Project name is required'), minLen(2)]} />
             <VField name="description" label="Description" className="mb-4"
@@ -169,34 +185,38 @@ export default function Projects() {
 
       {confirmDelete && (
         <ConfirmModal
-          title={`Delete project "${confirmDelete.name}"?`}
-          body={`Its attached devices keep living — they just lose the project tag (and get it back on restore). Restorable from "Show deleted".`}
+          title={`Delete ${confirmDelete.kind === 'squad' ? 'squad' : 'project'} "${confirmDelete.name}"?`}
+          body={`Its attached devices keep living — they just lose the tag (and get it back on restore). Restorable from "Show deleted".`}
           busy={remove.isPending}
           onConfirm={() => remove.mutate(confirmDelete.id)}
           onClose={() => setConfirmDelete(null)}
         />
       )}
 
-      {show && (
-        <Modal onClose={() => setShow(false)}>
+      {showKind && (
+        <Modal onClose={() => setShowKind(null)}>
           <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
               create.mutate({
                 name: String(f.get('name')),
                 description: String(f.get('description') || ''),
+                kind: showKind,
               });
             }}
           >
-            <h2 className="mb-4 text-lg font-bold">New project</h2>
-            <VField name="name" label="Name" className="mb-3" autoFocus placeholder="MyApp Mobile"
-              rules={[required('Project name is required'), minLen(2)]} />
+            <h2 className="mb-4 text-lg font-bold">
+              {showKind === 'squad' ? 'New squad' : 'New project'}
+            </h2>
+            <VField name="name" label="Name" className="mb-3" autoFocus
+              placeholder={showKind === 'squad' ? 'Core QA' : 'MyApp Mobile'}
+              rules={[required('A name is required'), minLen(2)]} />
             <VField name="description" label="Description" className="mb-4"
-              placeholder="What this project tests" />
+              placeholder={showKind === 'squad' ? 'Who this team is' : 'What this project tests'} />
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShow(false)}
+                onClick={() => setShowKind(null)}
                 className="rounded-lg border border-neutral-300 px-4 py-2 font-semibold"
               >
                 Cancel

@@ -29,6 +29,7 @@ import { AuditHardening1725700000000 } from '../migrations/1725700000000-audit-h
 import { TrimSpecs1725800000000 } from '../migrations/1725800000000-trim-specs';
 import { SpecsFreeForm1725900000000 } from '../migrations/1725900000000-specs-free-form';
 import { RequestProject1726000000000 } from '../migrations/1726000000000-request-project';
+import { Squads1726100000000 } from '../migrations/1726100000000-squads';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -64,6 +65,7 @@ export const dataSourceOptions: DataSourceOptions = {
     TrimSpecs1725800000000,
     SpecsFreeForm1725900000000,
     RequestProject1726000000000,
+    Squads1726100000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

@@ -71,6 +71,10 @@ class DeviceDto implements DeviceInput {
   @IsOptional()
   @IsUUID()
   projectId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  squadId?: string;
 }
 
 class DevicePatchDto {
@@ -82,6 +86,7 @@ class DevicePatchDto {
   @IsOptional() @IsString() imei?: string;
   @IsOptional() @IsArray() accessories?: string[];
   @IsOptional() @IsUUID() projectId?: string | null;
+  @IsOptional() @IsUUID() squadId?: string | null;
   @IsOptional() @IsIn(DEVICE_STATUSES) status?: string;
   @IsOptional() @IsString() damageNote?: string | null;
 }
@@ -102,6 +107,7 @@ const pub = (d: Device) => ({
   accessories: d.accessories,
   holder: d.holder ? { id: d.holder.id, name: d.holder.name } : null,
   project: d.project ? { id: d.project.id, name: d.project.name } : null,
+  squad: d.squad ? { id: d.squad.id, name: d.squad.name } : null,
   createdAt: d.createdAt,
 });
 
@@ -127,6 +133,7 @@ export class DevicesController {
       .withDeleted()
       .leftJoinAndSelect('d.holder', 'holder')
       .leftJoinAndSelect('d.project', 'project')
+      .leftJoinAndSelect('d.squad', 'squad')
       .orderBy('d.brand')
       .addOrderBy('d.model');
     const staffUser = req.user.role === 'admin' || req.user.role === 'manager';
@@ -215,7 +222,7 @@ export class DevicesController {
   async get(@Param('id') id: string) {
     const d = await this.db
       .devices()
-      .findOne({ where: { id }, relations: { holder: true, project: true } });
+      .findOne({ where: { id }, relations: { holder: true, project: true, squad: true } });
     if (!d) throw new NotFoundException('Device not found');
     return pub(d);
   }
@@ -284,7 +291,11 @@ export class DevicesController {
   @Roles('admin', 'manager')
   async create(@Body() dto: DeviceDto, @Req() req: { user: AuthUser }) {
     const d: Device = await this.bus.execute(new CreateDeviceCommand(actor(req), dto));
-    return pub(d);
+    // Reply with the same shape as GET — relations included.
+    const full = await this.db
+      .devices()
+      .findOne({ where: { id: d.id }, relations: { holder: true, project: true, squad: true } });
+    return pub(full ?? d);
   }
 
   @Patch(':id')
@@ -295,7 +306,10 @@ export class DevicesController {
     @Req() req: { user: AuthUser },
   ) {
     const d: Device = await this.bus.execute(new UpdateDeviceCommand(actor(req), id, dto));
-    return pub(d);
+    const full = await this.db
+      .devices()
+      .findOne({ where: { id: d.id }, relations: { holder: true, project: true, squad: true } });
+    return pub(full ?? d);
   }
 
   @Post('import')

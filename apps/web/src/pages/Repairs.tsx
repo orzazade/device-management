@@ -59,7 +59,8 @@ export default function Repairs() {
       <div className="mb-4 flex items-baseline gap-3">
         <h1 className="text-xl font-bold">Repairs</h1>
         <span className="text-neutral-500">
-          reported → repair requested → in repair → fixed / written off
+          Send a phone here from its device page → “Send to repair”. Flow: reported →
+          repair requested → in repair → fixed / written off
         </span>
       </div>
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}

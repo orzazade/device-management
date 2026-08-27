@@ -15,6 +15,7 @@ export interface DeviceRow {
   holder: { id: string; name: string } | null;
   busy?: { until: string; state: 'active' | 'overdue' } | null;
   project: { id: string; name: string } | null;
+  squad: { id: string; name: string } | null;
   createdAt: string;
 }
 
@@ -22,6 +23,7 @@ export interface ProjectRow {
   id: string;
   name: string;
   description: string;
+  kind: 'project' | 'squad';
   deviceCount: number;
 }
 

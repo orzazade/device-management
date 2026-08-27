@@ -20,7 +20,7 @@ export interface ImportReport {
 /** Fixed columns the importer understands. Every OTHER column becomes a
  * spec on the device, keyed by its header text ("RAM" → specs.RAM). */
 export const BASE_COLUMNS = [
-  'brand', 'model', 'os', 'os_version', 'serial', 'imei', 'accessories', 'project',
+  'brand', 'model', 'os', 'os_version', 'serial', 'imei', 'accessories', 'project', 'squad',
 ];
 
 /** Example spec columns in the template — any header works. */
@@ -45,6 +45,7 @@ export class ImportService {
     const example: Record<string, string> = {
       brand: 'Samsung', model: 'Galaxy S24', os: 'Android', os_version: '14',
       serial: 'RF8T2001', imei: '353912100000002', accessories: 'Box, Cable, Charger',
+      squad: '',
       project: '', RAM: '8 GB', Storage: '128 GB', Screen: '6.2"', '5G': 'yes',
     };
     ws.addRow(headers.map((h) => example[h] ?? ''));
@@ -90,8 +91,13 @@ export class ImportService {
       }
     }
 
-    const projects = await this.db.projects().find();
-    const projectByName = new Map(projects.map((p) => [p.name.toLowerCase(), p.id]));
+    const groups = await this.db.projects().find();
+    const projectByName = new Map(
+      groups.filter((p) => p.kind !== 'squad').map((p) => [p.name.toLowerCase(), p.id]),
+    );
+    const squadByName = new Map(
+      groups.filter((p) => p.kind === 'squad').map((p) => [p.name.toLowerCase(), p.id]),
+    );
     const existing = await this.db
       .devices()
       .find({ select: { serial: true, deletedAt: true }, withDeleted: true });
@@ -142,6 +148,13 @@ export class ImportService {
         projectId = projectByName.get(projectName.toLowerCase()) ?? null;
         if (!projectId) problems.push(`project "${projectName}" does not exist`);
       }
+      const squadName = cellStr(row, 'squad');
+      let squadId: string | null = null;
+      if (squadName) {
+        squadId = squadByName.get(squadName.toLowerCase()) ?? null;
+        if (!squadId) problems.push(`squad "${squadName}" does not exist`);
+      }
+      if (!projectName && !squadName) problems.push('give a project or a squad');
 
       if (problems.length) {
         errors.push({ row: rowNumber, message: problems.join('; ') });
@@ -167,6 +180,7 @@ export class ImportService {
           .map((a) => a.trim())
           .filter(Boolean),
         projectId,
+        squadId,
       });
     });
 

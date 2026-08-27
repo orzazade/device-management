@@ -96,7 +96,7 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         );
       }
 
-            const project = await ctx.projects.findOne({ where: { id: data.projectId } });
+            const project = await ctx.projects.findOne({ where: { id: data.projectId, kind: 'project' } });
       if (!project) throw new BadRequestException('Pick a project that exists');
       const request = await ctx.requests.save({
         deviceId: data.deviceId,

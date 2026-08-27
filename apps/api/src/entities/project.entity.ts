@@ -11,11 +11,17 @@ export class Project {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  // Unique per kind (partial index in the squads migration), not table-wide.
+  @Column()
   name: string;
 
   @Column({ default: '' })
   description: string;
+
+  /** 'project' (a product/app) or 'squad' (a team). One table, one set of
+   * delete/restore/attach rules for both. */
+  @Column({ default: 'project' })
+  kind: 'project' | 'squad';
 
   @CreateDateColumn()
   createdAt: Date;

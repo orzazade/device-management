@@ -67,6 +67,14 @@ export class Device {
   @JoinColumn({ name: 'project_id' })
   project: Project | null;
 
+  /** The squad (team) this device belongs to — same table as projects. */
+  @Column({ type: 'uuid', nullable: true })
+  squadId: string | null;
+
+  @ManyToOne(() => Project)
+  @JoinColumn({ name: 'squad_id' })
+  squad: Project | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
