@@ -98,7 +98,7 @@ export default function Layout() {
   useEffect(() => {
     const name = loc.pathname === '/' ? 'Dashboard'
       : loc.pathname.slice(1).split('/')[0].replace(/^\w/, (c) => c.toUpperCase());
-    document.title = `${name} · Azercell Device Manager`;
+    document.title = `${name} · Azercell Device Management`;
   }, [loc.pathname]);
   if (loading || booting) return <BrandLoader />;
   if (!user && sessionCheckFailed)

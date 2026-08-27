@@ -1,4 +1,4 @@
-# Azercell Device Manager
+# Azercell Device Management
 
 Internal lending library for QA test devices (phones, tablets): find a free
 device, request it for a date range, get approval, hand it over, return it.
