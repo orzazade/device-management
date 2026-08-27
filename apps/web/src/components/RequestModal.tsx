@@ -30,6 +30,9 @@ export default function RequestModal({
   const nav = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange>({ from: null, to: null });
+  // Controlled for the same reason as the edit dialog: the project list loads
+  // after first paint, so defaultValue would never stick.
+  const [projectId, setProjectId] = useState(device.project?.id ?? '');
   const users = useQuery({
     queryKey: ['users'],
     queryFn: () => api<UserRow[]>('/users'),
@@ -100,7 +103,8 @@ export default function RequestModal({
             <select
               name="projectId"
               required
-              defaultValue={device.project?.id ?? ''}
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
               className="w-full rounded-lg border border-neutral-300 px-3 py-2"
             >
               <option value="" disabled>
