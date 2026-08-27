@@ -10,6 +10,7 @@ import { AppDbContext, TransactionalContext } from '../db/app-db-context';
 import { DeviceRequest } from '../entities/device-request.entity';
 import { notify, staffIds } from '../notifications/notify';
 import { transition } from './request-machine';
+import { localDay } from '../dates';
 
 const EXCLUSION_VIOLATION = '23P01';
 
@@ -301,7 +302,7 @@ export class OverrideTimeHandler implements ICommandHandler<OverrideTimeCommand>
       request.toDate = toDate;
       // Extending a late loan past today makes it simply active again —
       // without this it stays "overdue" forever, alarms and all.
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDay();
       const overdueCleared = request.state === 'overdue' && toDate >= today;
       if (overdueCleared) transition(request, 'active');
       try {
@@ -377,7 +378,7 @@ export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCo
       }
       // No handover before the booking starts — the calendar promise
       // means something.
-      const startToday = new Date().toISOString().slice(0, 10);
+      const startToday = localDay();
       if (request.fromDate > startToday) {
         throw new ConflictException(
           `This booking starts ${request.fromDate} — hand over on or after that day`,

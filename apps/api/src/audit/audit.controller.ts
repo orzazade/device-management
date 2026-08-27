@@ -10,6 +10,7 @@ import { In } from 'typeorm';
 import { Roles } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { AuditLog } from '../entities/audit-log.entity';
+import { localDay } from '../dates';
 
 @Controller('audit')
 export class AuditController {
@@ -54,7 +55,7 @@ export class AuditController {
     @Query('to') to?: string,
   ) {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const day = new Date().toISOString().slice(0, 10);
+    const day = localDay();
     res.hijack();
     res.raw.writeHead(200, {
       'content-type': 'text/csv; charset=utf-8',
