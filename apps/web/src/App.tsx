@@ -3,7 +3,7 @@ import { queryClient } from './lib/queryClient';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toasts';
-import { AuthProvider, useAuth, type Role } from './lib/auth';
+import { AuthProvider, SessionExpiryRedirect, useAuth, type Role } from './lib/auth';
 import Audit from './pages/Audit';
 import Dashboard from './pages/Dashboard';
 import Requests from './pages/Requests';
@@ -47,6 +47,7 @@ export default function App() {
       <ToastProvider>
       <AuthProvider>
         <BrowserRouter>
+          <SessionExpiryRedirect />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<Layout />}>

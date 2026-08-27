@@ -151,7 +151,7 @@ export default function Repairs() {
         <ConfirmModal
           title={`Cancel this damage report?`}
           body={`“${cancelFor.issue}” on ${cancelFor.device.brand} ${cancelFor.device.model} will be closed as a mistake and the damage note cleared. ${cancelFor.reportedBy?.name ?? 'The reporter'} is notified.`}
-          confirmLabel="Cancel report"
+          confirmLabel="Yes, cancel the report"
           busy={act.isPending}
           onConfirm={() => act.mutate({ id: cancelFor.id, verb: 'cancel' })}
           onClose={() => setCancelFor(null)}

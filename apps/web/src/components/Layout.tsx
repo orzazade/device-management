@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
@@ -26,10 +26,18 @@ function Section({ label }: { label: string }) {
 
 function Badge({ n }: { n: number | undefined }) {
   if (!n) return null;
+  // A leading sr-only space keeps the link's text "Requests 3", not
+  // "Requests3", for screen readers and text-based tools.
   return (
-    <span className="ml-auto rounded-full bg-accent px-2 text-[11px] font-semibold leading-[18px] text-white">
-      {n}
-    </span>
+    <>
+      <span className="sr-only"> </span>
+      <span
+        aria-label={`${n} need attention`}
+        className="ml-auto rounded-full bg-accent px-2 text-[11px] font-semibold leading-[18px] text-white"
+      >
+        {n}
+      </span>
+    </>
   );
 }
 
@@ -43,6 +51,7 @@ export default function Layout() {
   const { user, loading, logout, mustChangePassword, clearMustChange, sessionCheckFailed, retrySession } =
     useAuth();
   const nav = useNavigate();
+  const loc = useLocation();
   const staff = isStaff(user?.role);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -87,10 +96,10 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [menuOpen]);
   useEffect(() => {
-    const name = location.pathname === '/' ? 'Dashboard'
-      : location.pathname.slice(1).split('/')[0].replace(/^\w/, (c) => c.toUpperCase());
+    const name = loc.pathname === '/' ? 'Dashboard'
+      : loc.pathname.slice(1).split('/')[0].replace(/^\w/, (c) => c.toUpperCase());
     document.title = `${name} · Azercell Device Manager`;
-  });
+  }, [loc.pathname]);
   if (loading || booting) return <BrandLoader />;
   if (!user && sessionCheckFailed)
     return (
@@ -117,6 +126,7 @@ export default function Layout() {
 
   const sidebar = (
     <aside
+      data-testid="sidebar"
       className={`flex h-screen w-54 shrink-0 flex-col border-r border-neutral-200 bg-white md:sticky md:top-0 ${
         menuOpen ? 'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50' : 'max-md:hidden'
       }`}
@@ -135,9 +145,9 @@ export default function Layout() {
       </div>
       <nav className="flex-1 overflow-y-auto p-2" onClick={() => setMenuOpen(false)}>
         <Section label="Lab" />
-        <NavLink to="/" end className={linkCls}>Dashboard</NavLink>
-        <NavLink to="/devices" className={linkCls}>Devices</NavLink>
-        <NavLink to="/requests" className={linkCls}>
+        <NavLink data-testid="nav-dashboard" to="/" end className={linkCls}>Dashboard</NavLink>
+        <NavLink data-testid="nav-devices" to="/devices" className={linkCls}>Devices</NavLink>
+        <NavLink data-testid="nav-requests" to="/requests" className={linkCls}>
           Requests
           <Badge
             n={
@@ -147,21 +157,21 @@ export default function Layout() {
             }
           />
         </NavLink>
-        <NavLink to="/repairs" className={linkCls}>
+        <NavLink data-testid="nav-repairs" to="/repairs" className={linkCls}>
           Repairs
           <Badge n={dash.data?.openRepairs} />
         </NavLink>
         {staff && (
           <>
             <Section label="Manage" />
-            <NavLink to="/projects" className={linkCls}>Projects</NavLink>
-            <NavLink to="/users" className={linkCls}>Users</NavLink>
-            <NavLink to="/reports" className={linkCls}>Idle devices</NavLink>
-            <NavLink to="/settings" className={linkCls}>Settings</NavLink>
+            <NavLink data-testid="nav-projects" to="/projects" className={linkCls}>Projects</NavLink>
+            <NavLink data-testid="nav-users" to="/users" className={linkCls}>Users</NavLink>
+            <NavLink data-testid="nav-reports" to="/reports" className={linkCls}>Idle devices</NavLink>
+            <NavLink data-testid="nav-settings" to="/settings" className={linkCls}>Settings</NavLink>
           </>
         )}
         {staff && (
-          <NavLink to="/audit" className={linkCls}>Audit log</NavLink>
+          <NavLink data-testid="nav-audit" to="/audit" className={linkCls}>Audit log</NavLink>
         )}
       </nav>
     </aside>
@@ -202,9 +212,10 @@ export default function Layout() {
           </form>
           <div className="flex-1" />
           <ThemeToggle />
-          <Bell />
+          <span data-testid="bell"><Bell /></span>
           <div className="relative" ref={userMenuRef}>
             <button
+              data-testid="user-menu"
               onClick={() => setUserOpen(!userOpen)}
               className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white py-1.5 pl-1.5 pr-3 shadow-sm hover:bg-neutral-50"
             >

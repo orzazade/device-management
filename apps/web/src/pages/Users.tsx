@@ -299,7 +299,7 @@ export default function Users() {
         <ConfirmModal
           title={`Make ${roleChange.user.name} a ${roleLabel[roleChange.role]}?`}
           body={`${roleChange.user.name} goes from ${roleLabel[roleChange.user.role]} to ${roleLabel[roleChange.role]} immediately — their access changes on their next click.`}
-          confirmLabel="Change role"
+          confirmLabel="Yes, change the role"
           busy={changeRole.isPending}
           onConfirm={() => {
             changeRole.mutate({ id: roleChange.user.id, role: roleChange.role });

@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -38,7 +39,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     // Errors deserve reading time; anything is dismissible by click.
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 8000 : 4000);
   }, []);
-  emit = push;
+  // Registering the escape hatch is a side effect, so it lives in an effect
+  // (safe under StrictMode double-render), and unregisters on unmount.
+  useEffect(() => {
+    emit = push;
+    return () => {
+      emit = null;
+    };
+  }, [push]);
 
   return (
     <Ctx.Provider value={push}>

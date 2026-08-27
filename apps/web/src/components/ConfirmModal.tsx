@@ -3,7 +3,7 @@ import Modal from './Modal';
 export default function ConfirmModal({
   title,
   body,
-  confirmLabel = 'Delete',
+  confirmLabel = 'Yes, delete',
   busy = false,
   onConfirm,
   onClose,
@@ -25,6 +25,7 @@ export default function ConfirmModal({
           <button
             type="button"
             onClick={onClose}
+            data-testid="confirm-cancel"
             className="rounded-lg border border-neutral-300 px-4 py-2 font-semibold"
           >
             Cancel
@@ -33,6 +34,7 @@ export default function ConfirmModal({
             type="button"
             disabled={busy}
             onClick={onConfirm}
+            data-testid="confirm-button"
             className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:brightness-110 disabled:opacity-50"
           >
             {confirmLabel}

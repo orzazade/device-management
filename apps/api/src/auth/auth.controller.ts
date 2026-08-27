@@ -14,6 +14,8 @@ import * as bcrypt from 'bcryptjs';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import { writeAudit } from '../audit/audit';
 import { AppDbContext } from '../db/app-db-context';
+import { REDIS } from '../redis';
+import type Redis from 'ioredis';
 import { AuthUser, Public } from './auth.guard';
 import { IDENTITY_PROVIDER, IdentityProvider } from './identity-provider';
 
@@ -44,23 +46,28 @@ const LOCK_MS = 15 * 60_000;
 
 @Controller('auth')
 export class AuthController {
-  // In-memory brute-force brake, per email. Fine for a single replica;
-  // a shared store comes with the LDAP/multi-replica era.
-  private readonly fails = new Map<string, { count: number; lockedUntil: number }>();
-
   constructor(
     @Inject(IDENTITY_PROVIDER) private readonly identity: IdentityProvider,
     private readonly jwt: JwtService,
     private readonly db: AppDbContext,
+    // Brute-force brake lives in Redis so every replica sees the same count.
+    @Inject(REDIS) private readonly redis: Redis,
   ) {}
+
+  private failKey(email: string) {
+    return `login:fails:${email}`;
+  }
+  private lockKey(email: string) {
+    return `login:lock:${email}`;
+  }
 
   @Public()
   @Post('login')
   async login(@Body() dto: LoginDto) {
     const key = dto.email.toLowerCase().trim();
-    const gate = this.fails.get(key);
-    if (gate && gate.lockedUntil > Date.now()) {
-      const mins = Math.ceil((gate.lockedUntil - Date.now()) / 60_000);
+    const lockedForMs = await this.redis.pttl(this.lockKey(key));
+    if (lockedForMs > 0) {
+      const mins = Math.ceil(lockedForMs / 60_000);
       throw new HttpException(
         `Too many wrong attempts — try again in ${mins} min`,
         429,
@@ -69,15 +76,15 @@ export class AuthController {
 
     const user = await this.identity.verify(dto.email, dto.password);
     if (!user) {
-      const next = { count: (gate?.count ?? 0) + 1, lockedUntil: 0 };
-      if (next.count >= MAX_FAILS) {
-        next.lockedUntil = Date.now() + LOCK_MS;
-        next.count = 0;
+      const count = await this.redis.incr(this.failKey(key));
+      if (count === 1) await this.redis.pexpire(this.failKey(key), LOCK_MS);
+      if (count >= MAX_FAILS) {
+        await this.redis.set(this.lockKey(key), '1', 'PX', LOCK_MS);
+        await this.redis.del(this.failKey(key));
       }
-      this.fails.set(key, next);
       throw new UnauthorizedException('Wrong email or password');
     }
-    this.fails.delete(key);
+    await this.redis.del(this.failKey(key), this.lockKey(key));
     await this.db.withTransaction(async (ctx) => {
       await writeAudit(ctx.manager, { id: user.id, name: user.name }, {
         entityType: 'user',

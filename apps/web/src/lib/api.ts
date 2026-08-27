@@ -8,6 +8,8 @@ export class ApiError extends Error {
 }
 
 const TOKEN_KEY = 'devicedesk.token';
+/** Fired once by api() when the server says the session is no longer valid. */
+export const SESSION_EXPIRED_EVENT = 'devicedesk:session-expired';
 
 export const tokenStore = {
   get: () => localStorage.getItem(TOKEN_KEY),
@@ -30,8 +32,10 @@ export async function api<T>(
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     if (res.status === 401 && !path.startsWith('/auth/login')) {
-      tokenStore.clear();
-      window.location.href = '/login?expired=1';
+      // Don't navigate from here: the session owner (AuthProvider) listens
+      // for this and moves the user to /login through the router, keeping
+      // the SPA, the query cache and the "return to" location intact.
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
     }
     const msg = Array.isArray(body?.message)
       ? body.message.join('; ')

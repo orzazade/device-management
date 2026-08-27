@@ -20,6 +20,8 @@ export default function Chip({ status }: { status: string }) {
   const [label, cls] = styles[status] ?? [status, 'bg-neutral-200 text-neutral-600'];
   return (
     <span
+      data-testid="chip"
+      data-status={status}
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current" />

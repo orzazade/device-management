@@ -44,16 +44,15 @@ export default function RangeCalendar({
   const [hint, setHint] = useState<string | null>(null);
 
   const kindOf = useMemo(() => {
+    // One pass: a booked hit wins outright; a requested hit is remembered.
     return (iso: string): 'booked' | 'requested' | null => {
+      let requested = false;
       for (const b of bookings) {
-        if (iso >= b.fromDate && iso <= b.toDate) {
-          if (b.kind === 'booked') return 'booked';
-        }
+        if (iso < b.fromDate || iso > b.toDate) continue;
+        if (b.kind === 'booked') return 'booked';
+        if (b.kind === 'requested') requested = true;
       }
-      for (const b of bookings) {
-        if (iso >= b.fromDate && iso <= b.toDate && b.kind === 'requested') return 'requested';
-      }
-      return null;
+      return requested ? 'requested' : null;
     };
   }, [bookings]);
 

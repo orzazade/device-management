@@ -5,6 +5,7 @@ export default function BrandLoader({ label = 'Loading…' }: { label?: string }
     <div
       role="status"
       aria-label={label}
+      data-testid="splash"
       className="fixed inset-0 z-[60] flex items-center justify-center bg-ground"
     >
       <span className="brand-logo heartbeat block w-56">

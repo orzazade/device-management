@@ -1,3 +1,12 @@
+import { config as loadDotenv } from 'dotenv';
+import { resolve } from 'node:path';
+
+// Local dev convenience: read `.env` from the working directory and from the
+// repo root (env.example says "copy to .env"). Real env vars always win —
+// dotenv never overrides a variable that is already set.
+loadDotenv({ quiet: true });
+loadDotenv({ path: resolve(process.cwd(), '../../.env'), quiet: true });
+
 // Central env config. Defaults match docker-compose for local dev;
 // production always overrides via real env vars.
 export const config = {

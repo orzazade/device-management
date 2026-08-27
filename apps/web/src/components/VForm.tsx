@@ -97,12 +97,16 @@ export function VField({
   const errorRef = useRef<string | null>(null);
   errorRef.current = error;
   const touched = useRef(false);
+  // Always validate with the rules of the latest render, not the ones the
+  // registration closed over.
+  const rulesRef = useRef(rules);
+  rulesRef.current = rules;
 
   useEffect(() => {
     if (!ctx) return;
     return ctx.register(name, {
       validate: () => {
-        const err = runRules(rules, ref.current?.value ?? '');
+        const err = runRules(rulesRef.current, ref.current?.value ?? '');
         setError(err);
         return !err;
       },

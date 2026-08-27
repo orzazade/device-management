@@ -217,21 +217,21 @@ export default function Requests() {
             empty="Nothing waiting for approval. 🎉"
             actions={(r) => (
               <span className="flex gap-1.5">
-                <button
+                <button data-testid="request-approve"
                   onClick={() => act.mutate({ id: r.id, verb: 'approve' })}
                   disabled={act.isPending && act.variables?.id === r.id}
                   className={`${btn} bg-accent text-white`}
                 >
                   Approve
                 </button>
-                <button
+                <button data-testid="request-reject"
                   onClick={() => setRejectFor(r)}
                   disabled={act.isPending && act.variables?.id === r.id}
                   className={`${btn} border border-neutral-300 text-red-700`}
                 >
                   Reject
                 </button>
-                <button
+                <button data-testid="request-override-time"
                   onClick={() => {
                     setTimeFor(r);
                     setOverrideRange({ from: r.fromDate, to: r.toDate });
@@ -254,14 +254,14 @@ export default function Requests() {
             empty=""
             actions={(r) => (
               <span className="flex gap-1.5">
-                <button
+                <button data-testid="request-cant-hand-over"
                   onClick={() => setCantFor(r)}
                   disabled={cantHandOver.isPending}
                   className={`${btn} border border-neutral-300`}
                 >
                   Can’t hand over
                 </button>
-                <button
+                <button data-testid="request-confirm-handover"
                   onClick={() => handover.mutate(r.id)}
                   disabled={handover.isPending}
                   className={`${btn} bg-accent text-white`}
@@ -293,7 +293,7 @@ export default function Requests() {
                 <span className="text-xs font-semibold text-red-700">
                   {daysLate(r)} {daysLate(r) === 1 ? 'day' : 'days'} late
                 </span>
-                <button
+                <button data-testid="request-check-in"
                   onClick={() => setReturnFor(r)}
                   className={`${btn} bg-accent text-white`}
                 >
@@ -359,13 +359,13 @@ export default function Requests() {
             </button>
           ) : r.state === 'active' || r.state === 'overdue' ? (
             <span className="flex gap-1.5">
-              <button
+              <button data-testid="request-extend"
                 onClick={() => setExtendFor(r)}
                 className={`${btn} border border-neutral-300`}
               >
                 Extend
               </button>
-              <button
+              <button data-testid="request-return"
                 onClick={() => (staffUser ? setReturnFor(r) : setOfferReturn(r))}
                 className={`${btn} bg-accent text-white`}
               >
@@ -391,7 +391,7 @@ export default function Requests() {
         <ConfirmModal
           title="Cancel this booking?"
           body={`Your approved booking for ${confirmCancel.device.brand} ${confirmCancel.device.model} (${confirmCancel.fromDate} – ${confirmCancel.toDate}) is released for others. This can't be undone — you'd have to request again.`}
-          confirmLabel="Cancel booking"
+          confirmLabel="Yes, cancel this booking"
           busy={cancel.isPending}
           onConfirm={() => {
             cancel.mutate(confirmCancel.id);
@@ -490,7 +490,7 @@ export default function Requests() {
                 disabled={cantHandOver.isPending}
                 className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
               >
-                {cantHandOver.isPending ? 'Cancelling…' : 'Cancel the booking'}
+                {cantHandOver.isPending ? 'Cancelling…' : 'Yes, cancel this booking'}
               </button>
             </div>
           </VForm>

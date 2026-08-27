@@ -34,6 +34,7 @@ export default function ThemeToggle({ className = '' }: { className?: string }) 
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
       onClick={flip}
+      data-testid="theme-toggle"
       className={`eclipse ${className}`}
     >
       <span className="corona" />

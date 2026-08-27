@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { ApiError, api, tokenStore } from './api';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ApiError, SESSION_EXPIRED_EVENT, api, tokenStore } from './api';
 import { queryClient } from './queryClient';
 
 export type Role = 'admin' | 'manager' | 'tester';
@@ -48,13 +49,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Only a real auth verdict invalidates the token. A server blip
         // must not sign out a hundred people.
         if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
-          tokenStore.clear();
+          invalidateSession();
         } else {
           setSessionCheckFailed(true);
         }
       })
       .finally(() => setLoading(false));
   }, [sessionAttempt]);
+
+  // The ONE place a session gets dropped. api() and the /auth/me check both
+  // end up here; the router hop happens in <SessionExpiryRedirect/>.
+  const invalidateSession = () => {
+    tokenStore.clear();
+    setUser(null);
+    setMustChangePassword(false);
+    queryClient.clear();
+  };
+  useEffect(() => {
+    const onExpired = () => invalidateSession();
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
 
   const login = async (email: string, password: string) => {
     const res = await api<{ token: string; user: Me; mustChangePassword?: boolean }>(
@@ -66,13 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMustChangePassword(!!res.mustChangePassword);
   };
 
-  const logout = () => {
-    tokenStore.clear();
-    setUser(null);
-    setMustChangePassword(false);
-    // The next person at this desk must not see this user's cached data.
-    queryClient.clear();
-  };
+  // The next person at this desk must not see this user's cached data.
+  const logout = () => invalidateSession();
 
   return (
     <Ctx.Provider
@@ -90,4 +100,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </Ctx.Provider>
   );
+}
+
+/** Mount inside the router: when the session expires mid-page, go to the
+ * login screen with the router (no hard reload) and remember where the
+ * person was, so sign-in brings them straight back. */
+export function SessionExpiryRedirect() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  useEffect(() => {
+    const onExpired = () => {
+      if (loc.pathname === '/login') return;
+      nav('/login?expired=1', { replace: true, state: { from: loc.pathname + loc.search } });
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, [nav, loc.pathname, loc.search]);
+  return null;
 }

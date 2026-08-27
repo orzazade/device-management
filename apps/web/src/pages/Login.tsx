@@ -26,6 +26,7 @@ export default function Login() {
         <ThemeToggle />
       </div>
       <VForm
+        data-testid="login-form"
         className="w-full max-w-90 rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm"
         onValidSubmit={async (f) => {
           setBusy(true);
@@ -70,6 +71,7 @@ export default function Login() {
         {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <button
           disabled={busy}
+          data-testid="login-submit"
           className="w-full rounded-lg bg-accent px-4 py-2 font-semibold text-white hover:brightness-110 disabled:opacity-50"
         >
           {busy ? 'Signing in…' : 'Sign in'}

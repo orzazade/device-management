@@ -41,6 +41,7 @@ export default function Modal({
 
   return createPortal(
     <div
+      data-testid="modal"
       className={`fixed inset-0 ${z} flex items-center justify-center bg-black/50 p-5`}
       onClick={(e) => closeOnBackdrop && e.target === e.currentTarget && onClose()}
     >

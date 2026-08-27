@@ -1,8 +1,10 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import LoadFailed from '../components/LoadFailed';
 import ChangeDiff from '../components/ChangeDiff';
-import { api } from '../lib/api';
+import { api, tokenStore } from '../lib/api';
+import { useToast } from '../components/Toasts';
 
 interface AuditRow {
   id: string;
@@ -32,6 +34,16 @@ export default function Audit() {
     else next.delete(key);
     setParams(next, { replace: true });
   };
+  // The "who" box keeps its own text and writes the URL ~250ms after typing
+  // stops — a controlled value that round-trips through the router drops
+  // keystrokes typed faster than the round-trip (same pattern as Devices).
+  const [actorText, setActorText] = useState(actor);
+  useEffect(() => setActorText(actor), [actor]);
+  useEffect(() => {
+    if (actorText === actor) return;
+    const t = setTimeout(() => setFilter('actor', actorText), 250);
+    return () => clearTimeout(t);
+  }, [actorText]);
   const query = new URLSearchParams();
   if (entityType) query.set('entityType', entityType);
   if (actor) query.set('actor', actor);
@@ -52,6 +64,35 @@ export default function Audit() {
     isLoading: pages.isLoading,
     isError: pages.isError,
     refetch: pages.refetch,
+  };
+  const toast = useToast();
+  const [exporting, setExporting] = useState(false);
+  // The server streams EVERY matching row — not just the pages loaded here.
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/v1/audit/export.csv?${query}`, {
+        headers: { authorization: `Bearer ${tokenStore.get()}` },
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, 2000);
+      toast('CSV downloaded — every matching entry included');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Export failed', 'error');
+    } finally {
+      setExporting(false);
+    }
   };
   const filterCls =
     'rounded-lg border border-neutral-300 bg-white px-2.5 py-1.5 text-sm focus:border-accent focus:outline-none';
@@ -76,42 +117,22 @@ export default function Audit() {
         </select>
         <input
           type="search"
-          value={actor}
-          onChange={(e) => setFilter('actor', e.target.value)}
+          value={actorText}
+          onChange={(e) => setActorText(e.target.value)}
           placeholder="Who…"
+          data-testid="audit-actor"
           className={`${filterCls} w-36`}
         />
         <input type="date" value={from} onChange={(e) => setFilter('from', e.target.value)} className={filterCls} />
         <span className="text-neutral-400">–</span>
         <input type="date" value={to} onChange={(e) => setFilter('to', e.target.value)} className={filterCls} />
         <button
-          onClick={() => {
-            const rowsFlat = pages.data?.pages.flat() ?? [];
-            const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-            const csv = [
-              ['when', 'who', 'entity', 'entityLabel', 'action', 'oldValue', 'newValue'].join(','),
-              ...rowsFlat.map((r) =>
-                [
-                  r.createdAt,
-                  r.actorName,
-                  r.entityType,
-                  r.entityLabel ?? '',
-                  r.action,
-                  JSON.stringify(r.oldValue ?? null),
-                  JSON.stringify(r.newValue ?? null),
-                ].map(esc).join(','),
-              ),
-            ].join('\n');
-            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm font-semibold"
+          onClick={exportCsv}
+          disabled={exporting}
+          data-testid="audit-export"
+          className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
         >
-          Export CSV
+          {exporting ? 'Exporting…' : 'Export CSV (all matching)'}
         </button>
         {(entityType || actor || from || to) && (
           <button

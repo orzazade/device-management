@@ -8,14 +8,14 @@ import ImportModal from '../components/ImportModal';
 import RequestModal from '../components/RequestModal';
 import SpecFields from '../components/SpecFields';
 import { collectSpecs, specsToPairs } from '../lib/specs';
-
-const isFlag = (v: string) => /^(yes|no|true|false)$/i.test(v);
 import { VForm, VField } from '../components/VForm';
 import { imei, required, serial } from '../lib/validate';
 import { useToast } from '../components/Toasts';
 import { api } from '../lib/api';
 import { isStaff, useAuth } from '../lib/auth';
 import type { DeviceRow, ProjectRow } from '../lib/types';
+
+const isFlag = (v: string) => /^(yes|no|true|false)$/i.test(v);
 
 export default function Devices() {
   const { user } = useAuth();
@@ -100,13 +100,13 @@ export default function Devices() {
         <div className="flex-1" />
         {isStaff(user?.role) && (
           <>
-            <button
+            <button data-testid="device-import"
               onClick={() => setShowImport(true)}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2 font-semibold"
             >
               Import Excel
             </button>
-            <button
+            <button data-testid="device-add"
               onClick={() => setShowCreate(true)}
               className="rounded-lg bg-accent px-4 py-2 font-semibold text-white hover:brightness-110"
             >
@@ -164,6 +164,8 @@ export default function Devices() {
             {devices.data?.map((d) => (
               <tr
                 key={d.id}
+                data-testid="device-row"
+                data-status={d.status}
                 onClick={() => status !== 'deleted' && nav(`/devices/${d.id}`)}
                 className={`border-b border-neutral-100 last:border-0 ${
                   status === 'deleted' ? 'opacity-60' : 'cursor-pointer hover:bg-neutral-50'
@@ -219,7 +221,7 @@ export default function Devices() {
                     </button>
                   ) : (
                     (d.status === 'available' || d.status === 'assigned') && (
-                      <button
+                      <button data-testid="device-request"
                         onClick={() => setRequestFor(d)}
                         className="rounded-lg bg-accent px-3 py-1 text-xs font-semibold text-white"
                       >

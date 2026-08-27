@@ -1,4 +1,11 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Res } from '@nestjs/common';
+import type { ServerResponse } from 'node:http';
+
+/** The bits of a Fastify reply a streaming handler needs (no direct fastify dep). */
+interface StreamReply {
+  hijack(): void;
+  raw: ServerResponse;
+}
 import { In } from 'typeorm';
 import { Roles } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
@@ -33,6 +40,59 @@ export class AuditController {
       ...r,
       entityLabel: labels.get(`${r.entityType}:${r.entityId}`) ?? null,
     }));
+  }
+
+  /** The whole filtered log as CSV, streamed in keyset batches — never a
+   * silently truncated file. Same filters as the list. */
+  @Get('export.csv')
+  @Roles('admin', 'manager')
+  async exportCsv(
+    @Res() res: StreamReply,
+    @Query('entityType') entityType?: string,
+    @Query('actor') actorName?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const day = new Date().toISOString().slice(0, 10);
+    res.hijack();
+    res.raw.writeHead(200, {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename="audit-${day}.csv"`,
+      'cache-control': 'no-store',
+    });
+    res.raw.write(['when', 'who', 'entity', 'entityLabel', 'action', 'oldValue', 'newValue'].join(',') + '\n');
+    const BATCH = 1000;
+    let beforeId: string | undefined;
+    for (;;) {
+      const qb = this.db.auditLogs().createQueryBuilder('a').orderBy('a.id', 'DESC').take(BATCH);
+      if (entityType) qb.andWhere('a.entityType = :entityType', { entityType });
+      if (actorName) qb.andWhere('a.actorName ILIKE :actor', { actor: `%${actorName}%` });
+      if (from) qb.andWhere('a.createdAt >= :from', { from });
+      if (to) qb.andWhere('a.createdAt < (:to)::date + 1', { to });
+      if (beforeId) qb.andWhere('a.id < :beforeId', { beforeId });
+      const rows = await qb.getMany();
+      if (!rows.length) break;
+      const labels = await this.resolveLabels(rows);
+      const chunk = rows
+        .map((r) =>
+          [
+            r.createdAt.toISOString(),
+            r.actorName,
+            r.entityType,
+            labels.get(`${r.entityType}:${r.entityId}`) ?? '',
+            r.action,
+            JSON.stringify(r.oldValue ?? null),
+            JSON.stringify(r.newValue ?? null),
+          ].map(esc).join(','),
+        )
+        .join('\n');
+      const ok = res.raw.write(chunk + '\n');
+      if (!ok) await new Promise<void>((r) => res.raw.once('drain', () => r()));
+      if (rows.length < BATCH) break;
+      beforeId = rows[rows.length - 1].id;
+    }
+    res.raw.end();
   }
 
   /** Batch-resolve "which one?" per entity type — a row about a request
