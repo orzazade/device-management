@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth';
 import { email, required } from '../lib/validate';
 
 export default function Login() {
-  const { user, loading, login } = useAuth();
+  const { user, loading, login, sessionExpired } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/';
@@ -18,7 +18,7 @@ export default function Login() {
   // No form flash for someone who is already signed in (F193).
   if (loading) return <BrandLoader />;
   if (user) return <Navigate to={from} replace />;
-  const expired = new URLSearchParams(location.search).get('expired') === '1';
+  const expired = sessionExpired || new URLSearchParams(location.search).get('expired') === '1';
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">

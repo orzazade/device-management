@@ -48,7 +48,7 @@ const roleLabel: Record<string, string> = {
 };
 
 export default function Layout() {
-  const { user, loading, logout, mustChangePassword, clearMustChange, sessionCheckFailed, retrySession } =
+  const { user, loading, logout, mustChangePassword, clearMustChange, sessionCheckFailed, retrySession, sessionExpired } =
     useAuth();
   const nav = useNavigate();
   const loc = useLocation();
@@ -116,7 +116,15 @@ export default function Layout() {
         </div>
       </div>
     );
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  // Whichever redirect wins the race, the reason travels with it.
+  if (!user)
+    return (
+      <Navigate
+        to={sessionExpired ? '/login?expired=1' : '/login'}
+        replace
+        state={{ from: loc.pathname + loc.search }}
+      />
+    );
 
   const initials = user.name
     .split(' ')

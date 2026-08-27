@@ -18,6 +18,9 @@ interface AuthState {
    * is kept; retry instead of dumping the user at the login screen. */
   sessionCheckFailed: boolean;
   retrySession: () => void;
+  /** The last session ended because the server rejected it (expired /
+   * deactivated) — the login screen explains that. */
+  sessionExpired: boolean;
   /** true right after logging in with a factory-default password. */
   mustChangePassword: boolean;
   clearMustChange: () => void;
@@ -35,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
   const [sessionAttempt, setSessionAttempt] = useState(0);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     if (!tokenStore.get()) {
@@ -59,14 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // The ONE place a session gets dropped. api() and the /auth/me check both
   // end up here; the router hop happens in <SessionExpiryRedirect/>.
-  const invalidateSession = () => {
+  const invalidateSession = (reason: 'expired' | 'logout' = 'expired') => {
     tokenStore.clear();
     setUser(null);
     setMustChangePassword(false);
+    setSessionExpired(reason === 'expired');
     queryClient.clear();
   };
   useEffect(() => {
-    const onExpired = () => invalidateSession();
+    const onExpired = () => invalidateSession('expired');
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);
@@ -78,11 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
     tokenStore.set(res.token);
     setUser(res.user);
+    setSessionExpired(false);
     setMustChangePassword(!!res.mustChangePassword);
   };
 
   // The next person at this desk must not see this user's cached data.
-  const logout = () => invalidateSession();
+  const logout = () => invalidateSession('logout');
 
   return (
     <Ctx.Provider
@@ -90,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         sessionCheckFailed,
+        sessionExpired,
         retrySession: () => setSessionAttempt((n) => n + 1),
         mustChangePassword,
         clearMustChange: () => setMustChangePassword(false),

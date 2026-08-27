@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type FormHTMLAttributes } from 'react';
 import { runRules, type Rule } from '../lib/validate';
 
 interface FieldReg {
@@ -23,11 +16,12 @@ export function VForm({
   onValidSubmit,
   className,
   children,
+  ...rest
 }: {
   onValidSubmit: (f: FormData) => void;
   className?: string;
   children: ReactNode;
-}) {
+} & Omit<FormHTMLAttributes<HTMLFormElement>, 'onSubmit' | 'className' | 'children'>) {
   const fields = useRef(new Map<string, FieldReg>());
   const register = (name: string, reg: FieldReg) => {
     fields.current.set(name, reg);
@@ -38,6 +32,7 @@ export function VForm({
   return (
     <Ctx.Provider value={{ register }}>
       <form
+        {...rest}
         noValidate
         className={className}
         onSubmit={(e) => {
