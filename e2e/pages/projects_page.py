@@ -66,16 +66,25 @@ class ProjectsPage(BasePage):
 
     # --------------------------------------------------------------- dialogs
 
-    def open_new_project(self) -> "ProjectDialog":
-        """The New button follows the tab, so make sure Projects is open."""
-        self.show_projects()
+    def _open_new(self, kind: str) -> "ProjectDialog":
+        """Switch tab, then wait for the New button to admit it switched.
+
+        The button's click handler reads the tab from state. Clicking it in the
+        same breath as the tab can fire while the old tab is still current — and
+        then a "New squad" click quietly creates a project. Waiting for the
+        label is what makes the tab change observable.
+        """
+        expected = "New squad" if kind == "squad" else "New project"
+        (self.show_squads if kind == "squad" else self.show_projects)()
+        self.wait(10).until(lambda d: self.new_button_label() == expected)
         self.click(self.NEW_BUTTON)
         return ProjectDialog(self.driver, self.base_url).wait_open()
 
+    def open_new_project(self) -> "ProjectDialog":
+        return self._open_new("project")
+
     def open_new_squad(self) -> "ProjectDialog":
-        self.show_squads()
-        self.click(self.NEW_BUTTON)
-        return ProjectDialog(self.driver, self.base_url).wait_open()
+        return self._open_new("squad")
 
     def edit(self, name: str) -> "ProjectDialog":
         locator = (

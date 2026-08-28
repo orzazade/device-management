@@ -16,9 +16,25 @@ class UsersPage(BasePage):
     ROWS = (By.CSS_SELECTOR, "table tbody tr")
     BANNER_ERROR = (By.XPATH, "//p[contains(@class,'text-red-700')]")
 
+    LOADING = (By.XPATH, "//p[normalize-space()='loading…']")
+
     def open_users(self) -> "UsersPage":
         self.open("/users")
         self.find(self.HEADING)
+        self.wait_loaded()
+        return self
+
+    def wait_loaded(self, timeout: int = 20) -> "UsersPage":
+        """Wait for the account list itself, not just the heading.
+
+        The heading renders immediately while the query is still in flight, so
+        counting rows straight after open_users() could return 0 and make a
+        later comparison meaningless. The list grows with the team, so this
+        matters more over time, not less.
+        """
+        self.wait(timeout).until(
+            lambda d: d.find_elements(*self.ROWS) or d.find_elements(*self.LOADING) == []
+        )
         return self
 
     def row_for(self, text: str):
