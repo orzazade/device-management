@@ -202,5 +202,27 @@ class Api:
     def notification_rules(self) -> list[dict]:
         return self.get("/notification-rules")
 
+    def notifications(self) -> list[dict]:
+        """This account's own notification feed, newest first.
+
+        The endpoint returns the 30 most recent alongside an unread count;
+        only the rows matter here.
+        """
+        return self.get("/notifications")["items"]
+
+    def scan_overdue(self) -> dict:
+        """Run the overdue sweep now instead of waiting for the hourly job."""
+        return self.post("/requests/scan-overdue")
+
+    def renag_overdue(self) -> dict:
+        """Send the repeat round of reminders for still-overdue loans."""
+        return self.post("/requests/renag-overdue")
+
+    def set_time(self, request_id: str, from_date: str, to_date: str) -> dict:
+        return self.request(
+            "PATCH", f"/requests/{request_id}/time",
+            json={"fromDate": from_date, "toDate": to_date},
+        )
+
     def audit(self, query: str = "?limit=100") -> list[dict]:
         return self.get(f"/audit{query}")

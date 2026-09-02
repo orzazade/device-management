@@ -303,6 +303,16 @@ export class RequestsController {
     return { marked };
   }
 
+  /** Manual re-nag of still-overdue loans, the companion to scan-overdue.
+   * Chasing a late device is the desk's job, so they can trigger the round
+   * of reminders themselves instead of waiting for the next scheduled one. */
+  @Post('renag-overdue')
+  @Roles('admin', 'manager')
+  async renagOverdue() {
+    const sent = await this.jobs.renagOverdue();
+    return { sent };
+  }
+
   @Post(':id/cancel')
   async cancel(
     @Param('id') id: string,

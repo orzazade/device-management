@@ -393,6 +393,47 @@ def active_loan(pending_request, admin_api: Api):
 
 
 @pytest.fixture
+def overdue_loan(active_loan, admin_api: Api):
+    """A loan the desk has already marked overdue.
+
+    Real overdue-ness needs a due date in the past, which no dialog will
+    accept, so the loan is created normally and then moved back with the
+    desk's own "change time" endpoint before the sweep runs. That is the same
+    code path the hourly job uses, so the resulting row is genuine, not a
+    hand-written state.
+    """
+
+    def _make(days_late: int = 2) -> tuple[dict, dict]:
+        device, req = active_loan(days_ahead=0, span=1)
+        admin_api.set_time(req["id"], _iso(-days_late - 1), _iso(-days_late))
+        admin_api.scan_overdue()
+        fresh = admin_api.request_by_id(req["id"])
+        assert fresh["state"] == "overdue", f"expected overdue, got {fresh['state']}"
+        return device, fresh
+
+    return _make
+
+
+@pytest.fixture
+def age_notifications():
+    """Push a request's overdue notifications into the past.
+
+    The repeat reminder deliberately stays quiet for three days after the
+    last one, so nothing can be observed about it until the existing
+    notifications look old. There is no API for that — the job reads
+    `created_at` — so the rows are backdated directly, as with `aged_device`.
+    """
+
+    def _age(request_id: str, days: int = 4) -> None:
+        _psql(
+            "UPDATE notifications SET created_at = now() - interval '%d days' "
+            "WHERE meta->>'requestId' = '%s'" % (days, request_id)
+        )
+
+    return _age
+
+
+@pytest.fixture
 def fresh_tester(root_api: Api) -> dict:
     """A permanent tester that deliberately never receives work.
 

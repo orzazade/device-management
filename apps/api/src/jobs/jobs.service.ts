@@ -137,7 +137,8 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         });
         const name = `${r.device.brand} ${r.device.model}`;
         await notify(ctx.manager, 'overdue', [r.requesterId],
-          `${name} is overdue — it was due back ${r.toDate}`, { requestId: r.id }, '/requests');
+          `${name} is overdue — it was due back ${r.toDate}. Return it, or extend the loan if you still need it`,
+          { requestId: r.id }, '/requests');
         await notify(ctx.manager, 'overdue', await staffIds(ctx.manager),
           `${name} is overdue (due ${r.toDate})`, { requestId: r.id }, '/loans');
       });
@@ -153,6 +154,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       .requests()
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.device', 'device')
+      .leftJoinAndSelect('r.requester', 'requester')
       .where(`r.state = 'overdue'`)
       .getMany();
     let sent = 0;
@@ -166,9 +168,19 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         .getOne();
       if (recent) continue;
       await this.db.withTransaction(async (ctx) => {
+        const name = `${r.device.brand} ${r.device.model}`;
+        // The holder is told what they can do about it: bringing the device
+        // back is the fix, but a loan that is simply still needed can be
+        // extended instead — the button is on their own row.
         await notify(ctx.manager, 'overdue', [r.requesterId],
-          `${r.device.brand} ${r.device.model} is STILL overdue — it was due back ${r.toDate}`,
+          `${name} is STILL overdue — it was due back ${r.toDate}. Return it, or extend the loan if you still need it`,
           { requestId: r.id }, '/requests');
+        // The desk hears about it every time too, not just when it first
+        // went late: the longer a device is out, the more the people who
+        // own the inventory need to know.
+        await notify(ctx.manager, 'overdue', await staffIds(ctx.manager),
+          `${name} is still overdue with ${r.requester?.name ?? 'its holder'} (due ${r.toDate})`,
+          { requestId: r.id }, '/loans');
       });
       sent++;
     }
