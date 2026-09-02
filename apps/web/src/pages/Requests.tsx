@@ -47,6 +47,13 @@ export default function Requests() {
     queryKey: ['requests', 'pending-handover'],
     queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
   });
+  // Only ever non-empty under the 'holder' approval policy: somebody wants a
+  // device this user is holding, and it is theirs to decide.
+  const myApprovals = useQuery({
+    queryKey: ['requests', 'pending-my-approval'],
+    queryFn: () => api<RequestRow[]>('/requests/pending-my-approval'),
+    refetchInterval: 60000,
+  });
   const all = useQuery({
     queryKey: ['requests', 'all-open'],
     queryFn: () => api<RequestRow[]>('/requests?scope=all'),
@@ -203,6 +210,36 @@ export default function Requests() {
         </Link>
       </div>
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
+
+      {(myApprovals.data?.length ?? 0) > 0 &&
+        section(
+          'Your decision',
+          'Someone is asking for a device you are holding. You decide, not the desk.',
+          <RequestTable
+            rows={myApprovals.data}
+            empty=""
+            actions={(r) => (
+              <span className="flex gap-1.5">
+                <button
+                  data-testid="request-approve"
+                  onClick={() => act.mutate({ id: r.id, verb: 'approve' })}
+                  disabled={act.isPending && act.variables?.id === r.id}
+                  className={`${btn} bg-accent text-white`}
+                >
+                  Approve
+                </button>
+                <button
+                  data-testid="request-reject"
+                  onClick={() => setRejectFor(r)}
+                  disabled={act.isPending && act.variables?.id === r.id}
+                  className={`${btn} border border-neutral-300 text-red-700`}
+                >
+                  Reject
+                </button>
+              </span>
+            )}
+          />,
+        )}
 
       {staffUser &&
         section(

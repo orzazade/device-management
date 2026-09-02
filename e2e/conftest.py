@@ -25,6 +25,7 @@ Design notes worth knowing before adding tests:
 
 from __future__ import annotations
 
+import itertools
 import os
 import pathlib
 import shutil
@@ -275,6 +276,14 @@ def as_tester(login_page, accounts, shell) -> AppShell:
 # --------------------------------------------------------------- test devices
 
 
+# One counter for the whole run, so no two devices can ever share a suffix.
+# The previous scheme mixed in `time.time()*1000 % 100000`, which repeats every
+# 100 seconds — over a 13-minute run two tests creating their first device at
+# the same point in that cycle minted the same serial and the API (rightly)
+# returned 409.
+_device_seq = itertools.count(1)
+
+
 @pytest.fixture
 def new_device(admin_api: Api, run_id: str, seed_project):
     """Mint a device with a unique serial, so tests never collide.
@@ -284,8 +293,10 @@ def new_device(admin_api: Api, run_id: str, seed_project):
     made: list[dict] = []
 
     def _make(brand: str = "Samsung", os_name: str = "Android", **extra) -> dict:
-        n = len(made) + 1
-        suffix = f"{run_id}-{n}-{int(time.time() * 1000) % 100000}"
+        # Zero-padded so no model name is a prefix of another: row
+        # locators match on `contains()`, and "…-1" would otherwise
+        # also match "…-11".
+        suffix = f"{run_id}-{next(_device_seq):03d}"
         body = {
             "brand": brand,
             "model": extra.pop("model", f"Galaxy {suffix}"),
@@ -370,7 +381,11 @@ def active_loan(pending_request, admin_api: Api):
     def _make(days_ahead: int = 0, span: int = 2) -> tuple[dict, dict]:
         skip_if_handover_blocked()
         device, req = pending_request(days_ahead=days_ahead, span=span)
-        admin_api.approve(req["id"])
+        # Free devices auto-approve under the 'busy_only' and 'holder'
+        # policies, and approving an approved request is a 409 — so only
+        # approve when it is actually still waiting.
+        if req.get("state") == "pending":
+            admin_api.approve(req["id"])
         admin_api.handover(req["id"])
         return device, admin_api.find_request_for_device(device["id"])
 
@@ -396,6 +411,23 @@ def fresh_tester(root_api: Api) -> dict:
         account["name"], account["email"], account["password"], "tester"
     )["id"]
     return account
+
+
+@pytest.fixture
+def approval_mode(admin_api: Api):
+    """Switch the lab's approval policy for one test and put it back after.
+
+    The policy is global server state, so a test that leaves it changed
+    silently rewrites what every later test means.
+    """
+    original = admin_api.settings()["approvalMode"]
+
+    def _set(mode: str) -> None:
+        admin_api.set_approval_mode(mode)
+
+    yield _set
+    if admin_api.settings()["approvalMode"] != original:
+        admin_api.set_approval_mode(original)
 
 
 @pytest.fixture
@@ -461,6 +493,14 @@ def pytest_runtest_makereport(item, call):
     target = SCREENSHOT_DIR / f"{item.name}.png"
     try:
         drv.save_screenshot(str(target))
-        report.sections.append(("Selenium", f"screenshot: {target}\nurl: {drv.current_url}"))
+        # The screenshot only shows the viewport, and this app's pages are
+        # long — a row that failed to appear is usually below the fold. Save
+        # the DOM too, so an intermittent failure is diagnosable from the
+        # artefacts alone instead of needing a re-run to reproduce.
+        html = SCREENSHOT_DIR / f"{item.name}.html"
+        html.write_text(drv.page_source, encoding="utf-8")
+        report.sections.append(
+            ("Selenium", f"screenshot: {target}\ndom: {html}\nurl: {drv.current_url}")
+        )
     except Exception:
         pass

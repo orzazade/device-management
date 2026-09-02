@@ -123,17 +123,20 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         },
       });
       // Config flag (GOALS.md): 'all' = everything needs approval (launch),
-      // 'busy_only' = a free device auto-approves.
+      // 'busy_only' = a free device auto-approves, 'holder' = whoever is
+      // holding the device decides, and managers stay out of it.
       const mode = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
+      const holderDecides = mode?.value === 'holder';
       // Pre-check instead of relying on the constraint: a constraint hit here
       // would roll back the whole transaction and the tester's request would
       // vanish. On conflict the request simply stays pending for staff.
+      const autoApproveMode = mode?.value === 'busy_only' || holderDecides;
       const busy =
-        mode?.value === 'busy_only' &&
+        autoApproveMode &&
         (device.holderId !== null ||
           (await conflictingBooking(ctx, device.id, data.fromDate, data.toDate, request.id)));
       let autoApproved = false;
-      if (mode?.value === 'busy_only' && !busy) {
+      if (autoApproveMode && !busy) {
         transition(request, 'approved');
         autoApproved = true;
         try {
@@ -159,7 +162,16 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
         await notify(ctx.manager, 'handover_pending', await staffIds(ctx.manager),
           `Hand ${device.brand} ${device.model} from the lab desk to ${requesterName}`,
           { requestId: request.id }, '/handovers');
+      } else if (holderDecides && device.holderId) {
+        // Peer approval: the person actually holding the phone is the one
+        // being asked to give it up, so they are the one who hears about it.
+        await notify(ctx.manager, 'request_created', [device.holderId],
+          `${requesterName} is asking for ${device.brand} ${device.model} you are holding (${data.fromDate} – ${data.toDate}) — approve or reject it`,
+          { requestId: request.id }, '/requests');
       } else {
+        // Either the desk decides (mode 'all'), or nobody holds the device and
+        // it could not be auto-approved because the dates clash with an
+        // existing booking — there is no holder to ask, so the desk decides.
         await notify(ctx.manager, 'request_created', await staffIds(ctx.manager),
           `${requesterName} requested ${device.brand} ${device.model} (${data.fromDate} – ${data.toDate})`,
           { requestId: request.id }, '/approvals');
@@ -189,6 +201,24 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
       const selfRequest =
         actor.id === request.requesterId || actor.id === request.createdById;
       let auditAction: string = decision;
+
+      // Who is allowed to decide at all. Normally the desk; under the
+      // 'holder' policy the person holding the device decides instead and
+      // staff stay out of it. A device with no holder has nobody to ask, so
+      // it falls back to the desk — otherwise such a request could never be
+      // answered by anyone.
+      const mode = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
+      const holderDecides = mode?.value === 'holder' && request.device?.holderId != null;
+      const isStaff = actorRole === 'admin' || actorRole === 'manager';
+      if (holderDecides) {
+        if (actor.id !== request.device.holderId) {
+          throw new ForbiddenException(
+            'Only the person holding this device can decide this request',
+          );
+        }
+      } else if (!isStaff) {
+        throw new ForbiddenException('Only an Admin or Manager can decide this request');
+      }
       if (decision === 'approved') {
         // Approving your own request: a Manager needs a second pair of
         // eyes; the Admin may, but the audit row says so explicitly.

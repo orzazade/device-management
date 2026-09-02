@@ -28,8 +28,8 @@ class RulePatchDto {
 }
 
 class ApprovalModeDto {
-  @IsIn(['all', 'busy_only'])
-  mode: 'all' | 'busy_only';
+  @IsIn(['all', 'busy_only', 'holder'])
+  mode: 'all' | 'busy_only' | 'holder';
 }
 
 @Controller()

@@ -183,15 +183,33 @@ export class RequestsController {
     return mine.map(pub);
   }
 
+  /** Staff decide, unless the 'holder' policy is on and someone is holding
+   *  the device — then only that person may. Enforced in DecideRequestHandler,
+   *  which is the only place that can see the policy and the holder together. */
+  /** Pending requests waiting for THIS user to decide, because they hold the
+   *  device. Empty unless the 'holder' approval policy is on — mirrors
+   *  pending-handover, which answers the same question for handovers. */
+  @Get('pending-my-approval')
+  async pendingMyApproval(@Req() req: { user: AuthUser }) {
+    const mode = await this.db.settings().findOne({ where: { key: 'approval_mode' } });
+    if (mode?.value !== 'holder') return [];
+    const all = await this.db.requests().find({
+      where: { state: 'pending' },
+      relations: { device: { holder: true }, requester: true, project: true },
+      order: { createdAt: 'DESC' },
+    });
+    return all
+      .filter((r) => r.device?.holderId === req.user.sub && r.requesterId !== req.user.sub)
+      .map(pub);
+  }
+
   @Post(':id/approve')
-  @Roles('admin', 'manager')
   async approve(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     await this.bus.execute(new DecideRequestCommand(actor(req), id, 'approved', req.user.role));
     return this.reload(id);
   }
 
   @Post(':id/reject')
-  @Roles('admin', 'manager')
   async reject(
     @Param('id') id: string,
     @Body() dto: RejectDto,

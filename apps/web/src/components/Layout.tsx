@@ -77,6 +77,14 @@ export default function Layout() {
     enabled: !!user && staff,
     refetchInterval: 30000,
   });
+  // Under the 'holder' policy a request can be waiting on anyone, not just
+  // staff — without this the person who has to decide never sees a badge.
+  const myApprovals = useQuery({
+    queryKey: ['requests', 'pending-my-approval'],
+    queryFn: () => api<RequestRow[]>('/requests/pending-my-approval'),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
   const dash = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => api<{ openRepairs: number }>('/reports/dashboard'),
@@ -161,6 +169,7 @@ export default function Layout() {
             n={
               (handovers.data?.length ?? 0) +
               (approvals.data?.length ?? 0) +
+              (myApprovals.data?.length ?? 0) +
               (overdue.data?.length ?? 0)
             }
           />

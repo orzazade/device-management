@@ -8,6 +8,7 @@ from .projects_page import ProjectDialog, ProjectsPage
 from .repairs_page import ADVANCE_LABELS, RepairConfirm, RepairsPage, WriteOffDialog
 from .requests_page import (
     SECTION_HANDOVER,
+    SECTION_MINE,
     SECTION_OUT_NOW,
     SECTION_OVERDUE,
     SECTION_PENDING,
@@ -54,6 +55,7 @@ __all__ = [
     "ReturnDialog",
     "ReturnIntentConfirm",
     "SECTION_HANDOVER",
+    "SECTION_MINE",
     "SECTION_OUT_NOW",
     "SECTION_OVERDUE",
     "SECTION_PENDING",

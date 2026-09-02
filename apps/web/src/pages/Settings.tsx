@@ -110,7 +110,7 @@ export default function Settings() {
             <b>Every request needs approval</b> (launch policy)
           </span>
         </label>
-        <label className="flex items-start gap-2.5">
+        <label className="mb-2 flex items-start gap-2.5">
           <input
             type="radio"
             name="approvalMode"
@@ -122,6 +122,21 @@ export default function Settings() {
           <span>
             <b>Free devices auto-approve</b> — approval only when the device is in someone’s
             hands
+          </span>
+        </label>
+        <label className="flex items-start gap-2.5">
+          <input
+            type="radio"
+            name="approvalMode"
+            checked={mode === 'holder'}
+            disabled={user?.role !== 'admin'}
+            onChange={() => setMode.mutate('holder')}
+            className="mt-1"
+          />
+          <span>
+            <b>Whoever holds the device approves</b> — the request goes straight to the
+            person using the phone, and managers stay out of it. A free device
+            auto-approves, since there is nobody to ask.
           </span>
         </label>
         {user?.role !== 'admin' && (

@@ -19,6 +19,9 @@ from selenium.webdriver.common.by import By
 from .base_page import BasePage, xq
 
 SECTION_PENDING = "Waiting for approval"
+# Only shown under the 'holder' approval policy: requests this user must
+# decide because they are holding the device.
+SECTION_MINE = "Your decision"
 SECTION_HANDOVER = "Hand these over"
 SECTION_OUT_NOW = "Out now"
 SECTION_OVERDUE = "Overdue — chase these"
@@ -96,6 +99,15 @@ class RequestsPage(BasePage):
         self.click(self._action(SECTION_PENDING, device_text, "Reject"))
         return RejectDialog(self.driver, self.base_url).wait_open()
 
+    # --- decisions that belong to the holder, not the desk ----------------
+
+    def approve_as_holder(self, device_text: str) -> None:
+        self.click(self._action(SECTION_MINE, device_text, "Approve"))
+
+    def reject_as_holder(self, device_text: str) -> "RejectDialog":
+        self.click(self._action(SECTION_MINE, device_text, "Reject"))
+        return RejectDialog(self.driver, self.base_url).wait_open()
+
     def confirm_handover(self, device_text: str) -> None:
         self.click(self._action(SECTION_HANDOVER, device_text, "Confirm handover"))
 
@@ -127,25 +139,57 @@ class RequestsPage(BasePage):
             f"//button[normalize-space()={xq(label)}]",
         )
 
+    def _own_row(self, device_text: str) -> tuple[str, str]:
+        return (
+            By.XPATH,
+            f"//h2[normalize-space()='My requests' or normalize-space()='All requests']"
+            f"/following::table[1]/tbody/tr[contains(., {xq(device_text)})]",
+        )
+
+    def _click_own_action(self, device_text: str, label: str, timeout: int = 20) -> None:
+        """Click a personal action, saying plainly which half went missing.
+
+        "Button never became clickable" is ambiguous: the personal list may
+        still be loading, the row may be absent, or the row may be there in a
+        state that offers no such button. Waiting for the row first turns one
+        vague timeout into a message that names the actual cause.
+        """
+        if not self.is_visible(self._own_row(device_text), timeout):
+            raise AssertionError(
+                f"no row for {device_text!r} under My requests — the personal "
+                f"list is empty, still loading, or filtered to the wrong tab"
+            )
+        if not self.is_visible(self._own_action(device_text, label), 5):
+            state = "unknown"
+            try:
+                state = self.own_state_of(device_text, timeout=2)
+            except Exception:
+                pass
+            raise AssertionError(
+                f"the row for {device_text!r} is there (state {state!r}) but "
+                f"offers no {label!r} button"
+            )
+        self.click(self._own_action(device_text, label))
+
     def has_own_action(self, device_text: str, label: str, timeout: int = 5) -> bool:
         return self.is_visible(self._own_action(device_text, label), timeout)
 
     def cancel_pending(self, device_text: str) -> None:
         """A pending request is dropped outright — no confirmation."""
-        self.click(self._own_action(device_text, "Cancel"))
+        self._click_own_action(device_text, "Cancel")
 
     def cancel_booking(self, device_text: str) -> "BookingCancelConfirm":
         """An approved booking asks first: releasing it cannot be undone."""
-        self.click(self._own_action(device_text, "Cancel booking"))
+        self._click_own_action(device_text, "Cancel booking")
         return BookingCancelConfirm(self.driver, self.base_url).wait_open()
 
     def extend(self, device_text: str) -> "ExtendDialog":
-        self.click(self._own_action(device_text, "Extend"))
+        self._click_own_action(device_text, "Extend")
         return ExtendDialog(self.driver, self.base_url).wait_open()
 
     def offer_return(self, device_text: str) -> "ReturnIntentConfirm":
         """A tester cannot check a device in — they notify the desk instead."""
-        self.click(self._own_action(device_text, "Return"))
+        self._click_own_action(device_text, "Return")
         return ReturnIntentConfirm(self.driver, self.base_url).wait_open()
 
     def own_state_of(self, device_text: str, timeout: int = 10) -> str:
