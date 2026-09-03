@@ -12,6 +12,7 @@ import {
 } from '../entities/notification.entity';
 import { Project } from '../entities/project.entity';
 import { Repair } from '../entities/repair.entity';
+import { Permission, Role, UserRole } from '../entities/rbac.entity';
 import { User } from '../entities/user.entity';
 import { Init1724500000000 } from '../migrations/1724500000000-init';
 import { UsersAudit1724600000000 } from '../migrations/1724600000000-users-audit';
@@ -31,6 +32,7 @@ import { SpecsFreeForm1725900000000 } from '../migrations/1725900000000-specs-fr
 import { RequestProject1726000000000 } from '../migrations/1726000000000-request-project';
 import { Squads1726100000000 } from '../migrations/1726100000000-squads';
 import { DropManagerRole1726200000000 } from '../migrations/1726200000000-drop-manager-role';
+import { RbacTables1726300000000 } from '../migrations/1726300000000-rbac-tables';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -48,6 +50,9 @@ export const dataSourceOptions: DataSourceOptions = {
     NotificationRule,
     EmailOutbox,
     Repair,
+    Permission,
+    Role,
+    UserRole,
   ],
   migrations: [
     Init1724500000000,
@@ -68,6 +73,7 @@ export const dataSourceOptions: DataSourceOptions = {
     RequestProject1726000000000,
     Squads1726100000000,
     DropManagerRole1726200000000,
+    RbacTables1726300000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

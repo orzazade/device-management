@@ -11,6 +11,7 @@ import {
 } from '../entities/notification.entity';
 import { Project } from '../entities/project.entity';
 import { Repair } from '../entities/repair.entity';
+import { Permission, Role, UserRole } from '../entities/rbac.entity';
 import { User } from '../entities/user.entity';
 
 /**
@@ -35,6 +36,18 @@ export class AppDbContext {
 
   users(manager?: EntityManager): Repository<User> {
     return this.m(manager).getRepository(User);
+  }
+
+  permissions(manager?: EntityManager): Repository<Permission> {
+    return this.m(manager).getRepository(Permission);
+  }
+
+  roles(manager?: EntityManager): Repository<Role> {
+    return this.m(manager).getRepository(Role);
+  }
+
+  userRoles(manager?: EntityManager): Repository<UserRole> {
+    return this.m(manager).getRepository(UserRole);
   }
 
   auditLogs(manager?: EntityManager): Repository<AuditLog> {
