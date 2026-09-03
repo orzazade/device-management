@@ -19,7 +19,7 @@ export class AuditController {
   /** Filterable, keyset-paginated. `beforeId` = id of the oldest row the
    * client already has; results are always newest-first. */
   @Get()
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async list(
     @Query('limit') limit?: string,
     @Query('entityType') entityType?: string,
@@ -46,7 +46,7 @@ export class AuditController {
   /** The whole filtered log as CSV, streamed in keyset batches — never a
    * silently truncated file. Same filters as the list. */
   @Get('export.csv')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async exportCsv(
     @Res() res: StreamReply,
     @Query('entityType') entityType?: string,

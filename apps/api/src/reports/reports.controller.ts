@@ -29,7 +29,7 @@ export class ReportsController {
       SELECT COUNT(*)::int AS n FROM repairs
       WHERE state IN ('reported','repair_requested','in_repair')
     `);
-    const staff = req.user.role === 'admin' || req.user.role === 'manager';
+    const staff = req.user.role === 'admin';
     let overdue: unknown[] = [];
     if (staff) {
       overdue = (
@@ -52,7 +52,7 @@ export class ReportsController {
   }
 
   @Get('idle-devices')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async idleDevices(@Query('days') days?: string) {
     const n = Math.min(Math.max(parseInt(days ?? '90', 10) || 90, 7), 365);
     // "Activity" = real usage: the end of a loan's window (or its creation

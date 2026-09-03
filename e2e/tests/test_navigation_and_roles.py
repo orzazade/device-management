@@ -1,7 +1,7 @@
 """Sidebar navigation, page titles, and what each role is allowed to reach.
 
 Role rules under test (App.tsx / Layout.tsx):
-  * admin and manager see the Manage section; testers do not
+  * the admin sees the Manage section; testers do not
   * a tester who types a staff URL is bounced back to the dashboard
   * unknown routes render the 404 page inside the shell, not a blank screen
 """
@@ -59,9 +59,11 @@ def test_page_title_follows_the_route(as_admin: AppShell):
     assert as_admin.document_title == "Dashboard · Azercell Device Management"
 
 
-def test_manager_sees_the_manage_section(as_manager: AppShell):
+def test_the_admin_sees_every_manage_link(as_admin: AppShell):
+    """With the manager tier gone, the Admin is the only role that runs the
+    lab — so every staff page has to be reachable from their sidebar."""
     for label in STAFF_ONLY:
-        assert as_manager.has_nav_link(label), f"a manager should see {label!r}"
+        assert as_admin.has_nav_link(label), f"an admin should see {label!r}"
 
 
 def test_tester_sidebar_hides_every_staff_page(as_tester: AppShell):

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, SESSION_EXPIRED_EVENT, api, tokenStore } from './api';
 import { queryClient } from './queryClient';
 
-export type Role = 'admin' | 'manager' | 'tester';
+export type Role = 'admin' | 'tester';
 export interface Me {
   id: string;
   name: string;
@@ -30,7 +30,8 @@ interface AuthState {
 
 const Ctx = createContext<AuthState>(null!);
 export const useAuth = () => useContext(Ctx);
-export const isStaff = (r?: Role) => r === 'admin' || r === 'manager';
+/** The desk is the Admin, and only the Admin. */
+export const isStaff = (r?: Role) => r === 'admin';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);

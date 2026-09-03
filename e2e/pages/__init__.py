@@ -7,13 +7,12 @@ from .login_page import ChangePasswordModal, LoginPage
 from .projects_page import ProjectDialog, ProjectsPage
 from .repairs_page import ADVANCE_LABELS, RepairConfirm, RepairsPage, WriteOffDialog
 from .requests_page import (
-    SECTION_HANDOVER,
+    SECTION_BOOKED_AHEAD,
     SECTION_MINE,
     SECTION_OUT_NOW,
     SECTION_OVERDUE,
     SECTION_PENDING,
     BookingCancelConfirm,
-    CantHandOverDialog,
     ExtendDialog,
     RejectDialog,
     RequestsPage,
@@ -31,7 +30,6 @@ __all__ = [
     "AuditPage",
     "BasePage",
     "BookingCancelConfirm",
-    "CantHandOverDialog",
     "ChangePasswordModal",
     "ConfirmDialog",
     "Dashboard",
@@ -54,7 +52,7 @@ __all__ = [
     "RequestsPage",
     "ReturnDialog",
     "ReturnIntentConfirm",
-    "SECTION_HANDOVER",
+    "SECTION_BOOKED_AHEAD",
     "SECTION_MINE",
     "SECTION_OUT_NOW",
     "SECTION_OVERDUE",

@@ -119,7 +119,7 @@ export default function RequestModal({
           )}
           {projects.data?.length === 0 && (
             <span className="mt-1 block text-xs text-amber-700">
-              No projects yet — ask a manager to add one under Projects.
+              No projects yet — ask an admin to add one under Projects.
             </span>
           )}
         </label>

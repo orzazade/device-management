@@ -23,7 +23,6 @@ import { ReportsController } from './reports/reports.controller';
 import { ProjectsController } from './projects/projects.controller';
 import {
   CancelRequestHandler,
-  ConfirmHandoverHandler,
   CreateRequestHandler,
   DecideRequestHandler,
   OverrideTimeHandler,
@@ -73,8 +72,7 @@ import { UsersController } from './users/users.controller';
     CreateRequestHandler,
     DecideRequestHandler,
     OverrideTimeHandler,
-    ConfirmHandoverHandler,
-    CancelRequestHandler,
+      CancelRequestHandler,
     ReturnRequestHandler,
     JobsService,
   ],

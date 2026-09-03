@@ -21,7 +21,12 @@ export type RequestState =
 
 /** Legal transitions — the server enforces these; anything else is a 409. */
 export const REQUEST_TRANSITIONS: Record<RequestState, RequestState[]> = {
-  pending: ['approved', 'rejected', 'cancelled'],
+  // 'active' straight from 'pending' is the normal path now: granting a
+  // request IS the handover, so the device changes hands the moment the
+  // holder says yes (or the moment someone takes a device nobody holds).
+  pending: ['active', 'approved', 'rejected', 'cancelled'],
+  // 'approved' is now only a booking made for a later date, waiting for its
+  // start morning.
   approved: ['active', 'cancelled'],
   active: ['returned', 'overdue'],
   // 'active' = the loan was extended past today, so it is no longer late.

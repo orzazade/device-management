@@ -22,7 +22,7 @@ SECTION_PENDING = "Waiting for approval"
 # Only shown under the 'holder' approval policy: requests this user must
 # decide because they are holding the device.
 SECTION_MINE = "Your decision"
-SECTION_HANDOVER = "Hand these over"
+SECTION_BOOKED_AHEAD = "Booked for later"
 SECTION_OUT_NOW = "Out now"
 SECTION_OVERDUE = "Overdue — chase these"
 
@@ -107,9 +107,6 @@ class RequestsPage(BasePage):
     def reject_as_holder(self, device_text: str) -> "RejectDialog":
         self.click(self._action(SECTION_MINE, device_text, "Reject"))
         return RejectDialog(self.driver, self.base_url).wait_open()
-
-    def confirm_handover(self, device_text: str) -> None:
-        self.click(self._action(SECTION_HANDOVER, device_text, "Confirm handover"))
 
     def check_in(self, device_text: str, section: str = SECTION_OUT_NOW) -> "ReturnDialog":
         self.click(self._action(section, device_text, "Check in"))
@@ -243,9 +240,6 @@ class RequestsPage(BasePage):
         self.click(self._action(SECTION_PENDING, device_text, "Time…"))
         return TimeOverrideDialog(self.driver, self.base_url).wait_open()
 
-    def cant_hand_over(self, device_text: str) -> "CantHandOverDialog":
-        self.click(self._action(SECTION_HANDOVER, device_text, "Can\u2019t hand over"))
-        return CantHandOverDialog(self.driver, self.base_url).wait_open()
 
 
 class RejectDialog(BasePage):
@@ -345,32 +339,32 @@ class TimeOverrideDialog(BasePage):
     def selected_summary(self) -> str:
         return self.find((By.XPATH, "//p[contains(., 'Selected:')]")).text.strip()
 
+    SELECTED = (By.XPATH, "//p[contains(., 'Selected:')]")
+
     def pick_range(self, span_days: int = 1) -> None:
+        """Pick a range the calendar will actually accept.
+
+        Booked days are disabled, but a range that *spans* one is refused
+        after the fact ("That range crosses a booked day"), and the widget
+        then treats the day just clicked as a new start. So walking forward
+        and re-checking is not a workaround — it is how the control behaves,
+        and blindly taking the first two free-looking days fails the moment
+        the device has any existing booking.
+        """
         days = self.find_all(self.SELECTABLE_DAYS)
+        assert len(days) > span_days, "the calendar offered no range to pick"
         self._click_element(days[0])
-        days = self.find_all(self.SELECTABLE_DAYS)
-        self._click_element(days[span_days])
+        for end in range(span_days, len(days)):
+            days = self.find_all(self.SELECTABLE_DAYS)
+            self._click_element(days[end])
+            if self.is_visible(self.SELECTED, timeout=1):
+                return
+        raise AssertionError("no free gap in the calendar to pick a range from")
 
     def submit(self) -> None:
         self.click(self.SUBMIT)
 
 
-class CantHandOverDialog(BasePage):
-    HEADING = (By.XPATH, "//h2[starts-with(normalize-space(), 'Can')]")
-    NOTE = (By.CSS_SELECTOR, "textarea[name='note']")
-    SUBMIT = (By.XPATH, "//button[contains(normalize-space(), 'Yes, cancel this booking')]")
-    BACK = (By.XPATH, "//button[normalize-space()='Back']")
-
-    def wait_open(self) -> "CantHandOverDialog":
-        self.find(self.NOTE)
-        return self
-
-    def with_note(self, text: str) -> "CantHandOverDialog":
-        self.type(self.NOTE, text)
-        return self
-
-    def submit(self) -> None:
-        self.click(self.SUBMIT)
 
 
 class BookingCancelConfirm(BasePage):

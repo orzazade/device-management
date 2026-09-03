@@ -1,19 +1,17 @@
-"""One device, followed end to end, through all three roles.
+"""One device, followed end to end, through both roles.
 
 The other files test each screen. This one tests the *hand-offs* — the points
-where work passes from a Tester to a Manager to an Admin — because that is
-where a role boundary either holds or leaks, and no single-role test can see
-it.
+where work passes between a Tester and the Admin — because that is where a
+role boundary either holds or leaks, and no single-role test can see it.
 
 The story, in the order the lab actually lives it:
 
-    Manager  adds a phone and files it under a project
-    Tester   asks for it, giving dates, a reason and the project
-    Manager  approves the request and hands the phone over
-    Tester   damages it and sends it to repair
-    Manager  takes it through the repair queue and back to available
-    Admin    sees the whole thing in the audit log, and does the two things
-             only an Admin can do
+    Admin   adds a phone and files it under a project
+    Tester  asks for it — and since nobody was holding it, it is his at once
+    Tester  damages it and sends it to repair
+    Admin   takes it through the repair queue and back to available
+    Admin   sees the whole thing in the audit log, and does the things only
+            an Admin can do
 """
 
 from __future__ import annotations
@@ -23,10 +21,8 @@ import time
 import pytest
 
 from api_client import Api
-from conftest import skip_if_handover_blocked
 from pages import (
-    SECTION_HANDOVER,
-    SECTION_PENDING,
+        SECTION_PENDING,
     AuditPage,
     DeviceDetailPage,
     DevicesPage,
@@ -70,7 +66,7 @@ def _sign_in(login_page: LoginPage, account: dict) -> None:
 
 
 @pytest.mark.smoke
-def test_one_phone_through_manager_tester_and_admin(
+def test_one_phone_through_the_admin_and_a_tester(
     login_page: LoginPage,
     devices_page: DevicesPage,
     detail: DeviceDetailPage,
@@ -82,13 +78,12 @@ def test_one_phone_through_manager_tester_and_admin(
     seed_project,
     run_id: str,
 ):
-    skip_if_handover_blocked()
     serial = f"SNJRNY{run_id}{int(time.time()) % 10000}"
     model = f"Galaxy Journey {run_id}"
-    tester, manager = accounts["tester"], accounts["manager"]
+    tester, admin = accounts["tester"], accounts["admin"]
 
-    # ---- 1. MANAGER puts a phone into the lab --------------------------
-    _sign_in(login_page, manager)
+    # ---- 1. ADMIN puts a phone into the lab ----------------------------
+    _sign_in(login_page, admin)
     devices_page.open_devices()
     add = devices_page.open_add_device()
     add.fill(
@@ -120,23 +115,12 @@ def test_one_phone_through_manager_tester_and_admin(
     dialog.submit()
     requests_page.wait_for_toast("Request submitted")
     requests_page.wait_for_path("/requests")
-    assert requests_page.own_state_of(model) == "Pending"
 
-    # A tester cannot approve their own request — the buttons are not theirs.
+    # ---- 3. nobody held it, so it is his the moment he asks ------------
+    assert requests_page.own_state_of(model) == "Active"
     assert not requests_page.has_section(SECTION_PENDING, timeout=3), (
         "the approval queue must not be visible to a tester"
     )
-
-    # ---- 3. MANAGER approves and hands it over -------------------------
-    _sign_in(login_page, manager)
-    requests_page.open_requests()
-    assert requests_page.has_row_in(SECTION_PENDING, model)
-    assert requests_page.requester_of(model) == tester["name"]
-
-    requests_page.approve(model)
-    requests_page.wait_for_toast("Approved")
-    requests_page.confirm_handover(model)
-    requests_page.wait_for_toast("Handover confirmed")
 
     handed_over = admin_api.device(device["id"])
     assert handed_over["status"] == "assigned"
@@ -162,7 +146,7 @@ def test_one_phone_through_manager_tester_and_admin(
     )
 
     # ---- 5. MANAGER runs the repair to completion ----------------------
-    _sign_in(login_page, manager)
+    _sign_in(login_page, admin)
     repairs_page.open_repairs()
     repairs_page.advance(model)                       # → repair requested
     repairs_page.wait_for_toast("moved forward")
@@ -173,9 +157,10 @@ def test_one_phone_through_manager_tester_and_admin(
     repairs_page.wait_for_state(model, "In repair")
     assert admin_api.device(device["id"])["status"] == "in_repair"
 
-    # Scrapping the phone is an Admin decision, not a Manager's.
-    assert not repairs_page.has_button(model, "Write off…", timeout=3), (
-        "a manager must not be able to write a device off"
+    # Scrapping the phone is an Admin decision, and the Admin is signed in,
+    # so the option is theirs to see.
+    assert repairs_page.has_button(model, "Write off…", timeout=3), (
+        "an admin should be offered the write-off option"
     )
 
     repairs_page.advance(model)                       # → fixed
@@ -191,7 +176,7 @@ def test_one_phone_through_manager_tester_and_admin(
     _sign_in(login_page, accounts["admin"])
 
     audit_page.open_audit()
-    audit_page.wait_for_entry("device", "created", manager["name"])
+    audit_page.wait_for_entry("device", "created", admin["name"])
     audit_page.filter_actor(tester["name"])
     actors = audit_page.actors()
     assert actors and all(a == tester["name"] for a in actors), (
@@ -207,10 +192,15 @@ def test_one_phone_through_manager_tester_and_admin(
         users_page.row_for(tester["email"])[1] + "//select",
     )
     assert users_page.is_present(role_select, timeout=5), (
-        "an admin can change roles — a manager cannot"
+        "only an admin can change roles"
     )
 
     from pages import SettingsPage
 
     settings = SettingsPage(login_page.driver, login_page.base_url).open_settings()
-    assert settings.mode_inputs_enabled(), "an admin owns the approval policy"
+    assert settings.is_visible(settings.FLOW_HEADING), (
+        "the admin can read how devices change hands"
+    )
+    assert settings.is_visible(settings.NOTIFICATIONS_HEADING), (
+        "and owns the notification rules"
+    )

@@ -1,6 +1,6 @@
 """The branches of the loan flow that are not the happy path.
 
-Cancelling, extending, a tester handing back, a holder refusing a handover,
+Cancelling, extending, a tester handing back, a holder refusing a request,
 and the desk moving someone's dates before approving.
 """
 
@@ -12,7 +12,7 @@ import pytest
 
 from api_client import Api
 from pages import (
-    SECTION_HANDOVER,
+    SECTION_MINE,
     SECTION_OUT_NOW,
     SECTION_PENDING,
     DevicesPage,
@@ -45,7 +45,7 @@ def _iso(days_ahead: int) -> str:
 def test_a_requester_can_withdraw_a_pending_request(
     login_page, accounts, requests_page: RequestsPage, admin_api: Api, pending_request
 ):
-    device, _ = pending_request()
+    device, req, holder = pending_request()
     label = device["model"]
 
     _sign_in(login_page, accounts["tester"])
@@ -57,25 +57,33 @@ def test_a_requester_can_withdraw_a_pending_request(
 
     requests_page.show_all()
     requests_page.wait_for_own_state(label, "Cancelled")
-    assert admin_api.find_request_for_device(device["id"])["state"] == "cancelled"
-    assert admin_api.device(device["id"])["status"] == "available"
+    # Look it up by id: the device carries the holder's loan as well as this
+    # withdrawn request, so a device-based lookup could read either.
+    assert admin_api.request_by_id(req["id"])["state"] == "cancelled"
+    assert admin_api.device(device["id"])["status"] == "assigned", (
+        "withdrawing a request leaves the phone with whoever already had it"
+    )
 
 
 def test_cancelling_an_approved_booking_asks_first(
     login_page, accounts, requests_page: RequestsPage, admin_api: Api, pending_request
 ):
-    """Releasing an approved booking cannot be undone, so it is confirmed."""
-    device, req = pending_request()
+    """Releasing an approved booking cannot be undone, so it is confirmed.
+
+    'Approved' only exists for a booking made for a later date now — one
+    starting today is assigned on the spot — so this books ahead.
+    """
+    device, req, holder = pending_request(days_ahead=3, span=1)
     admin_api.approve(req["id"])
     label = device["model"]
 
     _sign_in(login_page, accounts["tester"])
     requests_page.open_requests()
-    requests_page.wait_for_own_state(label, "Awaiting handover")
+    requests_page.wait_for_own_state(label, "Booked")
 
     confirm = requests_page.cancel_booking(label)
     confirm.dismiss()
-    assert requests_page.own_state_of(label) == "Awaiting handover", (
+    assert requests_page.own_state_of(label) == "Booked", (
         "backing out of the dialog keeps the booking"
     )
 
@@ -83,7 +91,7 @@ def test_cancelling_an_approved_booking_asks_first(
     confirm.confirm()
     requests_page.wait_for_toast("cancel")
 
-    assert admin_api.find_request_for_device(device["id"])["state"] == "cancelled"
+    assert admin_api.request_by_id(req["id"])["state"] == "cancelled"
 
 
 @pytest.mark.smoke
@@ -106,7 +114,7 @@ def test_a_holder_can_extend_a_loan(
     dialog.submit()
     requests_page.wait_for_toast("Extended")
 
-    assert admin_api.find_request_for_device(device["id"])["toDate"] == later
+    assert admin_api.request_by_id(req["id"])["toDate"] == later
 
 
 def test_an_extension_onto_someone_elses_booking_is_refused_with_the_reason(
@@ -151,7 +159,7 @@ def test_a_tester_returning_a_device_notifies_the_desk_instead_of_closing_the_lo
     login_page, accounts, requests_page: RequestsPage, admin_api: Api, active_loan
 ):
     """Only staff can check hardware back in — that is the receipt."""
-    device, _ = active_loan()
+    device, req = active_loan()
     label = device["model"]
 
     _sign_in(login_page, accounts["tester"])
@@ -162,8 +170,8 @@ def test_a_tester_returning_a_device_notifies_the_desk_instead_of_closing_the_lo
     confirm.confirm()
     requests_page.wait_for_toast("desk")
 
-    assert admin_api.find_request_for_device(device["id"])["state"] == "active", (
-        "the loan stays open until a manager physically accepts the device"
+    assert admin_api.request_by_id(req["id"])["state"] == "active", (
+        "the loan stays open until the desk physically accepts the device"
     )
     assert admin_api.device(device["id"])["status"] == "assigned"
 
@@ -176,52 +184,56 @@ def test_a_tester_returning_a_device_notifies_the_desk_instead_of_closing_the_lo
     assert admin_api.device(device["id"])["status"] == "available"
 
 
-def test_a_holder_who_cannot_hand_over_cancels_the_booking_with_a_reason(
+def test_a_holder_who_still_needs_the_phone_rejects_the_request_with_a_reason(
     login_page,
     accounts,
     requests_page: RequestsPage,
     admin_api: Api,
     active_loan,
-    tester_api: Api,
     seed_project,
+    spare_account,
 ):
-    """A device already in someone's hands can be requested by the next
-    person; if the holder still needs it, they say so and the booking dies."""
+    """A phone already in someone's hands can still be asked for — and the
+    person holding it is the one who answers. Saying no needs a reason, and
+    the phone does not move."""
     device, _ = active_loan(days_ahead=0, span=1)
     label = device["model"]
 
-    # The desk books the same device for itself, starting after the loan.
-    follow_up = admin_api.create_request(
-        device["id"], seed_project["id"], "Next in line for the release test", _iso(3), _iso(4)
+    asker = spare_account("rival", role="tester")
+    asker_api = admin_api.as_user(asker["email"], asker["password"])
+    asked = asker_api.create_request(
+        device["id"], seed_project["id"], "Next in line for the release test", _iso(0), _iso(1)
     )
-    admin_api.approve(follow_up["id"])
 
-    # The current holder is the one asked to hand it over.
     _sign_in(login_page, accounts["tester"])
     requests_page.open_requests()
-    assert requests_page.has_row_in(SECTION_HANDOVER, label), (
-        "the handover queue belongs to whoever holds the device"
+    assert requests_page.has_row_in(SECTION_MINE, label), (
+        "the decision belongs to whoever is holding the phone"
     )
 
-    dialog = requests_page.cant_hand_over(label)
+    dialog = requests_page.reject_as_holder(label)
     dialog.submit()
     assert dialog.field_error("note"), "a refusal without a reason helps nobody"
 
     dialog.with_note("Still needed for the release test until Friday")
     dialog.submit()
-    requests_page.wait_for_toast("cancel")
+    requests_page.wait_for_toast("reject")
 
-    refreshed = [
-        r for r in admin_api.requests_all() if r["id"] == follow_up["id"]
-    ][0]
-    assert refreshed["state"] == "cancelled"
+    refreshed = admin_api.request_by_id(asked["id"])
+    assert refreshed["state"] == "rejected"
     assert refreshed["decisionNote"], "the requester must be told why"
+    assert admin_api.device(device["id"])["holder"]["id"] == accounts["tester"]["id"], (
+        "a rejection leaves the phone where it was"
+    )
 
 
 def test_the_desk_can_move_a_requested_time_range_before_approving(
     login_page, accounts, requests_page: RequestsPage, admin_api: Api, pending_request
 ):
-    device, req = pending_request(days_ahead=1, span=1)
+    # Asked for a window well into the month, so the first free gap the
+    # calendar offers is necessarily a different one — otherwise "it moved"
+    # is not something the test can actually tell.
+    device, req, holder = pending_request(days_ahead=8, span=1)
     label = device["model"]
 
     _sign_in(login_page, accounts["admin"])
@@ -234,7 +246,7 @@ def test_the_desk_can_move_a_requested_time_range_before_approving(
     dialog.submit()
     requests_page.wait_for_toast("Time range updated")
 
-    after = admin_api.find_request_for_device(device["id"])
+    after = admin_api.request_by_id(req["id"])
     assert (after["fromDate"], after["toDate"]) != (req["fromDate"], req["toDate"]), (
         "the override should have moved the window"
     )
@@ -246,9 +258,9 @@ def test_a_pending_request_blocks_nothing_but_warns_the_next_requester(
 ):
     """Pending days show as 'requested' in the calendar: pickable, but the
     picker says someone else asked first."""
-    device, _ = pending_request(days_ahead=0, span=3)
+    device, _, holder = pending_request(days_ahead=0, span=3)
 
-    _sign_in(login_page, accounts["manager"])
+    _sign_in(login_page, accounts["admin"])
     devices_page.open_devices()
     devices_page.search(device["serial"])
     devices_page.wait_for_row_count(1)

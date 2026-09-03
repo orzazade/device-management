@@ -141,14 +141,20 @@ def test_the_theme_switch_is_available_before_sign_in(login_page: LoginPage, the
 # ------------------------------------------------------------------- the bell
 
 
-def test_a_new_request_notifies_the_desk(
-    as_admin, bell: NotificationBell, pending_request, accounts
+def test_a_new_request_notifies_the_person_holding_the_device(
+    login_page, shell, bell: NotificationBell, pending_request
 ):
-    """Staff are told when something lands in the approval queue."""
-    device, _ = pending_request()
+    """The alert goes to whoever has to answer it.
 
-    as_admin.open("/")
-    as_admin.wait_heading("Hi,")
+    That is the person holding the phone, not the desk — they are the one
+    being asked to give it up, and nobody else can decide it.
+    """
+    device, _, holder = pending_request()
+
+    login_page.clear_session()
+    login_page.login(holder["email"], holder["password"])
+    shell.open("/")
+    shell.wait_heading("Hi,")
 
     # The bell polls; give it a reload rather than waiting on its interval.
     bell.driver.refresh()

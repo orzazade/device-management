@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from selenium.webdriver.common.by import By
 
 from api_client import Api
 from pages import AuditPage, ReportsPage, SettingsPage
@@ -28,42 +29,25 @@ def reports(driver, base_url) -> ReportsPage:
 # ------------------------------------------------------------------- settings
 
 
-@pytest.fixture
-def restore_approval_mode(admin_api: Api):
-    """Approval mode is global state — put it back however the test ends,
-    or every later request test changes meaning."""
-    before = admin_api.settings()["approvalMode"]
-    yield before
-    if admin_api.settings()["approvalMode"] != before:
-        admin_api.set_approval_mode(before)
-
-
 @pytest.mark.smoke
-def test_the_approval_policy_can_be_flipped_and_flipped_back(
-    as_admin, settings: SettingsPage, admin_api: Api, restore_approval_mode
+def test_settings_explains_the_one_process_instead_of_offering_a_choice(
+    as_admin, settings: SettingsPage
 ):
-    settings.open_settings()
-    assert settings.approval_mode() == "all", "the launch policy is the default"
-
-    settings.choose_mode("busy_only")
-    settings.wait_for_toast("Approval policy saved")
-    assert admin_api.settings()["approvalMode"] == "busy_only"
-
-    # The choice survives a reload — it is server state, not a local toggle.
-    settings.open_settings()
-    settings.wait_for_mode("busy_only")
-
-    settings.choose_mode("all")
-    settings.wait_for_toast("Approval policy saved")
-    assert admin_api.settings()["approvalMode"] == "all"
-
-
-@pytest.mark.rbac
-def test_a_manager_sees_the_policy_but_cannot_change_it(as_manager, settings: SettingsPage):
+    """There is no approval policy to pick any more — the lab has exactly one
+    way of moving a phone, and the page states it rather than offering
+    switches that could put the system into a shape nobody designed for."""
     settings.open_settings()
 
-    assert not settings.mode_inputs_enabled(), "the radios are read-only for a manager"
-    assert settings.is_visible(settings.ADMIN_ONLY_NOTE), "and the page says why"
+    assert settings.is_visible(settings.FLOW_HEADING), (
+        "Settings should explain how devices change hands"
+    )
+    for rule in ["Nobody is holding it", "Somebody is holding it", "Late back"]:
+        assert settings.is_visible(settings.FLOW_RULE(rule)), (
+            f"the page never mentions the {rule!r} case"
+        )
+    assert not settings.find_all((By.CSS_SELECTOR, "input[name='approvalMode']")), (
+        "the old policy radios must be gone, not merely hidden"
+    )
 
 
 def test_the_notification_matrix_names_its_audience(as_admin, settings: SettingsPage):

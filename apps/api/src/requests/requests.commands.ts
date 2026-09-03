@@ -40,6 +40,85 @@ const overlapError = () =>
     'This device already has an approved booking that overlaps this time range',
   );
 
+/** Hand the device to the requester, right now.
+ *
+ * This is the moment the lab actually cares about: the phone stops being
+ * whoever's it was and becomes the requester's. It happens the instant a
+ * request is granted — either because nobody held the device and the
+ * requester simply took it, or because the person holding it said yes.
+ * There is no separate "confirm handover" step: approval *is* the handover.
+ *
+ * A device can only be in one pair of hands, so the previous holder's loan is
+ * closed as part of the same transaction and audited as a transfer, never
+ * left dangling.
+ */
+async function assignDevice(
+  ctx: TransactionalContext,
+  actor: Actor,
+  request: DeviceRequest,
+  auditAction: string,
+): Promise<void> {
+  const device = request.device;
+  if (device.status === 'retired' || device.status === 'in_repair') {
+    throw new ConflictException(
+      `Device is ${device.status.replace('_', ' ')} — it cannot be handed over`,
+    );
+  }
+  const previousHolderId = device.holderId;
+  const previousHolderName = previousHolderId
+    ? ((await ctx.users.findOne({ where: { id: previousHolderId }, withDeleted: true }))?.name ??
+      'unknown')
+    : 'the shelf';
+
+  // Close whatever loan the device was on. Without this the device would
+  // carry two open loans and the "one open loan" index would reject the save.
+  const open = await ctx.requests.find({
+    where: [
+      { deviceId: device.id, state: 'active' },
+      { deviceId: device.id, state: 'overdue' },
+    ],
+  });
+  for (const loan of open) {
+    if (loan.id === request.id) continue;
+    const was = transition(loan, 'returned');
+    await ctx.requests.save(loan);
+    await writeAudit(ctx.manager, actor, {
+      entityType: 'request',
+      entityId: loan.id,
+      action: 'transferred',
+      oldValue: { state: was, holder: previousHolderName },
+      newValue: { state: 'returned', holder: request.requester?.name ?? 'the requester' },
+    });
+  }
+
+  const old = transition(request, 'active');
+  device.holderId = request.requesterId;
+  device.status = 'assigned';
+  await ctx.devices.save(device);
+  try {
+    await ctx.requests.save(request);
+  } catch (e) {
+    if (isOverlapError(e)) throw overlapError();
+    throw e;
+  }
+  await writeAudit(ctx.manager, actor, {
+    entityType: 'request',
+    entityId: request.id,
+    action: auditAction,
+    oldValue: { state: old, holder: previousHolderName },
+    newValue: { state: 'active', holder: request.requester?.name ?? 'the requester' },
+  });
+  const name = `${device.brand} ${device.model}`;
+  await notify(ctx.manager, 'request_approved', [request.requesterId],
+    `${name} is now assigned to you — return by ${request.toDate}`,
+    { requestId: request.id }, '/requests');
+  if (previousHolderId && previousHolderId !== request.requesterId) {
+    await notify(ctx.manager, 'request_approved', [previousHolderId],
+      `${name} has moved from you to ${request.requester?.name ?? 'the requester'}`,
+      { requestId: request.id }, '/requests');
+  }
+}
+
 /** A booking that makes the device unavailable for [from, to]:
  * an overdue loan occupies the device until an unknown return date, so it
  * conflicts with ANY range; approved/active bookings conflict by range. */
@@ -122,58 +201,58 @@ export class CreateRequestHandler implements ICommandHandler<CreateRequestComman
           reason: data.reason,
         },
       });
-      // Config flag (GOALS.md): 'all' = everything needs approval (launch),
-      // 'busy_only' = a free device auto-approves, 'holder' = whoever is
-      // holding the device decides, and managers stay out of it.
-      const mode = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
-      const holderDecides = mode?.value === 'holder';
-      // Pre-check instead of relying on the constraint: a constraint hit here
-      // would roll back the whole transaction and the tester's request would
-      // vanish. On conflict the request simply stays pending for staff.
-      const autoApproveMode = mode?.value === 'busy_only' || holderDecides;
-      const busy =
-        autoApproveMode &&
-        (device.holderId !== null ||
-          (await conflictingBooking(ctx, device.id, data.fromDate, data.toDate, request.id)));
-      let autoApproved = false;
-      if (autoApproveMode && !busy) {
-        transition(request, 'approved');
-        autoApproved = true;
-        try {
-          await ctx.requests.save(request);
-        } catch (e) {
-          if (isOverlapError(e)) throw overlapError();
-          throw e;
+      // The whole process, in one place:
+      //
+      //   nobody is holding it   -> the requester just takes it
+      //   somebody is holding it -> that person decides, nobody else
+      //
+      // A free device whose dates clash with an existing booking is the one
+      // case with no obvious answer — there is no holder to ask — so it waits
+      // for the Admin.
+      const heldBy = device.holderId;
+      const clash = heldBy
+        ? null
+        : await conflictingBooking(ctx, device.id, data.fromDate, data.toDate, request.id);
+      const startsToday = data.fromDate <= localDay();
+
+      if (!heldBy && !clash) {
+        if (startsToday) {
+          // Straight into their hands — no approval step exists for a phone
+          // nobody is using.
+          // assignDevice saves the row it is handed, so it gets the real
+          // request with its relations attached — not a copy.
+          request.device = device;
+          request.requester = { name: requesterName } as DeviceRequest['requester'];
+          await assignDevice(ctx, actor, request, 'taken');
+        } else {
+          // Booked ahead: granted now, assigned on the morning it starts.
+          transition(request, 'approved');
+          try {
+            await ctx.requests.save(request);
+          } catch (e) {
+            if (isOverlapError(e)) throw overlapError();
+            throw e;
+          }
+          await writeAudit(ctx.manager, actor, {
+            entityType: 'request',
+            entityId: request.id,
+            action: 'auto_approved',
+            oldValue: { state: 'pending' },
+            newValue: { state: 'approved', starts: data.fromDate },
+          });
+          await notify(ctx.manager, 'request_approved', [request.requesterId],
+            `${device.brand} ${device.model} is booked for you from ${data.fromDate} — it becomes yours that morning`,
+            { requestId: request.id }, '/requests');
         }
-        await writeAudit(ctx.manager, actor, {
-          entityType: 'request',
-          entityId: request.id,
-          action: 'auto_approved',
-          oldValue: { state: 'pending' },
-          newValue: { state: 'approved' },
-        });
-      }
-      // The right people hear the right thing: an auto-approved request
-      // needs a handover, not an approval decision.
-      if (autoApproved) {
-        await notify(ctx.manager, 'request_approved', [request.requesterId],
-          `Your request for ${device.brand} ${device.model} was auto-approved (${data.fromDate} – ${data.toDate})`,
-          { requestId: request.id }, '/requests');
-        await notify(ctx.manager, 'handover_pending', await staffIds(ctx.manager),
-          `Hand ${device.brand} ${device.model} from the lab desk to ${requesterName}`,
-          { requestId: request.id }, '/handovers');
-      } else if (holderDecides && device.holderId) {
+      } else if (heldBy) {
         // Peer approval: the person actually holding the phone is the one
         // being asked to give it up, so they are the one who hears about it.
-        await notify(ctx.manager, 'request_created', [device.holderId],
+        await notify(ctx.manager, 'request_created', [heldBy],
           `${requesterName} is asking for ${device.brand} ${device.model} you are holding (${data.fromDate} – ${data.toDate}) — approve or reject it`,
           { requestId: request.id }, '/requests');
       } else {
-        // Either the desk decides (mode 'all'), or nobody holds the device and
-        // it could not be auto-approved because the dates clash with an
-        // existing booking — there is no holder to ask, so the desk decides.
         await notify(ctx.manager, 'request_created', await staffIds(ctx.manager),
-          `${requesterName} requested ${device.brand} ${device.model} (${data.fromDate} – ${data.toDate})`,
+          `${requesterName} requested ${device.brand} ${device.model} (${data.fromDate} – ${data.toDate}) — the dates clash with an existing booking`,
           { requestId: request.id }, '/approvals');
       }
       return request;
@@ -202,32 +281,32 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
         actor.id === request.requesterId || actor.id === request.createdById;
       let auditAction: string = decision;
 
-      // Who is allowed to decide at all. Normally the desk; under the
-      // 'holder' policy the person holding the device decides instead and
-      // staff stay out of it. A device with no holder has nobody to ask, so
-      // it falls back to the desk — otherwise such a request could never be
-      // answered by anyone.
-      const mode = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
-      const holderDecides = mode?.value === 'holder' && request.device?.holderId != null;
-      const isStaff = actorRole === 'admin' || actorRole === 'manager';
-      if (holderDecides) {
-        if (actor.id !== request.device.holderId) {
-          throw new ForbiddenException(
-            'Only the person holding this device can decide this request',
-          );
-        }
-      } else if (!isStaff) {
-        throw new ForbiddenException('Only an Admin or Manager can decide this request');
+      // Who is allowed to decide at all. The person holding the device does,
+      // because they are the one being asked to give it up. The Admin can too
+      // — somebody has to be able to unstick a request whose holder has left
+      // the company — but an Admin overriding a peer is recorded as exactly
+      // that, not disguised as the holder's own decision.
+      const holderId = request.device?.holderId ?? null;
+      const isAdmin = actorRole === 'admin';
+      const isHolder = holderId !== null && actor.id === holderId;
+      if (!isHolder && !isAdmin) {
+        throw new ForbiddenException(
+          holderId
+            ? 'Only the person holding this device can decide this request'
+            : 'Only an Admin can decide this request',
+        );
       }
+      const adminOverride = isAdmin && !isHolder && holderId !== null;
       if (decision === 'approved') {
-        // Approving your own request: a Manager needs a second pair of
-        // eyes; the Admin may, but the audit row says so explicitly.
-        if (selfRequest && actorRole !== 'admin') {
+        // Approving your own request: only the Admin may, and the audit row
+        // says so explicitly rather than reading like an ordinary approval.
+        if (selfRequest && !isAdmin) {
           throw new ForbiddenException(
             'You cannot approve your own request — ask another approver',
           );
         }
-        if (selfRequest && actorRole === 'admin') auditAction = 'self_approved';
+        if (selfRequest && isAdmin) auditAction = 'self_approved';
+        else if (adminOverride) auditAction = 'admin_override_approved';
         // Approval is a promise about a physical device — re-check it can
         // still be lent at all.
         const device = request.device;
@@ -243,9 +322,27 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
       if (decision === 'approved') {
         // The exclusion constraint misses an overdue loan (its range is in
         // the past) — but the device is physically out until it comes back.
-        const clash = await conflictingBooking(
+        const found = await conflictingBooking(
           ctx, request.deviceId, request.fromDate, request.toDate, request.id,
         );
+        // The holder's own loan is not a clash — it is the thing being ended.
+        // Approving a transfer hands the device on and closes that loan in the
+        // same breath, so counting it here would make every transfer
+        // impossible. Anyone else's booking still blocks.
+        //
+        // With one limit: only the holder may pass on a device that is
+        // OVERDUE. They have it in their hands, so they can vouch for where
+        // it is. An Admin overriding from the desk cannot — a late device is
+        // unaccounted for until somebody physically checks it in, and
+        // "transferring" it on paper would quietly close a loan nobody has
+        // confirmed the end of.
+        const ownLoan =
+          !!found &&
+          (found.state === 'active' || found.state === 'overdue') &&
+          holderId !== null &&
+          found.requesterId === holderId;
+        const isTheLoanBeingEnded = ownLoan && (found.state !== 'overdue' || isHolder);
+        const clash = isTheLoanBeingEnded ? null : found;
         if (clash && clash.state !== 'overdue') {
           throw new ConflictException(
             `This clashes with an existing ${clash.state} booking (${clash.fromDate} – ${clash.toDate})`,
@@ -257,43 +354,51 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
           );
         }
       }
-      const old = transition(request, decision);
+      const device = request.device;
+      const name = `${device.brand} ${device.model}`;
       request.decidedById = actor.id;
-      if (decision === 'rejected') request.decisionNote = note?.trim() || null;
-      try {
-        await ctx.requests.save(request);
-      } catch (e) {
-        if (isOverlapError(e)) throw overlapError();
-        throw e;
+
+      if (decision === 'approved') {
+        // Approval IS the handover. A booking that starts today changes hands
+        // now; one booked for a later date is promised now and assigned on
+        // the morning it starts.
+        if (request.fromDate <= localDay()) {
+          await assignDevice(ctx, actor, request, auditAction);
+          return request;
+        }
+        const old = transition(request, 'approved');
+        try {
+          await ctx.requests.save(request);
+        } catch (e) {
+          if (isOverlapError(e)) throw overlapError();
+          throw e;
+        }
+        await writeAudit(ctx.manager, actor, {
+          entityType: 'request',
+          entityId: request.id,
+          action: auditAction,
+          oldValue: { state: old },
+          newValue: { state: 'approved', starts: request.fromDate },
+        });
+        await notify(ctx.manager, 'request_approved', [request.requesterId],
+          `Your request for ${name} was approved — it becomes yours on ${request.fromDate}`,
+          { requestId: request.id }, '/requests');
+        return request;
       }
+
+      const old = transition(request, decision);
+      request.decisionNote = note?.trim() || null;
+      await ctx.requests.save(request);
       await writeAudit(ctx.manager, actor, {
         entityType: 'request',
         entityId: request.id,
         action: auditAction,
         oldValue: { state: old },
-        newValue: decision === 'rejected' && note ? { state: decision, reason: note } : { state: decision },
+        newValue: note ? { state: decision, reason: note } : { state: decision },
       });
-
-      const device = request.device;
-      const name = `${device.brand} ${device.model}`;
-      if (decision === 'approved') {
-        await notify(ctx.manager, 'request_approved', [request.requesterId],
-          `Your request for ${name} was approved (${request.fromDate} – ${request.toDate})`,
-          { requestId: request.id }, '/requests');
-        if (device.holderId) {
-          await notify(ctx.manager, 'handover_pending', [device.holderId],
-            `Handover needed: give ${name} to ${request.requester?.name ?? 'the requester'}`,
-            { requestId: request.id }, '/handovers');
-        } else {
-          await notify(ctx.manager, 'handover_pending', await staffIds(ctx.manager),
-            `Hand ${name} from the lab desk to ${request.requester?.name ?? 'the requester'}`,
-            { requestId: request.id }, '/handovers');
-        }
-      } else {
-        await notify(ctx.manager, 'request_rejected', [request.requesterId],
-          `Your request for ${name} was rejected${note ? ` — ${note.trim()}` : ''}`,
-          { requestId: request.id }, '/requests');
-      }
+      await notify(ctx.manager, 'request_rejected', [request.requesterId],
+        `Your request for ${name} was rejected${note ? ` — ${note.trim()}` : ''}`,
+        { requestId: request.id }, '/requests');
       return request;
     });
   }
@@ -366,90 +471,6 @@ export class OverrideTimeHandler implements ICommandHandler<OverrideTimeCommand>
           `Booking time for ${request.device?.brand} ${request.device?.model} changed: ${old} → ${fromDate} – ${toDate}`,
           { requestId: request.id }, '/requests');
       }
-      return request;
-    });
-  }
-}
-
-export class ConfirmHandoverCommand {
-  constructor(
-    readonly actor: Actor,
-    readonly requestId: string,
-    /** The confirmer: must be the device's current holder, or staff when the device is on the lab desk. */
-    readonly confirmerId: string,
-    readonly confirmerIsStaff: boolean,
-  ) {}
-}
-
-@CommandHandler(ConfirmHandoverCommand)
-export class ConfirmHandoverHandler implements ICommandHandler<ConfirmHandoverCommand> {
-  constructor(private readonly db: AppDbContext) {}
-
-  async execute(cmd: ConfirmHandoverCommand): Promise<DeviceRequest> {
-    const { actor, requestId, confirmerId, confirmerIsStaff } = cmd;
-    return this.db.withTransaction(async (ctx) => {
-      const request = await loadRequest(ctx, requestId);
-      const device = request.device;
-
-      const holderConfirms = device.holderId !== null && device.holderId === confirmerId;
-      const deskConfirms = device.holderId === null && confirmerIsStaff;
-      if (!holderConfirms && !deskConfirms) {
-        throw new ForbiddenException(
-          device.holderId
-            ? 'Only the current holder can confirm this handover'
-            : 'Only a manager or admin can hand over from the lab desk',
-        );
-      }
-
-      if (device.status === 'retired' || device.status === 'in_repair') {
-        throw new ConflictException(
-          `Device is ${device.status.replace('_', ' ')} — it cannot be handed over`,
-        );
-      }
-      // No handover before the booking starts — the calendar promise
-      // means something.
-      const startToday = localDay();
-      if (request.fromDate > startToday) {
-        throw new ConflictException(
-          `This booking starts ${request.fromDate} — hand over on or after that day`,
-        );
-      }
-      const old = transition(request, 'active');
-
-      // A device with an open loan is not the desk's to give away — the
-      // current loan gets checked in first (Loans page, one click), so
-      // every return passes the real check-in flow and is audited as one.
-      const previous = await ctx.requests.find({
-        where: [
-          { deviceId: device.id, state: 'active' },
-          { deviceId: device.id, state: 'overdue' },
-        ],
-      });
-      if (previous.some((p) => p.id !== request.id)) {
-        throw new ConflictException(
-          'This device is still checked out — check the current loan in first (Loans page)',
-        );
-      }
-
-      const previousHolder = device.holderId;
-      const previousHolderName = previousHolder
-        ? ((await ctx.users.findOne({ where: { id: previousHolder }, withDeleted: true }))?.name ??
-          'unknown')
-        : 'lab desk';
-      device.holderId = request.requesterId;
-      device.status = 'assigned';
-      await ctx.devices.save(device);
-      await ctx.requests.save(request);
-      await writeAudit(ctx.manager, actor, {
-        entityType: 'request',
-        entityId: request.id,
-        action: 'handover_confirmed',
-        oldValue: { state: old, holder: previousHolderName },
-        newValue: { state: 'active', holder: request.requester.name },
-      });
-      await notify(ctx.manager, 'request_approved', [request.requesterId],
-        `${device.brand} ${device.model} is now assigned to you — return by ${request.toDate}`,
-        { requestId: request.id }, '/requests');
       return request;
     });
   }

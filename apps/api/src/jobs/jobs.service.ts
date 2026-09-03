@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
+import { EntityManager } from 'typeorm';
 import * as nodemailer from 'nodemailer';
 import { config } from '../config';
 import { AppDbContext } from '../db/app-db-context';
+import { DeviceRequest } from '../entities/device-request.entity';
 import { EmailOutbox } from '../entities/notification.entity';
 import { writeAudit } from '../audit/audit';
 import { notify, staffIds } from '../notifications/notify';
@@ -45,6 +47,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       SCHEDULER_QUEUE,
       async (job) => {
         if (job.name === 'overdue-scan') {
+          await this.activateDueBookings();
           await this.scanOverdue();
           await this.expireStaleApprovals();
         }
@@ -66,6 +69,91 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     await this.worker?.close();
     await this.queue?.close();
+  }
+
+
+  /** Everyone an overdue device is a problem for.
+   *
+   * The holder, who can end it. The Admins, who own the inventory and have
+   * to chase it. And anyone with a request queued on that device, because
+   * their phone is the one that is not coming. Waiting people were the ones
+   * previously left in the dark: they are blocked by the lateness and were
+   * never told why.
+   */
+  private async overdueAudience(
+    manager: EntityManager,
+    r: DeviceRequest,
+  ): Promise<string[]> {
+    const others = new Set(await staffIds(manager));
+    const queued = await this.db
+      .requests()
+      .createQueryBuilder('q')
+      .where('q.device_id = :d', { d: r.deviceId })
+      .andWhere(`q.state IN ('pending', 'approved')`)
+      .getMany();
+    for (const q of queued) others.add(q.requesterId);
+    others.delete(r.requesterId);
+    return [...others];
+  }
+
+  /** Hands over every booking whose start date has arrived.
+   *
+   * Approval is normally the handover, but a booking made for a later date
+   * has to wait for that date to come round. This is what makes it arrive:
+   * on the morning a booking starts, the device becomes the requester's
+   * without anyone having to click anything.
+   *
+   * A device still out with someone else is skipped, not forced — the
+   * booking stays approved and `expireStaleApprovals` cleans it up if it
+   * never becomes possible.
+   */
+  async activateDueBookings(): Promise<number> {
+    const today = localDay();
+    const due = await this.db
+      .requests()
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.device', 'device')
+      .leftJoinAndSelect('r.requester', 'requester')
+      .where(`r.state = 'approved'`)
+      .andWhere('r.fromDate <= :today', { today })
+      .getMany();
+    let n = 0;
+    for (const r of due) {
+      const blocked = await this.db
+        .requests()
+        .createQueryBuilder('o')
+        .where('o.device_id = :d', { d: r.deviceId })
+        .andWhere(`o.state IN ('active', 'overdue')`)
+        .andWhere('o.id != :id', { id: r.id })
+        .getOne();
+      if (blocked) continue;
+      await this.db.withTransaction(async (ctx) => {
+        const res = await ctx.requests
+          .createQueryBuilder()
+          .update()
+          .set({ state: 'active' })
+          .where(`id = :id AND state = 'approved'`, { id: r.id })
+          .execute();
+        if (!res.affected) return;
+        n++;
+        const device = r.device;
+        device.holderId = r.requesterId;
+        device.status = 'assigned';
+        await ctx.devices.save(device);
+        await writeAudit(ctx.manager, SYSTEM_ACTOR, {
+          entityType: 'request',
+          entityId: r.id,
+          action: 'booking_started',
+          oldValue: { state: 'approved' },
+          newValue: { state: 'active', holder: r.requester?.name ?? 'the requester' },
+        });
+        await notify(ctx.manager, 'request_approved', [r.requesterId],
+          `${device.brand} ${device.model} is yours from today — return by ${r.toDate}`,
+          { requestId: r.id }, '/requests');
+      });
+    }
+    if (n) this.log.log(`activated ${n} booking(s) starting today`);
+    return n;
   }
 
   /** Approved but never collected: after 2 days past the start date the
@@ -112,6 +200,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       .requests()
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.device', 'device')
+      .leftJoinAndSelect('r.requester', 'requester')
       .where('r.state = :s', { s: 'active' })
       .andWhere('r.toDate < :today', { today })
       .getMany();
@@ -139,8 +228,10 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         await notify(ctx.manager, 'overdue', [r.requesterId],
           `${name} is overdue — it was due back ${r.toDate}. Return it, or extend the loan if you still need it`,
           { requestId: r.id }, '/requests');
-        await notify(ctx.manager, 'overdue', await staffIds(ctx.manager),
-          `${name} is overdue (due ${r.toDate})`, { requestId: r.id }, '/loans');
+        const others = await this.overdueAudience(ctx.manager, r);
+        await notify(ctx.manager, 'overdue', others,
+          `${name} is overdue with ${r.requester?.name ?? 'its holder'} (due ${r.toDate})`,
+          { requestId: r.id }, '/loans');
       });
     }
     if (late.length) this.log.warn(`overdue scan: ${late.length} request(s) marked overdue`);
@@ -178,7 +269,8 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
         // The desk hears about it every time too, not just when it first
         // went late: the longer a device is out, the more the people who
         // own the inventory need to know.
-        await notify(ctx.manager, 'overdue', await staffIds(ctx.manager),
+        const others = await this.overdueAudience(ctx.manager, r);
+        await notify(ctx.manager, 'overdue', others,
           `${name} is still overdue with ${r.requester?.name ?? 'its holder'} (due ${r.toDate})`,
           { requestId: r.id }, '/loans');
       });
@@ -194,6 +286,7 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       .requests()
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.device', 'device')
+      .leftJoinAndSelect('r.requester', 'requester')
       .where('r.state = :s', { s: 'active' })
       .andWhere('r.toDate <= :tomorrow', { tomorrow })
       .getMany();

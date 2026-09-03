@@ -96,6 +96,12 @@ class Api:
     def set_role(self, user_id: str, role: str) -> dict:
         return self.request("PATCH", f"/users/{user_id}/role", json={"role": role})
 
+    def deleted_users(self) -> list[dict]:
+        return self.get("/users?deleted=true")
+
+    def restore_user(self, user_id: str) -> dict:
+        return self.post(f"/users/{user_id}/restore")
+
     def ensure_user(self, name: str, email: str, password: str, role: str) -> dict:
         """Get-or-create a fixed test account, reset to a known-good state.
 
@@ -104,8 +110,21 @@ class Api:
         user list, which is noise for whoever actually administers the lab.
         Password, role and active flag are reset each time so a test that
         changes one of them cannot poison the next run.
+
+        Deleted accounts are restored rather than recreated. Emails are
+        unique across deleted rows too, so a create would 409 — and one of
+        these accounts really was soft-deleted, by the migration that retired
+        the manager role.
         """
         existing = self.find_user_by_email(email)
+        if existing is None:
+            gone = next(
+                (u for u in self.deleted_users() if u["email"].lower() == email.lower()),
+                None,
+            )
+            if gone is not None:
+                self.restore_user(gone["id"])
+                existing = self.find_user_by_email(email)
         if existing is None:
             return self.create_user(name, email, password, role)
         self.update_user(existing["id"], newPassword=password, active=True)
@@ -141,8 +160,8 @@ class Api:
     def approve(self, request_id: str) -> dict:
         return self.post(f"/requests/{request_id}/approve")
 
-    def handover(self, request_id: str) -> dict:
-        return self.post(f"/requests/{request_id}/handover")
+    def reject(self, request_id: str, note: str) -> dict:
+        return self.request("POST", f"/requests/{request_id}/reject", json={"note": note})
 
     def report_damage(self, device_id: str, issue: str) -> dict:
         return self.post("/repairs", {"deviceId": device_id, "issue": issue})
@@ -196,8 +215,6 @@ class Api:
     def settings(self) -> dict:
         return self.get("/settings")
 
-    def set_approval_mode(self, mode: str) -> dict:
-        return self.request("PATCH", "/settings/approval-mode", json={"mode": mode})
 
     def notification_rules(self) -> list[dict]:
         return self.get("/notification-rules")

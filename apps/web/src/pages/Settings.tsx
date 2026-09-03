@@ -13,13 +13,13 @@ interface Rule {
 
 /** Who actually receives each event — shown so the matrix is not a guess. */
 const AUDIENCE: Record<string, string> = {
-  request_created: 'Staff',
+  request_created: 'Whoever holds the device',
   request_approved: 'Requester',
   request_rejected: 'Requester',
-  handover_pending: 'Holder / staff',
+  handover_pending: 'Admins',
   due_soon: 'Holder',
-  overdue: 'Holder + staff',
-  repair_update: 'Reporter / staff',
+  overdue: 'Holder + admins + anyone waiting',
+  repair_update: 'Reporter + admins',
   request_time_changed: 'Requester + holder',
   request_cancelled: 'The other side',
 };
@@ -67,15 +67,6 @@ export default function Settings() {
     onError: (e) => setError(e.message),
   });
 
-  const setMode = useMutation({
-    mutationFn: (mode: string) =>
-      api('/settings/approval-mode', { method: 'PATCH', body: { mode } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['settings'] });
-      toast('Approval policy saved');
-    },
-    onError: (e) => setError(e.message),
-  });
 
   const patchRule = useMutation({
     mutationFn: ({ event, field, value }: { event: string; field: string; value: boolean }) =>
@@ -87,7 +78,6 @@ export default function Settings() {
     onError: (e) => setError(e.message),
   });
 
-  const mode = settings.data?.approvalMode;
 
   return (
     <div>
@@ -95,53 +85,30 @@ export default function Settings() {
       {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
 
       <div className="mb-4 max-w-2xl rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-        <h2 className="font-bold">Approval policy</h2>
-        <p className="mb-3 text-neutral-500">A config switch, not code — flip it any time.</p>
-        <label className="mb-2 flex items-start gap-2.5">
-          <input
-            type="radio"
-            name="approvalMode"
-            checked={mode === 'all'}
-            disabled={user?.role !== 'admin'}
-            onChange={() => setMode.mutate('all')}
-            className="mt-1"
-          />
-          <span>
-            <b>Every request needs approval</b> (launch policy)
-          </span>
-        </label>
-        <label className="mb-2 flex items-start gap-2.5">
-          <input
-            type="radio"
-            name="approvalMode"
-            checked={mode === 'busy_only'}
-            disabled={user?.role !== 'admin'}
-            onChange={() => setMode.mutate('busy_only')}
-            className="mt-1"
-          />
-          <span>
-            <b>Free devices auto-approve</b> — approval only when the device is in someone’s
-            hands
-          </span>
-        </label>
-        <label className="flex items-start gap-2.5">
-          <input
-            type="radio"
-            name="approvalMode"
-            checked={mode === 'holder'}
-            disabled={user?.role !== 'admin'}
-            onChange={() => setMode.mutate('holder')}
-            className="mt-1"
-          />
-          <span>
-            <b>Whoever holds the device approves</b> — the request goes straight to the
-            person using the phone, and managers stay out of it. A free device
-            auto-approves, since there is nobody to ask.
-          </span>
-        </label>
-        {user?.role !== 'admin' && (
-          <p className="mt-2 text-xs text-neutral-400">Only an Admin can change this.</p>
-        )}
+        <h2 className="font-bold">How devices change hands</h2>
+        <p className="mt-1 text-neutral-500">
+          Fixed, not a setting — this is how the lab works.
+        </p>
+        <ul className="mt-3 space-y-2">
+          <li>
+            <b>Nobody is holding it</b> — you request it and it is yours straight
+            away. There is nobody to ask.
+          </li>
+          <li>
+            <b>Somebody is holding it</b> — the request goes to that person. If
+            they approve, the phone becomes yours; if they reject, they say why
+            and you are told.
+          </li>
+          <li>
+            <b>Booked for a later date</b> — the phone becomes yours on the
+            morning the booking starts.
+          </li>
+          <li>
+            <b>Late back</b> — the holder, the admins and anyone waiting on that
+            phone are all reminded. The holder can extend if the work is not
+            finished.
+          </li>
+        </ul>
       </div>
 
       <div className="max-w-2xl overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">

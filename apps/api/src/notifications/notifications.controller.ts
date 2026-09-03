@@ -27,11 +27,6 @@ class RulePatchDto {
   email?: boolean;
 }
 
-class ApprovalModeDto {
-  @IsIn(['all', 'busy_only', 'holder'])
-  mode: 'all' | 'busy_only' | 'holder';
-}
-
 @Controller()
 export class NotificationsController {
   constructor(private readonly db: AppDbContext) {}
@@ -71,13 +66,13 @@ export class NotificationsController {
   }
 
   @Get('notification-rules')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async rules() {
     return this.db.notificationRules().find({ order: { event: 'ASC' } });
   }
 
   @Patch('notification-rules/:event')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async patchRule(
     @Param('event') event: string,
     @Body() dto: RulePatchDto,
@@ -103,16 +98,18 @@ export class NotificationsController {
     });
   }
 
+  /** Kept so existing clients keep working; the value is now fixed. Whoever
+   * holds a device decides who gets it next, and a device nobody holds is
+   * simply taken — there is nothing left to configure. */
   @Get('settings')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async settings() {
-    const mode = await this.db.settings().findOne({ where: { key: 'approval_mode' } });
-    return { approvalMode: mode?.value ?? 'all' };
+    return { approvalMode: 'holder' };
   }
 
   /** The outbox Settings promises: staff can SEE queued/failed mail. */
   @Get('email-outbox')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async emailOutbox() {
     const rows = await this.db.emailOutbox().find({
       order: { id: 'DESC' },
@@ -127,7 +124,7 @@ export class NotificationsController {
   }
 
   @Post('email-outbox/:id/retry')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async retryEmail(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const mail = await ctx.emailOutbox.findOne({ where: { id } });
@@ -150,23 +147,4 @@ export class NotificationsController {
     });
   }
 
-  @Patch('settings/approval-mode')
-  @Roles('admin')
-  async setApprovalMode(@Body() dto: ApprovalModeDto, @Req() req: { user: AuthUser }) {
-    return this.db.withTransaction(async (ctx) => {
-      const setting = await ctx.settings.findOne({ where: { key: 'approval_mode' } });
-      if (!setting) throw new BadRequestException('approval_mode setting is missing');
-      const old = setting.value;
-      setting.value = dto.mode;
-      await ctx.settings.save(setting);
-      await writeAudit(ctx.manager, { id: req.user.sub, name: req.user.name }, {
-        entityType: 'setting',
-        entityId: 'approval_mode',
-        action: 'changed',
-        oldValue: { mode: old },
-        newValue: { mode: dto.mode },
-      });
-      return { approvalMode: setting.value };
-    });
-  }
 }

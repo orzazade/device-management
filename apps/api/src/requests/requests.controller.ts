@@ -20,7 +20,6 @@ import { DeviceRequest } from '../entities/device-request.entity';
 import { JobsService } from '../jobs/jobs.service';
 import {
   CancelRequestCommand,
-  ConfirmHandoverCommand,
   CreateRequestCommand,
   DecideRequestCommand,
   OverrideTimeCommand,
@@ -85,7 +84,8 @@ class ReturnDto {
 }
 
 const actor = (req: { user: AuthUser }) => ({ id: req.user.sub, name: req.user.name });
-const staff = (u: AuthUser) => u.role === 'admin' || u.role === 'manager';
+/** The desk is the Admin, and only the Admin. */
+const staff = (u: AuthUser) => u.role === 'admin';
 
 const pub = (r: DeviceRequest) => ({
   id: r.id,
@@ -165,34 +165,10 @@ export class RequestsController {
     return (await qb.getMany()).map(pub);
   }
 
-  /** Approved requests waiting for THIS user to hand the device over. */
-  @Get('pending-handover')
-  async pendingHandover(@Req() req: { user: AuthUser }) {
-    const all = await this.db
-      .requests()
-      .find({
-        where: { state: 'approved' },
-        relations: { device: { holder: true }, requester: true, project: true },
-        order: { createdAt: 'DESC' },
-      });
-    const mine = all.filter(
-      (r) =>
-        r.device.holderId === req.user.sub ||
-        (r.device.holderId === null && staff(req.user)),
-    );
-    return mine.map(pub);
-  }
-
-  /** Staff decide, unless the 'holder' policy is on and someone is holding
-   *  the device — then only that person may. Enforced in DecideRequestHandler,
-   *  which is the only place that can see the policy and the holder together. */
-  /** Pending requests waiting for THIS user to decide, because they hold the
-   *  device. Empty unless the 'holder' approval policy is on — mirrors
-   *  pending-handover, which answers the same question for handovers. */
+  /** Pending requests waiting for THIS user to decide, because they are the
+   *  one holding the device somebody else is asking for. */
   @Get('pending-my-approval')
   async pendingMyApproval(@Req() req: { user: AuthUser }) {
-    const mode = await this.db.settings().findOne({ where: { key: 'approval_mode' } });
-    if (mode?.value !== 'holder') return [];
     const all = await this.db.requests().find({
       where: { state: 'pending' },
       relations: { device: { holder: true }, requester: true, project: true },
@@ -244,14 +220,6 @@ export class RequestsController {
     return this.reload(id);
   }
 
-  @Post(':id/handover')
-  async handover(@Param('id') id: string, @Req() req: { user: AuthUser }) {
-    await this.bus.execute(
-      new ConfirmHandoverCommand(actor(req), id, req.user.sub, staff(req.user)),
-    );
-    return this.reload(id);
-  }
-
   @Post(':id/return')
   async returnDevice(
     @Param('id') id: string,
@@ -297,7 +265,7 @@ export class RequestsController {
 
   /** Manual overdue scan — same code the hourly job runs, for ops and tests. */
   @Post('scan-overdue')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async scanOverdue(@Req() req: { user: AuthUser }) {
     const marked = await this.jobs.scanOverdue(actor(req));
     return { marked };
@@ -307,7 +275,7 @@ export class RequestsController {
    * Chasing a late device is the desk's job, so they can trigger the round
    * of reminders themselves instead of waiting for the next scheduled one. */
   @Post('renag-overdue')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async renagOverdue() {
     const sent = await this.jobs.renagOverdue();
     return { sent };

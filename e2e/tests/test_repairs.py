@@ -108,12 +108,15 @@ def test_only_an_admin_can_write_a_device_off(
     label = device["model"]
     admin_api.post(f"/repairs/{repair['id']}/advance")  # -> repair_requested
 
-    # A manager gets the forward and cancel buttons, but not write-off.
-    login_page.login(accounts["manager"]["email"], accounts["manager"]["password"])
+    # A tester can watch the queue but not touch it, and certainly not
+    # scrap hardware.
+    login_page.login(accounts["tester"]["email"], accounts["tester"]["password"])
     repairs.open_repairs()
-    assert repairs.has_button(label, "Send to repair →"), "a manager can still move it along"
     assert not repairs.has_button(label, "Write off…", timeout=2), (
         "scrapping hardware is an admin decision"
+    )
+    assert not repairs.has_button(label, "Send to repair →", timeout=2), (
+        "a tester cannot move the queue along either"
     )
 
     login_page.clear_session()

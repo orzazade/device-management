@@ -30,6 +30,7 @@ import { TrimSpecs1725800000000 } from '../migrations/1725800000000-trim-specs';
 import { SpecsFreeForm1725900000000 } from '../migrations/1725900000000-specs-free-form';
 import { RequestProject1726000000000 } from '../migrations/1726000000000-request-project';
 import { Squads1726100000000 } from '../migrations/1726100000000-squads';
+import { DropManagerRole1726200000000 } from '../migrations/1726200000000-drop-manager-role';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -66,6 +67,7 @@ export const dataSourceOptions: DataSourceOptions = {
     SpecsFreeForm1725900000000,
     RequestProject1726000000000,
     Squads1726100000000,
+    DropManagerRole1726200000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

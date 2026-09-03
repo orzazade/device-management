@@ -6,14 +6,13 @@ about it and they need different things:
 
   * the **holder**, who can end it — either bring the device back or, if the
     work genuinely is not finished, extend the loan;
-  * the **desk** (managers and admins), who own the inventory and have to
-    chase it, and who are blocked from lending the device to anyone else
-    until it comes back.
+  * the **admins**, who own the inventory and have to chase it;
+  * **anyone queuing** for that device, whose own phone is the one not
+    arriving.
 
-Both are told when the loan first goes late, and both are told again on
-every repeat round — the desk especially, because the longer a device is out
-the more they need to know, and one alert at flip time is easy to scroll
-past.
+All of them are told when the loan first goes late, and told again on every
+repeat round — one alert at flip time is easy to scroll past, and the longer
+a device is out the more the people blocked by it need to know.
 """
 
 from __future__ import annotations
@@ -21,7 +20,16 @@ from __future__ import annotations
 import pytest
 
 from api_client import Api
+from conftest import _iso, _psql
 from pages import LoginPage, NotificationBell, RequestsPage
+
+
+def age_notifications_via(_api: Api, request_id: str, days: int = 4) -> None:
+    """Push this request's alerts into the past so the next round may fire."""
+    _psql(
+        "UPDATE notifications SET created_at = now() - interval '%d days' "
+        "WHERE meta->>'requestId' = '%s'" % (days, request_id)
+    )
 
 pytestmark = pytest.mark.lifecycle
 
@@ -77,6 +85,34 @@ def test_the_holder_is_told_extending_is_an_option(
     )
 
 
+@pytest.mark.smoke
+def test_the_people_queuing_for_the_device_are_told_it_is_late(
+    overdue_loan, admin_api: Api, spare_account, seed_project
+):
+    """The group that used to be left in the dark.
+
+    Somebody waiting for this phone is the person most affected by it being
+    late — their own work is blocked — and they were the only ones never
+    told. A reminder that reaches the desk but not them explains the delay to
+    everyone except the person living it.
+    """
+    device, req = overdue_loan()
+
+    waiting = spare_account("rival", role="tester")
+    waiting_api = admin_api.as_user(waiting["email"], waiting["password"])
+    waiting_api.create_request(
+        device["id"], seed_project["id"], "Waiting on this one", _iso(0), _iso(1)
+    )
+    before = len(_about(waiting_api.notifications(), req["id"]))
+
+    age_notifications_via(admin_api, req["id"])
+    admin_api.renag_overdue()
+
+    assert len(_about(waiting_api.notifications(), req["id"])) > before, (
+        "the person queuing for the phone was never told it is running late"
+    )
+
+
 def test_the_repeat_reminder_reaches_the_desk_too(
     overdue_loan, age_notifications, admin_api: Api, tester_api: Api
 ):
@@ -124,7 +160,6 @@ def test_the_holder_can_extend_an_overdue_loan_from_the_ui(
     """The holder's own way out, driven through the browser: extending past
     today clears the overdue flag and the loan is simply active again."""
     device, req = overdue_loan()
-    from conftest import _iso
 
     _sign_in(login_page, accounts["tester"])
     requests_page.open_requests()

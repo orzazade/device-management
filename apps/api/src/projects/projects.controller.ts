@@ -44,7 +44,7 @@ export class ProjectsController {
     @Query('deleted') deleted?: string,
     @Query('kind') kind?: string,
   ) {
-    if (deleted === 'true' && !['admin', 'manager'].includes(req.user.role)) {
+    if (deleted === 'true' && req.user.role !== 'admin') {
       throw new ForbiddenException('Only staff can list deleted projects');
     }
     const kinds = kind === 'all' ? ['project', 'squad'] : [kind === 'squad' ? 'squad' : 'project'];
@@ -84,7 +84,7 @@ export class ProjectsController {
   }
 
   @Delete(':id')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const project = await ctx.projects.findOne({ where: { id } });
@@ -117,7 +117,7 @@ export class ProjectsController {
   }
 
   @Post(':id/restore')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const project = await ctx.projects.findOne({ where: { id }, withDeleted: true });
@@ -155,7 +155,7 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() dto: ProjectDto,
@@ -189,7 +189,7 @@ export class ProjectsController {
   }
 
   @Post()
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async create(@Body() dto: ProjectDto, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const kind = dto.kind ?? 'project';

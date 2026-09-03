@@ -4,7 +4,9 @@ const styles: Record<string, [string, string]> = {
   in_repair: ['In repair', 'bg-amber-100 text-amber-800'],
   retired: ['Retired', 'bg-neutral-200 text-neutral-600'],
   pending: ['Pending', 'bg-amber-100 text-amber-800'],
-  approved: ['Awaiting handover', 'bg-accent-soft text-accent'],
+  // 'approved' now only means a booking made for a later date — it
+// becomes the requester's automatically on the morning it starts.
+  approved: ['Booked', 'bg-accent-soft text-accent'],
   active: ['Active', 'bg-green-100 text-green-800'],
   rejected: ['Rejected', 'bg-neutral-200 text-neutral-600'],
   returned: ['Returned', 'bg-neutral-200 text-neutral-600'],

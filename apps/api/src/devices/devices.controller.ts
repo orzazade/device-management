@@ -136,7 +136,7 @@ export class DevicesController {
       .leftJoinAndSelect('d.squad', 'squad')
       .orderBy('d.brand')
       .addOrderBy('d.model');
-    const staffUser = req.user.role === 'admin' || req.user.role === 'manager';
+    const staffUser = req.user.role === 'admin';
     if (status && status !== 'deleted' && !(DEVICE_STATUSES as readonly string[]).includes(status)) {
       throw new BadRequestException(`Unknown status "${status}"`);
     }
@@ -166,7 +166,7 @@ export class DevicesController {
   }
 
   @Delete(':id')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const device = await ctx.devices.findOne({ where: { id } });
@@ -202,7 +202,7 @@ export class DevicesController {
   }
 
   @Post(':id/restore')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const device = await ctx.devices.findOne({ where: { id }, withDeleted: true });
@@ -288,7 +288,7 @@ export class DevicesController {
   }
 
   @Post()
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async create(@Body() dto: DeviceDto, @Req() req: { user: AuthUser }) {
     const d: Device = await this.bus.execute(new CreateDeviceCommand(actor(req), dto));
     // Reply with the same shape as GET — relations included.
@@ -299,7 +299,7 @@ export class DevicesController {
   }
 
   @Patch(':id')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() dto: DevicePatchDto,
@@ -313,7 +313,7 @@ export class DevicesController {
   }
 
   @Post('import')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async import(@Query('commit') commit: string, @Req() req: any) {
     const file = await req.file();
     if (!file) throw new BadRequestException('Upload an .xlsx file');
@@ -332,7 +332,7 @@ export class DevicesController {
   /** The column contract as a file, not a sentence: header row + one
    * example, generated from the same map the importer reads. */
   @Get('import/template')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async importTemplate(@Res({ passthrough: false }) res: any) {
     const buffer = await this.importer.buildTemplate();
     res

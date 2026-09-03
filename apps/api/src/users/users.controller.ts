@@ -92,7 +92,7 @@ export class UsersController {
   ) {}
 
   @Get()
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async list(@Query('deleted') deleted?: string) {
     if (deleted === 'true') {
       const gone = await this.db
@@ -170,7 +170,7 @@ export class UsersController {
   }
 
   @Post()
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async create(@Body() dto: CreateUserDto, @Req() req: { user: AuthUser }) {
     // A manager must not be able to mint accounts at or above their own
     // power — only an Admin creates Managers or Admins.
@@ -182,7 +182,7 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,

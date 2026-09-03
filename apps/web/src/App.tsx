@@ -60,13 +60,13 @@ export default function App() {
               <Route path="/approvals" element={<Navigate to="/requests" replace />} />
               <Route path="/loans" element={<Navigate to="/requests" replace />} />
               <Route path="/repairs" element={<Repairs />} />
-              <Route element={<RequireRole roles={['admin', 'manager']} />}>
+              <Route element={<RequireRole roles={['admin']} />}>
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
-              <Route element={<RequireRole roles={['admin', 'manager']} />}>
+              <Route element={<RequireRole roles={['admin']} />}>
                 <Route path="/audit" element={<Audit />} />
               </Route>
               <Route path="*" element={<NotFound />} />

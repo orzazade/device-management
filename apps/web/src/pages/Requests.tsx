@@ -28,7 +28,6 @@ export default function Requests() {
   // Desk modals (staff)
   const [timeFor, setTimeFor] = useState<RequestRow | null>(null);
   const [rejectFor, setRejectFor] = useState<RequestRow | null>(null);
-  const [cantFor, setCantFor] = useState<RequestRow | null>(null);
   const [overrideRange, setOverrideRange] = useState<DateRange>({ from: null, to: null });
   const [returnFor, setReturnFor] = useState<RequestRow | null>(null);
   // My-requests modals (everyone)
@@ -42,10 +41,6 @@ export default function Requests() {
   const mine = useQuery({
     queryKey: ['requests', 'mine'],
     queryFn: () => api<RequestRow[]>('/requests'),
-  });
-  const handovers = useQuery({
-    queryKey: ['requests', 'pending-handover'],
-    queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
   });
   // Only ever non-empty under the 'holder' approval policy: somebody wants a
   // device this user is holding, and it is theirs to decide.
@@ -73,11 +68,6 @@ export default function Requests() {
     );
   }, [focusId, mine.data, all.data, staffUser]);
 
-  const settings = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => api<{ approvalMode: string }>('/settings'),
-    enabled: staffUser,
-  });
   const overrideBookings = useQuery({
     queryKey: ['device-bookings', timeFor?.device.id, timeFor?.id],
     queryFn: () =>
@@ -99,7 +89,7 @@ export default function Requests() {
       invalidate();
       setError(null);
       setRejectFor(null);
-      toast(v.verb === 'approve' ? 'Approved — handover pending' : 'Request rejected');
+      toast(v.verb === 'approve' ? 'Approved — device assigned' : 'Request rejected');
     },
     onError: (e) => setError(e.message),
   });
@@ -116,27 +106,7 @@ export default function Requests() {
     onError: (e) => setError(e.message),
   });
 
-  const handover = useMutation({
-    mutationFn: (id: string) => api(`/requests/${id}/handover`, { method: 'POST' }),
-    onSuccess: () => {
-      invalidate();
-      setError(null);
-      toast('Handover confirmed — device assigned');
-    },
-    onError: (e) => setError(e.message),
-  });
 
-  const cantHandOver = useMutation({
-    mutationFn: ({ id, note }: { id: string; note: string }) =>
-      api(`/requests/${id}/cancel`, { method: 'POST', body: { note } }),
-    onSuccess: () => {
-      invalidate();
-      setCantFor(null);
-      setError(null);
-      toast('Request cancelled — the requester sees your reason');
-    },
-    onError: (e) => setError(e.message),
-  });
 
   const extend = useMutation({
     mutationFn: ({ id, fromDate, toDate }: { id: string; fromDate: string; toDate: string }) =>
@@ -176,11 +146,10 @@ export default function Requests() {
   const pending = all.data?.filter((r) => r.state === 'pending') ?? [];
   const overdue = all.data?.filter((r) => r.state === 'overdue') ?? [];
   const active = all.data?.filter((r) => r.state === 'active') ?? [];
-  const handoverIds = new Set(handovers.data?.map((r) => r.id));
   // Approved bookings a staff member cannot confirm (device is with someone
   // else) still deserve visibility on the desk.
   const approvedElsewhere = staffUser
-    ? (all.data?.filter((r) => r.state === 'approved' && !handoverIds.has(r.id)) ?? [])
+    ? (all.data?.filter((r) => r.state === 'approved') ?? [])
     : [];
 
   // Staff read the whole lab; testers read their own. Closed rows stay
@@ -244,9 +213,7 @@ export default function Requests() {
       {staffUser &&
         section(
           'Waiting for approval',
-          settings.data?.approvalMode === 'busy_only'
-            ? 'Free devices auto-approve — only busy ones land here.'
-            : 'Every request needs approval — change it in Settings.',
+          'Requests nobody else can answer — the device is free but the dates clash.',
           <RequestTable
             rows={pending}
             error={all.isError}
@@ -282,38 +249,10 @@ export default function Requests() {
           />,
         )}
 
-      {(handovers.data?.length ?? 0) > 0 &&
-        section(
-          'Hand these over',
-          'Physically hand the device over, then confirm here.',
-          <RequestTable
-            rows={handovers.data}
-            empty=""
-            actions={(r) => (
-              <span className="flex gap-1.5">
-                <button data-testid="request-cant-hand-over"
-                  onClick={() => setCantFor(r)}
-                  disabled={cantHandOver.isPending}
-                  className={`${btn} border border-neutral-300`}
-                >
-                  Can’t hand over
-                </button>
-                <button data-testid="request-confirm-handover"
-                  onClick={() => handover.mutate(r.id)}
-                  disabled={handover.isPending}
-                  className={`${btn} bg-accent text-white`}
-                >
-                  Confirm handover
-                </button>
-              </span>
-            )}
-          />,
-        )}
-
       {approvedElsewhere.length > 0 &&
         section(
-          'Approved, device still with someone',
-          'The current holder confirms these handovers — nothing for the desk to do yet.',
+          'Booked for later',
+          'These become the requester’s on the morning their booking starts.',
           <RequestTable rows={approvedElsewhere} empty="" />,
         )}
 
@@ -417,7 +356,7 @@ export default function Requests() {
       {offerReturn && (
         <ConfirmModal
           title={`Return ${offerReturn.device.brand} ${offerReturn.device.model}?`}
-          body="Bring the device to the lab desk — a manager checks it in there (that's your receipt). This notifies them you're on the way."
+          body="Bring the device to the lab desk — an admin checks it in there (that's your receipt). This notifies them you're on the way."
           confirmLabel="Notify the desk"
           busy={returnIntent.isPending}
           onConfirm={() => returnIntent.mutate(offerReturn.id)}
@@ -488,51 +427,6 @@ export default function Requests() {
         </Modal>
       )}
 
-      {cantFor && (
-        <Modal onClose={() => setCantFor(null)}>
-          <VForm
-            className="w-full max-w-md rounded-2xl bg-white p-6"
-            onValidSubmit={(f) =>
-              cantHandOver.mutate({ id: cantFor.id, note: String(f.get('note')) })
-            }
-          >
-            <h2 className="mb-1 text-lg font-bold">
-              Can’t hand over {cantFor.device.brand} {cantFor.device.model}?
-            </h2>
-            <p className="mb-3 text-neutral-500">
-              This cancels the booking. {cantFor.requester.name} and the lab desk will see your reason.
-            </p>
-            <div className="mb-3">
-              <VField
-                name="note"
-                label="Reason"
-                textarea
-                rows={2}
-                maxLength={300}
-                autoFocus
-                placeholder="e.g. I still need it for the release test until Friday"
-                rules={[required('Say why the handover can’t happen'), minLen(5)]}
-              />
-            </div>
-            {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-red-700">{error}</p>}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCantFor(null)}
-                className="rounded-lg border border-neutral-300 px-4 py-2 font-semibold"
-              >
-                Back
-              </button>
-              <button
-                disabled={cantHandOver.isPending}
-                className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
-              >
-                {cantHandOver.isPending ? 'Cancelling…' : 'Yes, cancel this booking'}
-              </button>
-            </div>
-          </VForm>
-        </Modal>
-      )}
 
       {rejectFor && (
         <Modal onClose={() => setRejectFor(null)}>

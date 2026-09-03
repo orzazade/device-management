@@ -46,7 +46,6 @@ SCREENSHOT_DIR = pathlib.Path(__file__).parent / "screenshots"
 # and digits) and none is a factory default, so they never trip the forced
 # password-change dialog.
 ADMIN_PASSWORD = "E2eAdmin2026"
-MANAGER_PASSWORD = "E2eManager2026"
 TESTER_PASSWORD = "E2eTester2026"
 DEFAULT_PASSWORD = "admin123"  # the app's factory default, on purpose
 
@@ -186,12 +185,6 @@ def accounts(root_api: Api) -> dict[str, dict]:
             "password": ADMIN_PASSWORD,
             "role": "admin",
         },
-        "manager": {
-            "name": "QA Automation Manager",
-            "email": "qa.manager@devicedesk.local",
-            "password": MANAGER_PASSWORD,
-            "role": "manager",
-        },
         "tester": {
             "name": "QA Automation Tester",
             "email": "qa.tester@devicedesk.local",
@@ -258,12 +251,6 @@ def shell(driver, base_url) -> AppShell:
 @pytest.fixture
 def as_admin(login_page, accounts, shell) -> AppShell:
     login_page.login(accounts["admin"]["email"], accounts["admin"]["password"])
-    return shell
-
-
-@pytest.fixture
-def as_manager(login_page, accounts, shell) -> AppShell:
-    login_page.login(accounts["manager"]["email"], accounts["manager"]["password"])
     return shell
 
 
@@ -336,15 +323,6 @@ def in_utc_offset_window() -> bool:
     return date.today() != server_today()
 
 
-def skip_if_handover_blocked() -> None:
-    """Kept as a no-op marker of where F-11 used to bite.
-
-    F-11 (the API reading "today" from UTC while the lab runs on Asia/Baku)
-    is fixed: `localDay()` now backs every calendar-day comparison. Handovers
-    work at any hour, so nothing is skipped. The call sites are left in place
-    because they mark the tests that would fail first if the bug returned.
-    """
-    return
 
 
 def _iso(days_ahead: int) -> str:
@@ -352,42 +330,53 @@ def _iso(days_ahead: int) -> str:
 
 
 @pytest.fixture
-def pending_request(new_device, tester_api: Api, seed_project):
-    """A device with a request already waiting for approval.
+def pending_request(new_device, tester_api: Api, seed_project, spare_account, root_api: Api):
+    """A request that is genuinely waiting for somebody to decide it.
 
-    Arranged over the API so a test about approving, rejecting or overriding
-    does not have to re-drive the request dialog first.
+    Only one situation produces one now: the device is already in another
+    person's hands, so the request goes to that person. A device nobody holds
+    is simply taken, so there is nothing to approve and no pending state to
+    arrange. The fixture therefore parks the device with a second tester
+    first, and returns that holder's account alongside the request — they are
+    the only login that can decide it.
     """
 
-    def _make(days_ahead: int = 0, span: int = 2, reason: str = "Seeded regression run") -> tuple[dict, dict]:
+    def _make(days_ahead: int = 0, span: int = 2, reason: str = "Seeded regression run"):
         device = new_device()
-        req = tester_api.create_request(
-            device["id"],
-            seed_project["id"],
-            reason,
-            _iso(days_ahead),
-            _iso(days_ahead + span),
+        holder_account = spare_account("holder", role="tester")
+        holder = root_api.as_user(holder_account["email"], holder_account["password"])
+        # Just today: the point is to put the device in somebody's hands, and
+        # a long hold would also fill the calendar, which several tests read.
+        holder.create_request(
+            device["id"], seed_project["id"], "Holding it first", _iso(0), _iso(0)
         )
-        return device, req
+        req = tester_api.create_request(
+            device["id"], seed_project["id"], reason, _iso(days_ahead), _iso(days_ahead + span),
+        )
+        assert req["state"] == "pending", (
+            f"a request for a held device should wait for the holder, got {req['state']}"
+        )
+        return device, req, holder_account
 
     return _make
 
 
 @pytest.fixture
-def active_loan(pending_request, admin_api: Api):
-    """A device already out in the tester's hands: requested, approved, handed
-    over. The starting point for extend / return / overdue scenarios."""
+def active_loan(new_device, tester_api: Api, seed_project, admin_api: Api):
+    """A device already in the tester's hands.
+
+    Taking a free device IS the handover now — no approval, no confirmation
+    step — so this is just a request that starts today.
+    """
 
     def _make(days_ahead: int = 0, span: int = 2) -> tuple[dict, dict]:
-        skip_if_handover_blocked()
-        device, req = pending_request(days_ahead=days_ahead, span=span)
-        # Free devices auto-approve under the 'busy_only' and 'holder'
-        # policies, and approving an approved request is a 409 — so only
-        # approve when it is actually still waiting.
-        if req.get("state") == "pending":
-            admin_api.approve(req["id"])
-        admin_api.handover(req["id"])
-        return device, admin_api.find_request_for_device(device["id"])
+        assert days_ahead == 0, "a loan only becomes active on the day it starts"
+        device = new_device()
+        req = tester_api.create_request(
+            device["id"], seed_project["id"], "Seeded active loan", _iso(0), _iso(span),
+        )
+        assert req["state"] == "active", f"expected an immediate loan, got {req['state']}"
+        return device, admin_api.request_by_id(req["id"])
 
     return _make
 
@@ -452,23 +441,6 @@ def fresh_tester(root_api: Api) -> dict:
         account["name"], account["email"], account["password"], "tester"
     )["id"]
     return account
-
-
-@pytest.fixture
-def approval_mode(admin_api: Api):
-    """Switch the lab's approval policy for one test and put it back after.
-
-    The policy is global server state, so a test that leaves it changed
-    silently rewrites what every later test means.
-    """
-    original = admin_api.settings()["approvalMode"]
-
-    def _set(mode: str) -> None:
-        admin_api.set_approval_mode(mode)
-
-    yield _set
-    if admin_api.settings()["approvalMode"] != original:
-        admin_api.set_approval_mode(original)
 
 
 @pytest.fixture

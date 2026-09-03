@@ -24,7 +24,7 @@ def users_page(driver, base_url) -> UsersPage:
 
 
 @pytest.mark.smoke
-def test_manager_creates_a_project(as_manager, projects_page: ProjectsPage, run_id: str):
+def test_the_admin_creates_a_project(as_admin, projects_page: ProjectsPage, run_id: str):
     name = f"Release Regression {run_id}"
 
     projects_page.open_projects()
@@ -42,7 +42,7 @@ def test_manager_creates_a_project(as_manager, projects_page: ProjectsPage, run_
 
 @pytest.mark.smoke
 def test_projects_and_squads_are_separate_tabs(
-    as_manager, projects_page: ProjectsPage, admin_api: Api, run_id: str
+    as_admin, projects_page: ProjectsPage, admin_api: Api, run_id: str
 ):
     """Since the page was split into tabs, a project must not show up under
     Squads and vice versa — that separation is the whole point of the split."""
@@ -81,7 +81,7 @@ def test_projects_and_squads_are_separate_tabs(
     assert stored[squad_name] == "squad"
 
 
-def test_the_new_button_follows_the_open_tab(as_manager, projects_page: ProjectsPage):
+def test_the_new_button_follows_the_open_tab(as_admin, projects_page: ProjectsPage):
     """One button, relabelled by context — so it must never offer to create
     the wrong kind."""
     projects_page.open_projects()
@@ -94,7 +94,7 @@ def test_the_new_button_follows_the_open_tab(as_manager, projects_page: Projects
 
 
 def test_each_tab_counts_its_own_kind(
-    as_manager, projects_page: ProjectsPage, admin_api: Api, run_id: str
+    as_admin, projects_page: ProjectsPage, admin_api: Api, run_id: str
 ):
     """The count in each tab label has to track what that tab holds."""
     projects_page.open_projects()
@@ -113,7 +113,7 @@ def test_each_tab_counts_its_own_kind(
 
 @pytest.mark.validation
 def test_project_name_is_required_and_has_a_minimum_length(
-    as_manager, projects_page: ProjectsPage
+    as_admin, projects_page: ProjectsPage
 ):
     projects_page.open_projects()
     dialog = projects_page.open_new_project()
@@ -234,33 +234,26 @@ def test_changing_a_role_asks_for_confirmation_first(
 
     users_page.open_users()
     users_page.search(email)
-    confirm = users_page.change_role(email, "Manager")
+    confirm = users_page.change_role(email, "Admin")
 
-    assert "Manager" in confirm.title and name in confirm.title
+    assert "Admin" in confirm.title and name in confirm.title
     confirm.cancel()
     assert [u for u in admin_api.users() if u["email"] == email][0]["role"] == "tester", (
         "cancelling the dialog must not change the role"
     )
 
     users_page.search(email)
-    confirm = users_page.change_role(email, "Manager")
+    confirm = users_page.change_role(email, "Admin")
     confirm.confirm()
     users_page.wait_for_toast("Role updated")
 
-    assert [u for u in admin_api.users() if u["email"] == email][0]["role"] == "manager"
+    assert [u for u in admin_api.users() if u["email"] == email][0]["role"] == "admin"
 
 
 @pytest.mark.rbac
-def test_a_manager_cannot_reassign_roles(as_manager, users_page: UsersPage, accounts):
-    """Only admins get the role dropdown — a manager sees plain text."""
-    users_page.open_users()
-    users_page.search(accounts["tester"]["email"])
-
-    row_select = (
-        users_page.row_for(accounts["tester"]["email"])[0],
-        users_page.row_for(accounts["tester"]["email"])[1] + "//select",
-    )
-    assert not users_page.is_present(row_select, timeout=2), (
-        "a manager must not be offered the role dropdown"
-    )
-    assert users_page.role_of(accounts["tester"]["email"]) == "Tester"
+def test_a_tester_cannot_reach_the_users_screen_at_all(as_tester, users_page: UsersPage):
+    """Accounts are the Admin's business. A tester is not offered the page and
+    cannot reach it by typing the address either."""
+    assert not as_tester.has_nav_link("Users"), "a tester must not see the Users link"
+    users_page.open("/users")
+    users_page.wait_for_path("/")

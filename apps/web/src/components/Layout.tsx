@@ -43,7 +43,6 @@ function Badge({ n }: { n: number | undefined }) {
 
 const roleLabel: Record<string, string> = {
   admin: 'Admin',
-  manager: 'Manager',
   tester: 'Tester',
 };
 
@@ -65,20 +64,14 @@ export default function Layout() {
     const t = setTimeout(() => setBooting(false), 2000);
     return () => clearTimeout(t);
   }, []);
-  const handovers = useQuery({
-    queryKey: ['requests', 'pending-handover'],
-    queryFn: () => api<RequestRow[]>('/requests/pending-handover'),
-    enabled: !!user,
-    refetchInterval: 30000,
-  });
   const approvals = useQuery({
     queryKey: ['requests', 'pending-approvals'],
     queryFn: () => api<RequestRow[]>('/requests?scope=all&state=pending'),
     enabled: !!user && staff,
     refetchInterval: 30000,
   });
-  // Under the 'holder' policy a request can be waiting on anyone, not just
-  // staff — without this the person who has to decide never sees a badge.
+  // A request can be waiting on anyone, not just the desk — without this
+  // the person who has to decide never sees a badge.
   const myApprovals = useQuery({
     queryKey: ['requests', 'pending-my-approval'],
     queryFn: () => api<RequestRow[]>('/requests/pending-my-approval'),
@@ -167,7 +160,6 @@ export default function Layout() {
           Requests
           <Badge
             n={
-              (handovers.data?.length ?? 0) +
               (approvals.data?.length ?? 0) +
               (myApprovals.data?.length ?? 0) +
               (overdue.data?.length ?? 0)

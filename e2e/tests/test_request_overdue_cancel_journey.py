@@ -21,9 +21,9 @@ from __future__ import annotations
 import pytest
 
 from api_client import Api, ApiError
-from conftest import _iso, skip_if_handover_blocked
+from conftest import _iso
 from pages import (
-    SECTION_HANDOVER,
+    SECTION_MINE,
     SECTION_OVERDUE,
     SECTION_PENDING,
     DevicesPage,
@@ -84,11 +84,10 @@ def test_request_journey_lab_tester_asks_admin_approves_and_hands_over(
     over in the browser, and Narmin — who wants the same phone — sees an
     honest picture of it being taken.
     """
-    skip_if_handover_blocked()
     device = new_device()
     label = device["model"]
 
-    # --- lab tester asks -------------------------------------------------
+    # --- lab tester asks, and that is that -------------------------------
     _sign_in(login_page, accounts["tester"])
     devices_page.open_devices().search(label)
     assert devices_page.cell_status(label) == "Available", (
@@ -103,33 +102,49 @@ def test_request_journey_lab_tester_asks_admin_approves_and_hands_over(
     requests_page.wait_for_toast("Request submitted")
     requests_page.wait_for_path("/requests")
 
+    # Nobody was holding it, so there was nobody to ask: it is his already.
     req = admin_api.find_request_for_device(device["id"])
     assert req is not None, "the request never reached the server"
-    assert req["state"] == "pending", f"expected pending, got {req['state']}"
+    assert req["state"] == "active", f"a free phone should be taken, got {req['state']}"
+    assert admin_api.device(device["id"])["holder"]["id"] == accounts["tester"]["id"]
 
-    # --- Narmin sees it is spoken for, but is not blocked ----------------
+    # --- Narmin now has to ask him, not the desk -------------------------
+    narmin_api = Api(api_url)
+    narmin_api.login(narmin["email"], narmin["password"])
+    hers = narmin_api.create_request(
+        device["id"], seed_project["id"], "I need it after him", _iso(0), _iso(1)
+    )
+    assert hers["state"] == "pending", "a held phone has to be asked for"
+
     _sign_in(login_page, narmin)
-    devices_page.open_devices().search(label)
-    assert devices_page.has_request_button(label), (
-        "a pending request must not stop the next person asking for later dates"
-    )
-
-    # --- admin approves and hands over -----------------------------------
-    _sign_in(login_page, accounts["admin"])
     requests_page.open_requests()
-    assert requests_page.has_row_in(SECTION_PENDING, label), (
-        "the desk's approval queue should be showing this request"
-    )
-    requests_page.approve(label)
-    requests_page.wait_for_toast("Approved")
-    requests_page.confirm_handover(label)
-    requests_page.wait_for_toast("Handover confirmed")
+    assert requests_page.own_state_of(label) == "Pending"
 
-    out = admin_api.request_by_id(req["id"])
-    assert out["state"] == "active", f"after handover expected active, got {out['state']}"
-    assert admin_api.device(device["id"])["holder"]["id"] == accounts["tester"]["id"], (
-        "the lab tester should now be recorded as holding the phone"
+    # --- the lab tester approves, and the phone moves --------------------
+    _sign_in(login_page, accounts["tester"])
+    requests_page.open_requests()
+    assert requests_page.has_row_in(SECTION_MINE, label), (
+        "the request belongs to whoever is holding the phone"
     )
+    requests_page.approve_as_holder(label)
+    requests_page.wait_for_toast("Approved")
+
+    out = admin_api.request_by_id(hers["id"])
+    assert out["state"] == "active", f"approval should assign it, got {out['state']}"
+    assert admin_api.device(device["id"])["holder"]["id"] == narmin["id"], (
+        "the phone should have moved to Narmin"
+    )
+    assert admin_api.request_by_id(req["id"])["state"] == "returned", (
+        "the lab tester's loan ends when he passes it on"
+    )
+
+    # --- and an Admin can see every step of it ---------------------------
+    actions = [
+        a["action"] for a in admin_api.audit("?limit=300")
+        if a.get("entityId") in {req["id"], hers["id"]}
+    ]
+    for expected in ("created", "taken", "approved", "transferred"):
+        assert expected in actions, f"{expected!r} missing from the audit trail: {actions}"
 
 
 # --------------------------------------------------------------- 2. overdue
@@ -176,6 +191,9 @@ def test_overdue_journey_blocks_narmin_until_the_admin_checks_it_back_in(
     narmin_req = narmin_api.create_request(
         device["id"], seed_project["id"], "Need it once it is free", _iso(4), _iso(6)
     )
+    # The desk cannot sign the phone over from a distance: it is late, which
+    # means nobody has confirmed where it actually is. Only the person
+    # holding it can pass it on, and only by physically doing so.
     with pytest.raises(ApiError) as refused:
         admin_api.approve(narmin_req["id"])
     assert "overdue" in str(refused.value).lower(), (
@@ -212,24 +230,28 @@ def test_cancel_journey_narmin_withdraws_then_drops_a_confirmed_booking(
     narmin,
     api_url,
     requests_page: RequestsPage,
-    new_device,
+    active_loan,
     seed_project,
     admin_api: Api,
 ):
     """The requester's own two ways out.
 
-    A request nobody has agreed to yet is dropped outright. A booking the desk
-    has already confirmed asks first, because releasing it gives the days back
-    to everyone else and cannot be undone.
+    A request nobody has agreed to yet is dropped outright. A booking already
+    granted asks first, because releasing it gives the days back to everyone
+    else and cannot be undone.
+
+    Both need a phone somebody else is holding: a free one is taken on the
+    spot, so it never sits in a state there is anything to withdraw from.
     """
     narmin_api = Api(api_url)
     narmin_api.login(narmin["email"], narmin["password"])
 
     # --- pending: withdrawn without ceremony -----------------------------
-    first = new_device()
+    first, _ = active_loan(days_ahead=0, span=1)
     pending = narmin_api.create_request(
         first["id"], seed_project["id"], "Changed my mind about this one", _iso(1), _iso(2)
     )
+    assert pending["state"] == "pending"
     _sign_in(login_page, narmin)
     requests_page.open_requests()
     assert requests_page.has_own_action(first["model"], "Cancel"), (
@@ -242,13 +264,15 @@ def test_cancel_journey_narmin_withdraws_then_drops_a_confirmed_booking(
     requests_page.wait_for_own_state(first["model"], "Cancelled")
     assert admin_api.request_by_id(pending["id"])["state"] == "cancelled"
 
-    # --- approved: asks first --------------------------------------------
-    second = new_device()
+    # --- granted for later: asks first ------------------------------------
+    # Approval hands a phone over immediately, so the only way to hold a
+    # booking that has been granted but not yet started is to book ahead.
+    second, _ = active_loan(days_ahead=0, span=1)
     booking = narmin_api.create_request(
-        second["id"], seed_project["id"], "Booked then no longer needed", _iso(1), _iso(2)
+        second["id"], seed_project["id"], "Booked then no longer needed", _iso(4), _iso(5)
     )
-    if admin_api.request_by_id(booking["id"])["state"] == "pending":
-        admin_api.approve(booking["id"])
+    admin_api.approve(booking["id"])
+    assert admin_api.request_by_id(booking["id"])["state"] == "approved"
 
     requests_page.open_requests()
     confirm = requests_page.cancel_booking(second["model"])
@@ -262,12 +286,9 @@ def test_cancel_journey_narmin_withdraws_then_drops_a_confirmed_booking(
     requests_page.show_all()
     requests_page.wait_for_own_state(second["model"], "Cancelled")
     assert admin_api.request_by_id(booking["id"])["state"] == "cancelled"
-    assert admin_api.device(second["id"])["status"] == "available", (
-        "a released booking puts the phone back on the shelf"
-    )
 
 
-def test_cancel_journey_the_lab_tester_refuses_a_handover_and_narmin_hears_why(
+def test_cancel_journey_the_lab_tester_refuses_and_narmin_hears_why(
     login_page: LoginPage,
     accounts,
     narmin,
@@ -277,38 +298,38 @@ def test_cancel_journey_the_lab_tester_refuses_a_handover_and_narmin_hears_why(
     seed_project,
     admin_api: Api,
 ):
-    """The third way a booking dies: the person holding the phone cannot give
-    it up. That is a decision the holder makes, not the desk, and the reason
-    has to reach the person who was expecting the phone."""
-    device, _ = active_loan(days_ahead=0, span=1)
+    """The third way a request dies: the person holding the phone says no.
+    That is the holder's call, not the desk's, and the reason has to reach the
+    person who was hoping for the phone."""
+    device, mine = active_loan(days_ahead=0, span=1)
     label = device["model"]
 
     narmin_api = Api(api_url)
     narmin_api.login(narmin["email"], narmin["password"])
     waiting = narmin_api.create_request(
-        device["id"], seed_project["id"], "Next in the queue for this phone", _iso(3), _iso(4)
+        device["id"], seed_project["id"], "Next in the queue for this phone", _iso(0), _iso(1)
     )
-    if admin_api.request_by_id(waiting["id"])["state"] == "pending":
-        admin_api.approve(waiting["id"])
+    assert waiting["state"] == "pending"
 
-    # --- the lab tester says he cannot hand it over ----------------------
     _sign_in(login_page, accounts["tester"])
     requests_page.open_requests()
-    assert requests_page.has_row_in(SECTION_HANDOVER, label), (
-        "the holder should be asked to hand the phone over"
+    assert requests_page.has_row_in(SECTION_MINE, label), (
+        "the holder is the one being asked"
     )
-    dialog = requests_page.cant_hand_over(label)
+    dialog = requests_page.reject_as_holder(label)
     dialog.with_note("Still mid-run on the release candidate, cannot free it up")
     dialog.submit()
-    requests_page.wait_for_toast("cancel")
+    requests_page.wait_for_toast("reject")
 
     killed = admin_api.request_by_id(waiting["id"])
-    assert killed["state"] == "cancelled", f"expected cancelled, got {killed['state']}"
+    assert killed["state"] == "rejected", f"expected rejected, got {killed['state']}"
+    assert admin_api.request_by_id(mine["id"])["state"] == "active", (
+        "saying no leaves his own loan untouched"
+    )
 
-    # --- and Narmin is told, with the reason ------------------------------
     told = _alerts(narmin_api, waiting["id"])
-    assert any("cancel" in t.lower() for t in told), (
-        f"Narmin was never told her booking was called off: {told}"
+    assert any("reject" in t.lower() for t in told), (
+        f"Narmin was never told her request was refused: {told}"
     )
     assert any("mid-run" in t for t in told), (
         f"the reason never reached her: {told}"

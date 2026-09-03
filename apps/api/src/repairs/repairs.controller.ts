@@ -110,7 +110,7 @@ export class RepairsController {
   }
 
   @Post(':id/advance')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async advance(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const repair = await ctx.repairs.findOne({
@@ -179,7 +179,7 @@ export class RepairsController {
   /** A mistaken report gets an exit that does not drag the device out
    * of circulation. Staff only; clears the damage note it created. */
   @Post(':id/cancel')
-  @Roles('admin', 'manager')
+  @Roles('admin')
   async cancel(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const repair = await ctx.repairs.findOne({

@@ -18,8 +18,8 @@ interface UserRow {
   createdAt: string;
 }
 
-const ROLES: Role[] = ['admin', 'manager', 'tester'];
-const roleLabel: Record<Role, string> = { admin: 'Admin', manager: 'Manager', tester: 'Tester' };
+const ROLES: Role[] = ['admin', 'tester'];
+const roleLabel: Record<Role, string> = { admin: 'Admin', tester: 'Tester' };
 
 export default function Users() {
   const { user: me } = useAuth();

@@ -49,10 +49,10 @@ export async function notify(
   }
 }
 
-/** Active staff (admin + manager) user ids — the audience for lab events. */
+/** Active Admin user ids — the desk, and the audience for lab events. */
 export async function staffIds(manager: EntityManager): Promise<string[]> {
   const staff = await manager
     .getRepository(User)
-    .find({ where: [{ role: 'admin', active: true }, { role: 'manager', active: true }] });
+    .find({ where: { role: 'admin', active: true } });
   return staff.map((s) => s.id);
 }

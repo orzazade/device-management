@@ -23,10 +23,8 @@ import time
 import pytest
 
 from api_client import Api
-from conftest import skip_if_handover_blocked
 from pages import (
-    SECTION_HANDOVER,
-    SECTION_OUT_NOW,
+        SECTION_OUT_NOW,
     DeviceDetailPage,
     DevicesPage,
     LoginPage,
@@ -56,9 +54,9 @@ def requests_page(driver, base_url) -> RequestsPage:
 
 @pytest.mark.smoke
 def test_a_device_added_through_the_ui_is_available_and_in_its_project(
-    as_manager, devices_page: DevicesPage, admin_api: Api, seed_project, run_id: str
+    as_admin, devices_page: DevicesPage, admin_api: Api, seed_project, run_id: str
 ):
-    """The starting status. A manager adds hardware and it is immediately
+    """The starting status. An admin adds hardware and it is immediately
     borrowable, tagged to the project it was bought for."""
     serial = f"SNAVAIL{run_id}{int(time.time()) % 10000}"
     model = f"Galaxy Available {run_id}"
@@ -101,25 +99,17 @@ def test_a_device_becomes_assigned_once_it_is_handed_over(
     pending_request,
     seed_project,
 ):
-    """Assigned is earned, not set: approval alone does not move the hardware,
-    only a confirmed handover does."""
-    skip_if_handover_blocked()
-    device, req = pending_request()
+    """Assigned is earned, not set: it is the person holding the phone saying
+    yes that moves it, and the move happens in that same moment."""
+    device, req, holder = pending_request()
     label = device["model"]
 
     login_page.clear_session()
-    login_page.login(accounts["manager"]["email"], accounts["manager"]["password"])
+    login_page.login(holder["email"], holder["password"])
     requests_page.open_requests()
 
-    requests_page.approve(label)
+    requests_page.approve_as_holder(label)
     requests_page.wait_for_toast("Approved")
-    assert admin_api.device(device["id"])["status"] == "available", (
-        "approval is a decision, not a handover"
-    )
-
-    assert requests_page.has_row_in(SECTION_HANDOVER, label)
-    requests_page.confirm_handover(label)
-    requests_page.wait_for_toast("Handover confirmed")
 
     stored = admin_api.device(device["id"])
     assert stored["status"] == "assigned"
@@ -165,7 +155,7 @@ def test_a_device_sent_to_repair_shows_as_in_repair(
     assert stored["project"]["name"] == seed_project["name"], "still in its project"
 
     login_page.clear_session()
-    login_page.login(accounts["manager"]["email"], accounts["manager"]["password"])
+    login_page.login(accounts["admin"]["email"], accounts["admin"]["password"])
     devices_page.open_devices()
     devices_page.search(device["serial"])
     devices_page.wait_for_row_count(1)
@@ -183,7 +173,7 @@ def test_a_device_sent_to_repair_shows_as_in_repair(
 
 
 def test_a_device_can_be_retired_and_leaves_circulation(
-    as_manager, devices_page: DevicesPage, detail: DeviceDetailPage,
+    as_admin, devices_page: DevicesPage, detail: DeviceDetailPage,
     admin_api: Api, new_device, seed_project,
 ):
     """End of life. The record stays for history, but nobody can book it."""

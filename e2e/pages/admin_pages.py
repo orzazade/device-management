@@ -11,9 +11,10 @@ from .base_page import BasePage, xq
 
 class SettingsPage(BasePage):
     HEADING = (By.XPATH, "//h1[normalize-space()='Settings']")
-    MODE_ALL = (By.XPATH, "//label[contains(., 'Every request needs approval')]/input[@type='radio']")
-    MODE_BUSY_ONLY = (By.XPATH, "//label[contains(., 'Free devices auto-approve')]/input[@type='radio']")
-    ADMIN_ONLY_NOTE = (By.XPATH, "//p[contains(., 'Only an Admin can change this')]")
+    FLOW_HEADING = (By.XPATH, "//h2[normalize-space()='How devices change hands']")
+    FLOW_RULE = staticmethod(
+        lambda text: (By.XPATH, f"//h2[normalize-space()='How devices change hands']/following::li[contains(., \"{text}\")][1]")
+    )
     NOTIFICATIONS_HEADING = (By.XPATH, "//h2[normalize-space()='Notifications']")
     OUTBOX_HEADING = (By.XPATH, "//h2[normalize-space()='Email outbox']")
     OUTBOX_ROWS = (By.XPATH, "//h2[normalize-space()='Email outbox']/following::table[1]/tbody/tr")
@@ -22,30 +23,6 @@ class SettingsPage(BasePage):
         self.open("/settings")
         self.find(self.HEADING)
         return self
-
-    def approval_mode(self, timeout: int = 10) -> str:
-        if self.find(self.MODE_ALL, timeout).is_selected():
-            return "all"
-        if self.find(self.MODE_BUSY_ONLY, timeout).is_selected():
-            return "busy_only"
-        return "unset"
-
-    def wait_for_mode(self, expected: str, timeout: int = 15) -> None:
-        deadline = time.time() + timeout
-        seen = ""
-        while time.time() < deadline:
-            seen = self.approval_mode(timeout=2)
-            if seen == expected:
-                return
-            time.sleep(0.2)
-        raise AssertionError(f"approval mode stayed {seen!r}, expected {expected!r}")
-
-    def choose_mode(self, mode: str) -> "SettingsPage":
-        self._click_element(self.find(self.MODE_ALL if mode == "all" else self.MODE_BUSY_ONLY))
-        return self
-
-    def mode_inputs_enabled(self) -> bool:
-        return self.find(self.MODE_ALL).is_enabled()
 
     # --- notification matrix -------------------------------------------
 

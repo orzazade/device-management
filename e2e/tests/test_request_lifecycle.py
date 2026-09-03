@@ -12,10 +12,8 @@ from __future__ import annotations
 import pytest
 
 from api_client import Api
-from conftest import skip_if_handover_blocked
 from pages import (
-    SECTION_HANDOVER,
-    SECTION_OUT_NOW,
+        SECTION_OUT_NOW,
     SECTION_PENDING,
     DevicesPage,
     LoginPage,
@@ -50,7 +48,6 @@ def test_a_device_goes_out_and_comes_back(
     new_device,
     seed_project,
 ):
-    skip_if_handover_blocked()
     device = new_device(accessories=["Box", "Charger"])
     label = device["model"]
     tester = accounts["tester"]
@@ -73,39 +70,20 @@ def test_a_device_goes_out_and_comes_back(
     requests_page.wait_for_toast("Request submitted")
     requests_page.wait_for_path("/requests")
     assert requests_page.has_row(label)
-    assert requests_page.state_of(label) == "Pending"
+
+    # --- 2. nobody held it, so it is already theirs ----------------------
+    # There is no approval step for a phone on the shelf: asking for it is
+    # taking it, and the device changes hands in the same call.
+    assert requests_page.own_state_of(label) == "Active"
 
     stored = admin_api.find_request_for_device(device["id"])
-    assert stored is not None and stored["state"] == "pending"
+    assert stored is not None and stored["state"] == "active"
     assert stored["requester"]["name"] == tester["name"]
     assert stored["project"]["name"] == seed_project["name"]
 
-    # --- 2. an admin approves it ----------------------------------------
-    _sign_in(login_page, accounts["admin"])
-    requests_page.open_requests()
-    assert requests_page.has_row_in(SECTION_PENDING, label), (
-        "the request should be queued for approval"
-    )
-    assert requests_page.requester_of(label) == tester["name"]
-
-    requests_page.approve(label)
-    requests_page.wait_for_toast("Approved — handover pending")
-
-    assert admin_api.find_request_for_device(device["id"])["state"] == "approved"
-    assert admin_api.device(device["id"])["status"] == "available", (
-        "approval alone must not hand the hardware over"
-    )
-
-    # --- 3. the desk hands it over --------------------------------------
-    assert requests_page.has_row_in(SECTION_HANDOVER, label), (
-        "an approved request lands in the handover queue"
-    )
-    requests_page.confirm_handover(label)
-    requests_page.wait_for_toast("Handover confirmed — device assigned")
-
-    after_handover = admin_api.device(device["id"])
-    assert after_handover["status"] == "assigned"
-    assert after_handover["holder"]["name"] == tester["name"]
+    assigned = admin_api.device(device["id"])
+    assert assigned["status"] == "assigned"
+    assert assigned["holder"]["name"] == tester["name"]
 
     devices_page.open_devices()
     devices_page.search(device["serial"])
@@ -113,7 +91,8 @@ def test_a_device_goes_out_and_comes_back(
     assert devices_page.cell_status(device["serial"]) == "Assigned"
     assert tester["name"] in devices_page.cell_holder(device["serial"])
 
-    # --- 4. and takes it back -------------------------------------------
+    # --- 3. the desk takes it back ---------------------------------------
+    _sign_in(login_page, accounts["admin"])
     requests_page.open_requests()
     assert requests_page.has_row_in(SECTION_OUT_NOW, label), "the loan shows as out"
     ret = requests_page.check_in(label)
@@ -175,35 +154,26 @@ def test_a_rejected_request_carries_the_reason_back_to_the_requester(
     requests_page: RequestsPage,
     accounts,
     admin_api: Api,
-    new_device,
-    seed_project,
+    pending_request,
 ):
-    device = new_device()
+    """Only a device somebody is holding can be rejected — a free one is
+    simply taken. So the person holding it is the one who says no, and the
+    reason has to travel back to whoever asked."""
+    device, req, holder = pending_request()
     label = device["model"]
     note = "Reserved for the release test that week"
 
-    _sign_in(login_page, accounts["tester"])
-    devices_page.open_devices()
-    devices_page.search(device["serial"])
-    devices_page.wait_for_row_count(1)
-    dialog = devices_page.open_request_for(device["serial"])
-    dialog.choose_project(seed_project["name"])
-    dialog.enter_reason("Battery drain investigation over two days")
-    dialog.pick_first_free_range()
-    dialog.submit()
-    requests_page.wait_for_toast("Request submitted")
-
-    _sign_in(login_page, accounts["admin"])
+    _sign_in(login_page, holder)
     requests_page.open_requests()
-    reject = requests_page.reject(label)
+    reject = requests_page.reject_as_holder(label)
     reject.with_note(note)
     reject.submit()
-    requests_page.wait_for_toast("Request rejected")
+    requests_page.wait_for_toast("reject")
 
-    stored = admin_api.find_request_for_device(device["id"])
+    stored = admin_api.request_by_id(req["id"])
     assert stored["state"] == "rejected"
-    assert admin_api.device(device["id"])["status"] == "available", (
-        "a rejection must leave the device free"
+    assert admin_api.device(device["id"])["status"] == "assigned", (
+        "a rejection leaves the phone with whoever already had it"
     )
 
     # The requester sees the verdict and the reason under "all".
@@ -225,7 +195,6 @@ def test_a_damaged_return_sends_the_device_to_repairs(
     new_device,
     seed_project,
 ):
-    skip_if_handover_blocked()
     device = new_device(accessories=["Box", "Charger"])
     label = device["model"]
     damage = "Screen cracked in the bottom-left corner"
@@ -241,13 +210,10 @@ def test_a_damaged_return_sends_the_device_to_repairs(
     dialog.submit()
     requests_page.wait_for_toast("Request submitted")
 
+    # Free device, so the tester already has it — the desk only checks it
+    # back in.
     _sign_in(login_page, accounts["admin"])
     requests_page.open_requests()
-    requests_page.approve(label)
-    requests_page.wait_for_toast("Approved — handover pending")
-    requests_page.confirm_handover(label)
-    requests_page.wait_for_toast("Handover confirmed")
-
     ret = requests_page.check_in(label)
     ret.uncheck_accessory("Charger")
     ret.mark_damaged(damage)
