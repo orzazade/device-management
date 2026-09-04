@@ -144,7 +144,40 @@ fi
 
 # ---------------------------------------------------------------------- run
 
+# The API and Vite have always been logged; pytest was not, so the run's own
+# output existed only on the terminal. Anything that piped this script — a CI
+# step, a `| tail`, an agent capturing the last few lines — threw the rest
+# away, and a failure two thirds of the way through a seventeen-minute run
+# was then unreadable without repeating it.
+RUN_LOG="$LOG_DIR/pytest-$(date +%Y%m%d-%H%M%S).log"
+ln -sf "$(basename "$RUN_LOG")" "$LOG_DIR/pytest-latest.log"
+
+# Colour on a terminal, none in the file. pytest turns colour off when its
+# stdout is a pipe, and tee makes it one, so it has to be asked for — then
+# stripped from the saved copy, which is read with grep far more often than
+# with a pager.
+COLOR_FLAG=""
+[ -t 1 ] && COLOR_FLAG="--color=yes"
+
 say "running the suite against $WEB_URL"
+say "full log: $RUN_LOG"
 cd "$E2E_DIR"
+set +e
 BASE_URL="$WEB_URL" API_URL="http://localhost:${API_PORT}/api/v1" \
-  "$VENV/bin/python" -m pytest "$@"
+  "$VENV/bin/python" -m pytest $COLOR_FLAG "$@" 2>&1 | tee "$RUN_LOG"
+PYTEST_STATUS=${PIPESTATUS[0]}
+set -e
+
+if [ -n "$COLOR_FLAG" ]; then
+  sed $'s/\033\[[0-9;]*m//g' "$RUN_LOG" > "$RUN_LOG.tmp" && mv "$RUN_LOG.tmp" "$RUN_LOG"
+fi
+
+# Keep the last ten runs. Enough to compare a failure against the run before
+# it, without the directory growing for the life of the project.
+ls -1t "$LOG_DIR"/pytest-2*.log 2>/dev/null | tail -n +11 | while read -r old; do
+  rm -f "$old"
+done
+
+# Repeated last, so it survives being piped through `tail`.
+say "full log: $RUN_LOG"
+exit $PYTEST_STATUS
