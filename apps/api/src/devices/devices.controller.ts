@@ -25,7 +25,7 @@ import {
   IsUUID,
   MinLength,
 } from 'class-validator';
-import { AuthUser, Roles } from '../auth/auth.guard';
+import { AuthUser, RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { Device, DEVICE_STATUSES } from '../entities/device.entity';
 import {
@@ -119,6 +119,7 @@ export class DevicesController {
     private readonly importer: ImportService,
   ) {}
 
+  @RequirePermission('devices.view')
   @Get()
   async list(
     @Req() req: { user: AuthUser },
@@ -165,8 +166,8 @@ export class DevicesController {
     return rows.map((d) => ({ ...pub(d), busy: busy.get(d.id) ?? null }));
   }
 
+  @RequirePermission('devices.delete')
   @Delete(':id')
-  @Roles('admin')
   async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const device = await ctx.devices.findOne({ where: { id } });
@@ -201,8 +202,8 @@ export class DevicesController {
     });
   }
 
+  @RequirePermission('devices.restore')
   @Post(':id/restore')
-  @Roles('admin')
   async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const device = await ctx.devices.findOne({ where: { id }, withDeleted: true });
@@ -218,6 +219,7 @@ export class DevicesController {
     });
   }
 
+  @RequirePermission('devices.view')
   @Get(':id')
   async get(@Param('id') id: string) {
     const d = await this.db
@@ -232,6 +234,7 @@ export class DevicesController {
    * hard bookings, pending are "requested" (picking them invites a conflict).
    * excludeRequestId lets the time-override modal ignore its own range.
    */
+  @RequirePermission('devices.view')
   @Get(':id/bookings')
   async bookings(
     @Param('id') id: string,
@@ -251,6 +254,7 @@ export class DevicesController {
       }));
   }
 
+  @RequirePermission('devices.view')
   @Get(':id/repairs')
   async repairs(@Param('id') id: string) {
     const rows = await this.db.repairs().find({
@@ -268,6 +272,7 @@ export class DevicesController {
     }));
   }
 
+  @RequirePermission('devices.view')
   @Get(':id/history')
   async history(@Param('id') id: string) {
     // The device's story includes its loans and repairs, not just edits.
@@ -287,8 +292,8 @@ export class DevicesController {
       .find({ where: wheres as never, order: { id: 'DESC' }, take: 200 });
   }
 
+  @RequirePermission('devices.create')
   @Post()
-  @Roles('admin')
   async create(@Body() dto: DeviceDto, @Req() req: { user: AuthUser }) {
     const d: Device = await this.bus.execute(new CreateDeviceCommand(actor(req), dto));
     // Reply with the same shape as GET — relations included.
@@ -298,8 +303,8 @@ export class DevicesController {
     return pub(full ?? d);
   }
 
+  @RequirePermission('devices.update')
   @Patch(':id')
-  @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() dto: DevicePatchDto,
@@ -312,8 +317,8 @@ export class DevicesController {
     return pub(full ?? d);
   }
 
+  @RequirePermission('devices.import')
   @Post('import')
-  @Roles('admin')
   async import(@Query('commit') commit: string, @Req() req: any) {
     const file = await req.file();
     if (!file) throw new BadRequestException('Upload an .xlsx file');
@@ -331,8 +336,8 @@ export class DevicesController {
 
   /** The column contract as a file, not a sentence: header row + one
    * example, generated from the same map the importer reads. */
+  @RequirePermission('devices.import')
   @Get('import/template')
-  @Roles('admin')
   async importTemplate(@Res({ passthrough: false }) res: any) {
     const buffer = await this.importer.buildTemplate();
     res

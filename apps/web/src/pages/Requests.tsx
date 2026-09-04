@@ -10,7 +10,7 @@ import ReturnModal from '../components/ReturnModal';
 import { VForm, VField } from '../components/VForm';
 import { minLen, required } from '../lib/validate';
 import { api } from '../lib/api';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
 
 const CLOSED = ['returned', 'rejected', 'cancelled'];
@@ -20,7 +20,10 @@ const CLOSED = ['returned', 'rejected', 'cancelled'];
  * concern them; staff see the lab-wide desk view plus their own. */
 export default function Requests() {
   const { user } = useAuth();
-  const staffUser = isStaff(user?.role);
+  const can = useCan();
+  // The desk sections all hang off seeing everyone's requests; the
+  // individual actions inside them check their own permission.
+  const staffUser = can('requests.viewAll');
   const qc = useQueryClient();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);

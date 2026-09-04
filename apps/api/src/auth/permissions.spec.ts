@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCESS_CONTROL_KEYS,
-  ADMINISTRATOR_KEYS,
   ALL_PERMISSION_KEYS,
   LAB_TESTER_KEYS,
   PERMISSIONS,
   PERMISSION_DEPENDENCIES,
+  SUPER_ADMIN_KEYS,
+  SYSTEM_ROLES,
   withDependencies,
 } from './permissions';
 
@@ -66,15 +67,17 @@ describe('the seeded system roles', () => {
     expect(new Set(ALL_PERMISSION_KEYS)).toEqual(new Set(PERMISSIONS.map((p) => p.key)));
   });
 
-  it('keeps access control out of Administrator', () => {
-    for (const key of ACCESS_CONTROL_KEYS) {
-      expect(ADMINISTRATOR_KEYS, `Administrator must not hold ${key}`).not.toContain(key);
-    }
+  it('has exactly two system roles', () => {
+    // One administrative tier, not two. Anyone who administers the lab also
+    // administers access to it.
+    expect(Object.keys(SYSTEM_ROLES).sort()).toEqual(['labTester', 'superAdmin']);
   });
 
-  it('gives Administrator everything else', () => {
-    const expected = ALL_PERMISSION_KEYS.filter((k) => !ACCESS_CONTROL_KEYS.includes(k));
-    expect([...ADMINISTRATOR_KEYS].sort()).toEqual([...expected].sort());
+  it('gives Super Admin access control, which nothing else may hold', () => {
+    for (const key of ACCESS_CONTROL_KEYS) {
+      expect(SUPER_ADMIN_KEYS, `Super Admin must hold ${key}`).toContain(key);
+      expect(LAB_TESTER_KEYS, `Lab Tester must not hold ${key}`).not.toContain(key);
+    }
   });
 
   it('puts every access-control permission in the Access control module', () => {

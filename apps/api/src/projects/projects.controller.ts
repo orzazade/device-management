@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { writeAudit } from '../audit/audit';
-import { AuthUser, Roles } from '../auth/auth.guard';
+import { AuthUser, RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 
 class ProjectDto {
@@ -38,6 +38,7 @@ export class ProjectsController {
   constructor(private readonly db: AppDbContext) {}
 
   /** kind: 'project' (default — existing callers), 'squad', or 'all'. */
+  @RequirePermission('projects.view')
   @Get()
   async list(
     @Req() req: { user: AuthUser },
@@ -83,8 +84,8 @@ export class ProjectsController {
     }));
   }
 
+  @RequirePermission('projects.delete')
   @Delete(':id')
-  @Roles('admin')
   async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const project = await ctx.projects.findOne({ where: { id } });
@@ -116,8 +117,8 @@ export class ProjectsController {
     });
   }
 
+  @RequirePermission('projects.restore')
   @Post(':id/restore')
-  @Roles('admin')
   async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const project = await ctx.projects.findOne({ where: { id }, withDeleted: true });
@@ -154,8 +155,8 @@ export class ProjectsController {
     });
   }
 
+  @RequirePermission('projects.update')
   @Patch(':id')
-  @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() dto: ProjectDto,
@@ -188,8 +189,8 @@ export class ProjectsController {
     });
   }
 
+  @RequirePermission('projects.create')
   @Post()
-  @Roles('admin')
   async create(@Body() dto: ProjectDto, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const kind = dto.kind ?? 'project';

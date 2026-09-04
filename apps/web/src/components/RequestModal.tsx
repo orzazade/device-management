@@ -5,7 +5,7 @@ import { useToast } from './Toasts';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import type { DeviceRow } from '../lib/types';
 import RangeCalendar, { type BookingRange, type DateRange } from './RangeCalendar';
 import { VForm, VField } from './VForm';
@@ -25,6 +25,7 @@ export default function RequestModal({
   onClose: () => void;
 }) {
   const { user } = useAuth();
+  const can = useCan();
   const qc = useQueryClient();
   const toast = useToast();
   const nav = useNavigate();
@@ -36,7 +37,7 @@ export default function RequestModal({
   const users = useQuery({
     queryKey: ['users'],
     queryFn: () => api<UserRow[]>('/users'),
-    enabled: isStaff(user?.role),
+    enabled: can('users.view'),
   });
   const projects = useQuery({
     queryKey: ['projects'],
@@ -148,7 +149,7 @@ export default function RequestModal({
             <RangeCalendar bookings={bookings.data ?? []} value={range} onChange={setRange} />
           )}
         </div>
-        {isStaff(user?.role) && (
+        {can('users.view') && (
           <label className="mb-3 block">
             <span className="mb-1 block text-xs font-semibold text-neutral-500">
               On behalf of

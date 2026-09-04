@@ -28,11 +28,22 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
         role: data.role,
         passwordHash: bcrypt.hashSync(data.password, 10),
       });
+      // Grant the matching role straight away. An account created with no
+      // role would hold no permissions at all — a person who can sign in and
+      // then find every screen empty, which reads as a broken app rather than
+      // as a deliberate restriction.
+      const target = data.role === 'admin' ? 'Super Admin' : 'Lab Tester';
+      await ctx.manager.query(
+        `INSERT INTO user_roles (user_id, role_id, granted_by_id)
+         SELECT $1, r.id, $2 FROM roles r WHERE r.name = $3
+         ON CONFLICT DO NOTHING`,
+        [user.id, actor.id, target],
+      );
       await writeAudit(ctx.manager, actor, {
         entityType: 'user',
         entityId: user.id,
         action: 'created',
-        newValue: { name: user.name, email: user.email, role: user.role },
+        newValue: { name: user.name, email: user.email, role: user.role, rbacRole: target },
       });
       return user;
     });
@@ -157,12 +168,32 @@ export class ChangeUserRoleHandler implements ICommandHandler<ChangeUserRoleComm
       }
       user.role = role;
       await ctx.users.save(user);
+
+      // Keep the permission model in step with the legacy column. Until the
+      // role editor ships, this endpoint is the only thing that changes what
+      // somebody can do, so letting the two drift would mean permissions
+      // going stale the moment anyone is promoted.
+      const target = role === 'admin' ? 'Super Admin' : 'Lab Tester';
+      await ctx.manager.query(
+        `DELETE FROM user_roles ur
+         USING roles r
+         WHERE ur.role_id = r.id AND ur.user_id = $1
+           AND r.name IN ('Super Admin', 'Lab Tester')`,
+        [user.id],
+      );
+      await ctx.manager.query(
+        `INSERT INTO user_roles (user_id, role_id, granted_by_id)
+         SELECT $1, r.id, $2 FROM roles r WHERE r.name = $3
+         ON CONFLICT DO NOTHING`,
+        [user.id, actor.id, target],
+      );
+
       await writeAudit(ctx.manager, actor, {
         entityType: 'user',
         entityId: user.id,
         action: 'role_changed',
         oldValue: { role: old },
-        newValue: { role },
+        newValue: { role, rbacRole: target },
       });
       return user;
     });

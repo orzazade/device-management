@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
 import { useClickOutside } from '../lib/useClickOutside';
 import Bell from './Bell';
@@ -51,7 +51,19 @@ export default function Layout() {
     useAuth();
   const nav = useNavigate();
   const loc = useLocation();
-  const staff = isStaff(user?.role);
+  const can = useCan();
+  // Each link asks for the permission its own page needs, so a role that
+  // grants only one of them shows only that one.
+  //
+  // Projects is the exception worth spelling out: `projects.view` means "read
+  // the list", which every tester needs for the project dropdown when asking
+  // for a device. The Projects SCREEN is for changing those groups, so it
+  // asks whether you can change something — otherwise granting the dropdown
+  // would hand everyone an admin page.
+  const canManageProjects =
+    can('projects.create') || can('projects.update') || can('projects.delete');
+  const manage = ['users.view', 'reports.idle.view', 'settings.view'];
+  const showManage = canManageProjects || manage.some((k) => can(k));
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -67,7 +79,7 @@ export default function Layout() {
   const approvals = useQuery({
     queryKey: ['requests', 'pending-approvals'],
     queryFn: () => api<RequestRow[]>('/requests?scope=all&state=pending'),
-    enabled: !!user && staff,
+    enabled: !!user && can('requests.viewAll'),
     refetchInterval: 30000,
   });
   // A request can be waiting on anyone, not just the desk — without this
@@ -87,7 +99,7 @@ export default function Layout() {
   const overdue = useQuery({
     queryKey: ['requests', 'overdue-count'],
     queryFn: () => api<RequestRow[]>('/requests?scope=all&state=overdue'),
-    enabled: !!user && staff,
+    enabled: !!user && can('requests.viewAll'),
     refetchInterval: 60000,
   });
   useEffect(() => {
@@ -170,16 +182,24 @@ export default function Layout() {
           Repairs
           <Badge n={dash.data?.openRepairs} />
         </NavLink>
-        {staff && (
+        {showManage && (
           <>
             <Section label="Manage" />
-            <NavLink data-testid="nav-projects" to="/projects" className={linkCls}>Projects</NavLink>
-            <NavLink data-testid="nav-users" to="/users" className={linkCls}>Users</NavLink>
-            <NavLink data-testid="nav-reports" to="/reports" className={linkCls}>Idle devices</NavLink>
-            <NavLink data-testid="nav-settings" to="/settings" className={linkCls}>Settings</NavLink>
+            {canManageProjects && (
+              <NavLink data-testid="nav-projects" to="/projects" className={linkCls}>Projects</NavLink>
+            )}
+            {can('users.view') && (
+              <NavLink data-testid="nav-users" to="/users" className={linkCls}>Users</NavLink>
+            )}
+            {can('reports.idle.view') && (
+              <NavLink data-testid="nav-reports" to="/reports" className={linkCls}>Idle devices</NavLink>
+            )}
+            {can('settings.view') && (
+              <NavLink data-testid="nav-settings" to="/settings" className={linkCls}>Settings</NavLink>
+            )}
           </>
         )}
-        {staff && (
+        {can('audit.view') && (
           <NavLink data-testid="nav-audit" to="/audit" className={linkCls}>Audit log</NavLink>
         )}
       </nav>

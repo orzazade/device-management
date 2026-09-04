@@ -23,7 +23,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-import { AuthUser, Roles } from '../auth/auth.guard';
+import { AuthUser, PermissionChange, RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { Role, ROLES, User } from '../entities/user.entity';
 import {
@@ -91,8 +91,8 @@ export class UsersController {
     private readonly bus: CommandBus,
   ) {}
 
+  @RequirePermission('users.view')
   @Get()
-  @Roles('admin')
   async list(@Query('deleted') deleted?: string) {
     if (deleted === 'true') {
       const gone = await this.db
@@ -114,8 +114,8 @@ export class UsersController {
     return users.map((u) => ({ ...pub(u), holds: byId.get(u.id) ?? 0 }));
   }
 
+  @RequirePermission('users.delete')
   @Delete(':id')
-  @Roles('admin')
   async softDelete(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       if (id === req.user.sub) throw new ConflictException('You cannot delete yourself');
@@ -148,8 +148,8 @@ export class UsersController {
     });
   }
 
+  @RequirePermission('users.restore')
   @Post(':id/restore')
-  @Roles('admin')
   async restore(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const user = await ctx.users.findOne({ where: { id }, withDeleted: true });
@@ -169,8 +169,8 @@ export class UsersController {
     });
   }
 
+  @RequirePermission('users.create')
   @Post()
-  @Roles('admin')
   async create(@Body() dto: CreateUserDto, @Req() req: { user: AuthUser }) {
     // A manager must not be able to mint accounts at or above their own
     // power — only an Admin creates Managers or Admins.
@@ -181,8 +181,8 @@ export class UsersController {
     return pub(user);
   }
 
+  @RequirePermission('users.update')
   @Patch(':id')
-  @Roles('admin')
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,
@@ -210,7 +210,11 @@ export class UsersController {
   }
 
   @Patch(':id/role')
-  @Roles('admin')
+  @RequirePermission('users.roles.assign')
+  @PermissionChange(
+    'Role assignment moves to Super Admin at step 3 — ordinary Admins lose it, ' +
+      'which is what keeps "can manage users" from becoming "can do anything".',
+  )
   async changeRole(
     @Param('id') id: string,
     @Body() dto: ChangeRoleDto,

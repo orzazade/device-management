@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
-import { AuthUser, Roles } from '../auth/auth.guard';
+import { AuthUser, RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { DeviceRequest } from '../entities/device-request.entity';
 import { JobsService } from '../jobs/jobs.service';
@@ -119,6 +119,7 @@ export class RequestsController {
     private readonly jobs: JobsService,
   ) {}
 
+  @RequirePermission('requests.create')
   @Post()
   async create(@Body() dto: CreateRequestDto, @Req() req: { user: AuthUser }) {
     const requesterId =
@@ -142,6 +143,7 @@ export class RequestsController {
     return this.reload(r.id);
   }
 
+  @RequirePermission('requests.view')
   @Get()
   async list(
     @Req() req: { user: AuthUser },
@@ -264,8 +266,8 @@ export class RequestsController {
   }
 
   /** Manual overdue scan — same code the hourly job runs, for ops and tests. */
+  @RequirePermission('jobs.run')
   @Post('scan-overdue')
-  @Roles('admin')
   async scanOverdue(@Req() req: { user: AuthUser }) {
     const marked = await this.jobs.scanOverdue(actor(req));
     return { marked };
@@ -274,8 +276,8 @@ export class RequestsController {
   /** Manual re-nag of still-overdue loans, the companion to scan-overdue.
    * Chasing a late device is the desk's job, so they can trigger the round
    * of reminders themselves instead of waiting for the next scheduled one. */
+  @RequirePermission('jobs.run')
   @Post('renag-overdue')
-  @Roles('admin')
   async renagOverdue() {
     const sent = await this.jobs.renagOverdue();
     return { sent };

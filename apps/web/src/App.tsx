@@ -3,7 +3,7 @@ import { queryClient } from './lib/queryClient';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toasts';
-import { AuthProvider, SessionExpiryRedirect, useAuth, type Role } from './lib/auth';
+import { AuthProvider, SessionExpiryRedirect, useAuth } from './lib/auth';
 import Audit from './pages/Audit';
 import Dashboard from './pages/Dashboard';
 import Requests from './pages/Requests';
@@ -31,11 +31,11 @@ function NotFound() {
   );
 }
 
-/** Blocks a route group by role. The API refuses anyway (403) — this keeps
- * testers from ever landing on staff pages via a typed URL. */
-function RequireRole({ roles }: { roles: Role[] }) {
+/** Blocks a route by permission. The API refuses anyway (403) — this keeps
+ * someone from landing on a page that would only show them an error. */
+function RequirePermission({ need }: { need: string }) {
   const { user } = useAuth();
-  if (user && !roles.includes(user.role)) return <Navigate to="/" replace />;
+  if (user && !user.permissions?.includes(need)) return <Navigate to="/" replace />;
   return <Outlet />;
 }
 
@@ -60,13 +60,21 @@ export default function App() {
               <Route path="/approvals" element={<Navigate to="/requests" replace />} />
               <Route path="/loans" element={<Navigate to="/requests" replace />} />
               <Route path="/repairs" element={<Repairs />} />
-              <Route element={<RequireRole roles={['admin']} />}>
+              <Route element={<RequirePermission need="reports.idle.view" />}>
                 <Route path="/reports" element={<Reports />} />
+              </Route>
+              {/* The screen manages groups; reading the list is a different,
+                  much wider permission that feeds the request dialog. */}
+              <Route element={<RequirePermission need="projects.create" />}>
                 <Route path="/projects" element={<Projects />} />
+              </Route>
+              <Route element={<RequirePermission need="users.view" />}>
                 <Route path="/users" element={<Users />} />
+              </Route>
+              <Route element={<RequirePermission need="settings.view" />}>
                 <Route path="/settings" element={<Settings />} />
               </Route>
-              <Route element={<RequireRole roles={['admin']} />}>
+              <Route element={<RequirePermission need="audit.view" />}>
                 <Route path="/audit" element={<Audit />} />
               </Route>
               <Route path="*" element={<NotFound />} />

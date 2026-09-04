@@ -33,6 +33,8 @@ import { RequestProject1726000000000 } from '../migrations/1726000000000-request
 import { Squads1726100000000 } from '../migrations/1726100000000-squads';
 import { DropManagerRole1726200000000 } from '../migrations/1726200000000-drop-manager-role';
 import { RbacTables1726300000000 } from '../migrations/1726300000000-rbac-tables';
+import { DropAdministratorRole1726400000000 } from '../migrations/1726400000000-drop-administrator-role';
+import { BackfillMissingRoles1726500000000 } from '../migrations/1726500000000-backfill-missing-roles';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -74,6 +76,8 @@ export const dataSourceOptions: DataSourceOptions = {
     Squads1726100000000,
     DropManagerRole1726200000000,
     RbacTables1726300000000,
+    DropAdministratorRole1726400000000,
+    BackfillMissingRoles1726500000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

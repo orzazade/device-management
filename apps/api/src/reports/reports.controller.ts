@@ -1,5 +1,5 @@
 import { Controller, Get, Query, Req } from '@nestjs/common';
-import { AuthUser, Roles } from '../auth/auth.guard';
+import { AuthUser, RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 
 /**
@@ -12,6 +12,7 @@ export class ReportsController {
 
   /** Honest dashboard numbers, computed where the data lives.
    * "Available now" excludes open repairs and bookings covering today. */
+  @RequirePermission('reports.view')
   @Get('dashboard')
   async dashboard(@Req() req: { user: AuthUser }) {
     const [avail] = await this.db.raw.query(`
@@ -51,8 +52,8 @@ export class ReportsController {
     return { availableNow: avail.n, openRepairs: repairs.n, overdue };
   }
 
+  @RequirePermission('reports.idle.view')
   @Get('idle-devices')
-  @Roles('admin')
   async idleDevices(@Query('days') days?: string) {
     const n = Math.min(Math.max(parseInt(days ?? '90', 10) || 90, 7), 365);
     // "Activity" = real usage: the end of a loan's window (or its creation

@@ -55,10 +55,9 @@ export class Permission {
 /**
  * A named set of permissions.
  *
- * Three are seeded and marked `isSystem`: Super Admin, Administrator and Lab
- * Tester. System roles cannot be deleted, and the first two cannot have their
- * permissions edited — otherwise one click could lock the organisation out of
- * its own tool.
+ * Two are seeded and marked `isSystem`: Super Admin and Lab Tester. Neither
+ * can be deleted, and Super Admin's permissions cannot be edited — otherwise
+ * one click could lock the organisation out of its own tool.
  */
 @Entity('roles')
 export class Role {

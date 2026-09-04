@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import { useClickOutside } from '../lib/useClickOutside';
 
 interface NotifRow {
@@ -27,6 +27,7 @@ function timeAgo(iso: string): string {
 
 export default function Bell() {
   const { user } = useAuth();
+  const can = useCan();
   const qc = useQueryClient();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
@@ -118,7 +119,7 @@ export default function Bell() {
               <p className="p-5 text-center text-neutral-400">No notifications yet.</p>
             )}
           </div>
-          {isStaff(user?.role) && (
+          {can('settings.view') && (
             <div className="border-t border-neutral-100 p-2.5 text-center">
               <Link
                 to="/settings"

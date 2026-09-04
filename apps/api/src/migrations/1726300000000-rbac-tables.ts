@@ -1,12 +1,35 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 import {
   ACCESS_CONTROL_KEYS,
-  ADMINISTRATOR_KEYS,
   ALL_PERMISSION_KEYS,
   LAB_TESTER_KEYS,
   PERMISSIONS,
-  SYSTEM_ROLES,
 } from '../auth/permissions';
+
+// Names are frozen here rather than read from SYSTEM_ROLES: a migration is a
+// record of what actually ran, and it must keep seeding what it seeded even
+// after the constant moves on. The Administrator role it creates is retired
+// by the next migration.
+const SEEDED = {
+  superAdmin: {
+    name: 'Super Admin',
+    description:
+      'Unrestricted. The only role that can create roles, change what a role grants, or decide which roles a person holds.',
+  },
+  administrator: {
+    name: 'Administrator',
+    description:
+      'Runs the lab: devices, users, repairs, projects, settings and the audit log. Cannot change who can do what.',
+  },
+  labTester: {
+    name: 'Lab Tester',
+    description:
+      'Borrows devices, reports damage, and sees the lab’s inventory. The baseline every account starts from.',
+  },
+};
+const ADMINISTRATOR_SEED = ALL_PERMISSION_KEYS.filter(
+  (k) => !ACCESS_CONTROL_KEYS.includes(k),
+);
 
 /**
  * Step 1 of the RBAC rollout: the tables, the catalogue and the backfill.
@@ -122,19 +145,16 @@ export class RbacTables1726300000000 implements MigrationInterface {
       );
     };
 
-    const superId = await roleId(SYSTEM_ROLES.superAdmin.name, SYSTEM_ROLES.superAdmin.description);
-    const adminId = await roleId(
-      SYSTEM_ROLES.administrator.name,
-      SYSTEM_ROLES.administrator.description,
-    );
-    const testerId = await roleId(SYSTEM_ROLES.labTester.name, SYSTEM_ROLES.labTester.description);
+    const superId = await roleId(SEEDED.superAdmin.name, SEEDED.superAdmin.description);
+    const adminId = await roleId(SEEDED.administrator.name, SEEDED.administrator.description);
+    const testerId = await roleId(SEEDED.labTester.name, SEEDED.labTester.description);
 
     // Grants are stored as rows rather than resolved by a rule at runtime, so
     // the database answers "what does this role allow?" on its own. The cost
     // is that a release adding a permission must also grant it to these two —
     // guarded by a test that asserts Super Admin holds every catalogue key.
     await grant(superId, ALL_PERMISSION_KEYS);
-    await grant(adminId, ADMINISTRATOR_KEYS);
+    await grant(adminId, ADMINISTRATOR_SEED);
     await grant(testerId, LAB_TESTER_KEYS);
 
     // Belt and braces: access control must never reach a non-super role.

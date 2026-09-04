@@ -13,7 +13,7 @@ import {
 import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 import { IsNull } from 'typeorm';
 import { writeAudit } from '../audit/audit';
-import { AuthUser, Roles } from '../auth/auth.guard';
+import { AuthUser, RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { NotificationRule } from '../entities/notification.entity';
 
@@ -65,14 +65,14 @@ export class NotificationsController {
     return { ok: true };
   }
 
+  @RequirePermission('settings.view')
   @Get('notification-rules')
-  @Roles('admin')
   async rules() {
     return this.db.notificationRules().find({ order: { event: 'ASC' } });
   }
 
+  @RequirePermission('settings.rules.update')
   @Patch('notification-rules/:event')
-  @Roles('admin')
   async patchRule(
     @Param('event') event: string,
     @Body() dto: RulePatchDto,
@@ -101,15 +101,15 @@ export class NotificationsController {
   /** Kept so existing clients keep working; the value is now fixed. Whoever
    * holds a device decides who gets it next, and a device nobody holds is
    * simply taken — there is nothing left to configure. */
+  @RequirePermission('settings.view')
   @Get('settings')
-  @Roles('admin')
   async settings() {
     return { approvalMode: 'holder' };
   }
 
   /** The outbox Settings promises: staff can SEE queued/failed mail. */
+  @RequirePermission('settings.email.view')
   @Get('email-outbox')
-  @Roles('admin')
   async emailOutbox() {
     const rows = await this.db.emailOutbox().find({
       order: { id: 'DESC' },
@@ -123,8 +123,8 @@ export class NotificationsController {
     return { counts, rows };
   }
 
+  @RequirePermission('settings.email.retry')
   @Post('email-outbox/:id/retry')
-  @Roles('admin')
   async retryEmail(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const mail = await ctx.emailOutbox.findOne({ where: { id } });

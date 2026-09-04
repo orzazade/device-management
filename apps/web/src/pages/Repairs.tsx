@@ -7,7 +7,7 @@ import Modal from '../components/Modal';
 import { VForm, VField } from '../components/VForm';
 import { minLen, required } from '../lib/validate';
 import { api } from '../lib/api';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 
 interface RepairRow {
   id: string;
@@ -20,6 +20,9 @@ interface RepairRow {
 
 export default function Repairs() {
   const { user } = useAuth();
+  const can = useCan();
+  // The actions column exists only if there is at least one action in it.
+  const canAct = can('repairs.advance') || can('repairs.cancel') || can('repairs.writeOff');
   const qc = useQueryClient();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +89,7 @@ export default function Repairs() {
               <th className="px-4 py-2.5">Opened</th>
               <th className="px-4 py-2.5">By</th>
               <th className="px-4 py-2.5">State</th>
-              {isStaff(user?.role) && <th className="px-4 py-2.5" />}
+              {canAct && <th className="px-4 py-2.5" />}
             </tr>
           </thead>
           <tbody>
@@ -105,7 +108,7 @@ export default function Repairs() {
                 <td className="px-4 py-2.5">
                   <Chip status={r.state} />
                 </td>
-                {isStaff(user?.role) && (
+                {canAct && (
                   <td className="whitespace-nowrap px-4 py-2.5">
                     {!['fixed', 'written_off'].includes(r.state) && (
                       <button
@@ -126,7 +129,7 @@ export default function Repairs() {
                       </button>
                     )}
                     {['repair_requested', 'in_repair'].includes(r.state) &&
-                      user?.role === 'admin' && (
+                      can('repairs.writeOff') && (
                         <button
                           onClick={() => setWriteOffFor(r)}
                           disabled={act.isPending}

@@ -224,7 +224,10 @@ def test_changing_a_role_asks_for_confirmation_first(
     as_admin, users_page: UsersPage, admin_api: Api, spare_account
 ):
     """Role changes take effect on the person's next click, so the app makes
-    the admin acknowledge the consequence.
+    the administrator acknowledge the consequence.
+
+    Assigning roles belongs to Super Admin, which is now the single
+    administrative role — so an admin signing in is already one.
 
     The account is permanent and reset to Tester by the fixture, so the test
     can promote it every run without creating anyone.

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Chip from '../components/Chip';
 import RequestTable from '../components/RequestTable';
 import { api } from '../lib/api';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import type { RequestRow } from '../lib/requests';
 import type { DeviceRow } from '../lib/types';
 
@@ -24,6 +24,7 @@ interface DashStats {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const can = useCan();
   const devices = useQuery({
     queryKey: ['devices'],
     queryFn: () => api<DeviceRow[]>('/devices'),
@@ -42,7 +43,7 @@ export default function Dashboard() {
   const pending = useQuery({
     queryKey: ['requests', 'pending-approvals'],
     queryFn: () => api<RequestRow[]>('/requests?scope=all&state=pending'),
-    enabled: isStaff(user?.role),
+    enabled: can('reports.viewAll'),
   });
 
   const mine = devices.data?.filter((d) => d.holder?.id === user?.id) ?? [];
@@ -56,7 +57,7 @@ export default function Dashboard() {
         <h1 className="text-xl font-bold">Hi, {user?.name.split(' ')[0]}</h1>
         <p className="text-neutral-500">Here’s the lab right now.</p>
       </div>
-      {isStaff(user?.role) && (stats.data?.overdue.length ?? 0) > 0 && (
+      {can('reports.viewAll') && (stats.data?.overdue.length ?? 0) > 0 && (
         <div className="mb-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3">
           <b className="text-red-800">
             {stats.data!.overdue.length} device{stats.data!.overdue.length > 1 ? 's are' : ' is'} overdue
@@ -78,7 +79,7 @@ export default function Dashboard() {
           <Stat k={stats.data?.availableNow ?? '…'} label="Devices available now" />
         </Link>
         <Stat k={mine.length} label="In my hands" />
-        {isStaff(user?.role) && (
+        {can('requests.viewAll') && (
           <Link to="/requests" className="text-inherit no-underline">
             <Stat k={pending.data?.length ?? '…'} label="Waiting for approval" />
           </Link>

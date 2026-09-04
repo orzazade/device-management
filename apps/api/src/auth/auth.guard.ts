@@ -10,24 +10,71 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { AppDbContext } from '../db/app-db-context';
 import { Role } from '../entities/user.entity';
+import { PermissionResolver } from './permission.resolver';
 
-export interface AuthUser {
+/**
+ * What the signed token carries: identity, and nothing that can go stale.
+ *
+ * Permissions are deliberately absent. Putting them in a 12-hour token would
+ * mean a revoked permission kept working until it expired — the exact
+ * property the guard goes out of its way to avoid by re-reading the user on
+ * every request.
+ */
+export interface TokenClaims {
   sub: string;
   name: string;
   email: string;
   role: Role;
 }
 
+/** The caller, as handlers see them: claims plus freshly resolved permissions. */
+export interface AuthUser extends TokenClaims {
+  /** Effective permissions, resolved per request. Not enforced yet (step 2). */
+  permissions: Set<string>;
+}
+
 export const PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
 
 export const ROLES_KEY = 'roles';
+/**
+ * @deprecated Nothing uses this any more — permissions decide. It survives
+ * only so step 5 can remove it together with the users.role column it reads.
+ */
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
 
+export const PERMISSIONS_KEY = 'permissions';
 /**
- * Global guard: every route requires a valid Bearer token unless @Public().
- * @Roles(...) additionally restricts by role. The frontend only hides
- * buttons; this is the actual protection.
+ * The permissions this route will require once step 3 switches enforcement.
+ *
+ * During step 2 it enforces nothing: the guard resolves what the caller holds,
+ * compares it against the @Roles verdict, and logs when the two disagree. That
+ * turns a mis-mapped endpoint into a warning on a developer's machine rather
+ * than a 403 for somebody trying to do their job.
+ */
+export const RequirePermission = (...keys: string[]) =>
+  SetMetadata(PERMISSIONS_KEY, keys);
+
+export const PERMISSION_CHANGE_KEY = 'permissionChange';
+/**
+ * Marks a route where the permission model is MEANT to differ from today's
+ * role check, with the reason. Without this, an intended change would look
+ * identical to a mapping bug in the logs and "no warnings" could never be a
+ * clean gate for step 3.
+ */
+export const PermissionChange = (why: string) => SetMetadata(PERMISSION_CHANGE_KEY, why);
+
+/**
+ * Global guard: every route requires a valid Bearer token unless @Public(),
+ * and every permission named by @RequirePermission() must be held. The
+ * frontend only hides buttons; this is the actual protection.
+ *
+ * Two things it deliberately does NOT decide. Whether a particular record is
+ * yours to act on — approving a request for a device you hold, cancelling
+ * your own booking — is a relationship, settled in the handler. And routes
+ * with no permission at all are reachable by anyone signed in, which is
+ * checked to be intentional by route-coverage.spec.ts rather than left to
+ * whoever reads the diff.
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -35,6 +82,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwt: JwtService,
     private readonly reflector: Reflector,
     private readonly db: AppDbContext,
+    private readonly perms: PermissionResolver,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -47,9 +95,9 @@ export class AuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     const token = (req.headers['authorization'] ?? '').replace(/^Bearer /, '');
     if (!token) throw new UnauthorizedException('Missing token');
-    let claims: AuthUser;
+    let claims: TokenClaims;
     try {
-      claims = await this.jwt.verifyAsync<AuthUser>(token);
+      claims = await this.jwt.verifyAsync<TokenClaims>(token);
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
@@ -60,21 +108,34 @@ export class AuthGuard implements CanActivate {
     if (!dbUser || !dbUser.active) {
       throw new UnauthorizedException('Account is deactivated');
     }
+    // Resolved on every request for the same reason the role is: so a change
+    // takes effect on the person's next click, not when their token expires.
+    const held = await this.perms.forUser(dbUser.id);
     const user: AuthUser = {
       sub: dbUser.id,
       name: dbUser.name,
       email: dbUser.email,
       role: dbUser.role,
+      permissions: held,
     };
     req.user = user;
 
-    const roles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+    // Permissions decide. @Roles is gone from the routes; the decorator
+    // survives only until step 5 removes the legacy column with it.
+    const required = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
       ctx.getHandler(),
       ctx.getClass(),
     ]);
-    if (roles && !roles.includes(user.role)) {
-      throw new ForbiddenException(`Requires role: ${roles.join(' or ')}`);
+    if (required?.length) {
+      const missing = required.filter((key) => !held.has(key));
+      if (missing.length) {
+        // Name what is missing. "Forbidden" with no reason turns a permission
+        // problem into a support ticket, and the key is not a secret — the
+        // person either holds it or does not.
+        throw new ForbiddenException(`Requires permission: ${missing.join(', ')}`);
+      }
     }
+
     return true;
   }
 }

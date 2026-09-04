@@ -7,7 +7,7 @@ interface StreamReply {
   raw: ServerResponse;
 }
 import { In } from 'typeorm';
-import { Roles } from '../auth/auth.guard';
+import { RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { AuditLog } from '../entities/audit-log.entity';
 import { localDay } from '../dates';
@@ -18,8 +18,8 @@ export class AuditController {
 
   /** Filterable, keyset-paginated. `beforeId` = id of the oldest row the
    * client already has; results are always newest-first. */
+  @RequirePermission('audit.view')
   @Get()
-  @Roles('admin')
   async list(
     @Query('limit') limit?: string,
     @Query('entityType') entityType?: string,
@@ -45,8 +45,8 @@ export class AuditController {
 
   /** The whole filtered log as CSV, streamed in keyset batches — never a
    * silently truncated file. Same filters as the list. */
+  @RequirePermission('audit.export')
   @Get('export.csv')
-  @Roles('admin')
   async exportCsv(
     @Res() res: StreamReply,
     @Query('entityType') entityType?: string,

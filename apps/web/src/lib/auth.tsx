@@ -9,6 +9,8 @@ export interface Me {
   name: string;
   email: string;
   role: Role;
+  /** Effective permission keys, resolved by the server for this account. */
+  permissions: string[];
 }
 
 interface AuthState {
@@ -30,8 +32,17 @@ interface AuthState {
 
 const Ctx = createContext<AuthState>(null!);
 export const useAuth = () => useContext(Ctx);
-/** The desk is the Admin, and only the Admin. */
-export const isStaff = (r?: Role) => r === 'admin';
+/**
+ * Can the signed-in person do this?
+ *
+ * Hiding a control the API would refuse is a courtesy, not a defence — the
+ * guard decides every request regardless of what this returns. Use it to stop
+ * showing doors that will not open, never to decide whether something is safe.
+ */
+export const useCan = () => {
+  const { user } = useAuth();
+  return (key: string) => !!user?.permissions?.includes(key);
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);

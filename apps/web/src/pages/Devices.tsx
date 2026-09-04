@@ -12,13 +12,14 @@ import { VForm, VField } from '../components/VForm';
 import { imei, required, serial } from '../lib/validate';
 import { useToast } from '../components/Toasts';
 import { api } from '../lib/api';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import type { DeviceRow, ProjectRow } from '../lib/types';
 
 const isFlag = (v: string) => /^(yes|no|true|false)$/i.test(v);
 
 export default function Devices() {
   const { user } = useAuth();
+  const can = useCan();
   const nav = useNavigate();
   const qc = useQueryClient();
   const [urlParams, setUrlParams] = useSearchParams();
@@ -99,7 +100,7 @@ export default function Devices() {
             : `${devices.data?.length ?? '…'} of ${all.data?.length ?? '…'}`}
         </span>
         <div className="flex-1" />
-        {isStaff(user?.role) && (
+        {can('devices.create') && (
           <>
             <button data-testid="device-import"
               onClick={() => setShowImport(true)}
@@ -143,7 +144,7 @@ export default function Devices() {
           <option value="assigned">Assigned</option>
           <option value="in_repair">In repair</option>
           <option value="retired">Retired</option>
-          {isStaff(user?.role) && <option value="deleted">Deleted 🗑</option>}
+          {can('devices.viewDeleted') && <option value="deleted">Deleted 🗑</option>}
         </select>
       </div>
 

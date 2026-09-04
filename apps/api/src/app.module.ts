@@ -5,6 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
+import { PermissionResolver } from './auth/permission.resolver';
 import { IDENTITY_PROVIDER } from './auth/identity-provider';
 import { LocalIdentityProvider } from './auth/local-identity.provider';
 import { AuditController } from './audit/audit.controller';
@@ -59,6 +60,7 @@ import { UsersController } from './users/users.controller';
     ReportsController,
   ],
   providers: [
+    PermissionResolver,
     AppDbContext,
     { provide: REDIS, useFactory: createRedis },
     { provide: IDENTITY_PROVIDER, useClass: LocalIdentityProvider },

@@ -100,10 +100,10 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: 'jobs.run', module: 'Maintenance', feature: 'Jobs', name: 'Run maintenance jobs', description: 'Trigger the overdue sweep and the reminder round by hand.' },
 
   // ------------------------------------------------------ access control
-  // Held by Super Admin alone, and never grantable to a custom role. This is
-  // what makes the escalation guard structural rather than a comparison:
-  // an Administrator cannot reach these endpoints at all, so there is no path
-  // from "can manage users" to "can do anything".
+  // Held by Super Admin alone, and never grantable to a custom role. Super
+  // Admin is the top of the model, so it cannot escalate itself — and a
+  // custom role can never be handed these, which is what keeps
+  // "can manage users" from becoming "can do anything".
   { key: 'roles.view', module: 'Access control', feature: 'Roles', name: 'View roles', description: 'See the roles that exist and what each one grants.' },
   { key: 'roles.create', module: 'Access control', feature: 'Roles', name: 'Create a role', description: 'Define a new role and choose its permissions.' },
   { key: 'roles.update', module: 'Access control', feature: 'Roles', name: 'Edit a role', description: 'Rename a role or change what it grants.' },
@@ -194,17 +194,19 @@ export function withDependencies(keys: Iterable<string>): string[] {
   return [...out];
 }
 
-/** The three seeded roles. Their permission sets are fixed in code. */
+/**
+ * The two seeded roles. Their permission sets are fixed in code.
+ *
+ * There is no middle administrative tier. An earlier design kept one that ran
+ * the lab but could not change who can do what; that separation was dropped
+ * in favour of a single administrative role, so anyone who administers the
+ * lab also administers access to it.
+ */
 export const SYSTEM_ROLES = {
   superAdmin: {
     name: 'Super Admin',
     description:
-      'Unrestricted. The only role that can create roles, change what a role grants, or decide which roles a person holds.',
-  },
-  administrator: {
-    name: 'Administrator',
-    description:
-      'Runs the lab: devices, users, repairs, projects, settings and the audit log. Cannot change who can do what.',
+      'Unrestricted. Runs the lab and decides who can do what — the only role that can create roles or assign them.',
   },
   labTester: {
     name: 'Lab Tester',
@@ -224,7 +226,5 @@ export const LAB_TESTER_KEYS: string[] = withDependencies([
   'reports.view',
 ]);
 
-/** What Administrator grants: everything except access control. */
-export const ADMINISTRATOR_KEYS: string[] = ALL_PERMISSION_KEYS.filter(
-  (k) => !ACCESS_CONTROL_KEYS.includes(k),
-);
+/** What Super Admin grants: everything, including access control. */
+export const SUPER_ADMIN_KEYS: string[] = ALL_PERMISSION_KEYS;

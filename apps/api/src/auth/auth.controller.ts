@@ -16,7 +16,8 @@ import { writeAudit } from '../audit/audit';
 import { AppDbContext } from '../db/app-db-context';
 import { REDIS } from '../redis';
 import type Redis from 'ioredis';
-import { AuthUser, Public } from './auth.guard';
+import { AuthUser, Public, TokenClaims } from './auth.guard';
+import { PermissionResolver } from './permission.resolver';
 import { IDENTITY_PROVIDER, IdentityProvider } from './identity-provider';
 
 class LoginDto {
@@ -52,6 +53,7 @@ export class AuthController {
     private readonly db: AppDbContext,
     // Brute-force brake lives in Redis so every replica sees the same count.
     @Inject(REDIS) private readonly redis: Redis,
+    private readonly perms: PermissionResolver,
   ) {}
 
   private failKey(email: string) {
@@ -94,7 +96,7 @@ export class AuthController {
       });
     });
 
-    const payload: AuthUser = {
+    const payload: TokenClaims = {
       sub: user.id,
       name: user.name,
       email: user.email,
@@ -102,7 +104,16 @@ export class AuthController {
     };
     return {
       token: await this.jwt.signAsync(payload),
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        // The frontend seeds its session straight from this object. Leaving
+        // permissions out meant a signed-in Admin saw a tester's app until a
+        // reload happened to call /auth/me.
+        permissions: [...(await this.perms.forUser(user.id))],
+      },
       // Shipping-default credentials must not survive first contact.
       mustChangePassword: DEFAULT_PASSWORDS.includes(dto.password),
     };
@@ -139,7 +150,10 @@ export class AuthController {
 
   @Get('me')
   me(@Req() req: { user: AuthUser }) {
-    const { sub, name, email, role } = req.user;
-    return { id: sub, name, email, role };
+    const { sub, name, email, role, permissions } = req.user;
+    // The frontend gets the permission list so it can stop showing doors that
+    // will not open. It is not a security boundary — the guard has already
+    // decided this request, and will decide every other one.
+    return { id: sub, name, email, role, permissions: [...permissions] };
   }
 }

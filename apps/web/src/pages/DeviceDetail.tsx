@@ -11,7 +11,7 @@ import { specsToPairs } from '../lib/specs';
 import Chip from '../components/Chip';
 import DeviceEditModal from '../components/DeviceEditModal';
 import RequestModal from '../components/RequestModal';
-import { isStaff, useAuth } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
 import { ApiError, api } from '../lib/api';
 import type { AuditRow, DeviceRow } from '../lib/types';
 
@@ -24,6 +24,7 @@ export default function DeviceDetail() {
   const [showRequest, setShowRequest] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const { user } = useAuth();
+  const can = useCan();
   const device = useQuery({
     queryKey: ['device', id],
     queryFn: () => api<DeviceRow>(`/devices/${id}`),
@@ -118,7 +119,7 @@ export default function DeviceDetail() {
             Send to repair…
           </button>
         )}
-        {isStaff(user?.role) && (
+        {can('devices.update') && (
           <button
             onClick={() => setShowEdit(true)}
             className="rounded-lg border border-neutral-300 bg-white px-4 py-2 font-semibold"

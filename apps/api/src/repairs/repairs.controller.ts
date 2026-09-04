@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { IsString, IsUUID, MinLength } from 'class-validator';
 import { writeAudit } from '../audit/audit';
-import { AuthUser, Roles } from '../auth/auth.guard';
+import { AuthUser, RequirePermission } from '../auth/auth.guard';
 import { AppDbContext } from '../db/app-db-context';
 import { Repair, REPAIR_TRANSITIONS, RepairState } from '../entities/repair.entity';
 import { notify, staffIds } from '../notifications/notify';
@@ -60,6 +60,7 @@ const pub = (r: Repair) => ({
 export class RepairsController {
   constructor(private readonly db: AppDbContext) {}
 
+  @RequirePermission('repairs.view')
   @Get()
   async list() {
     const rows = await this.db.repairs().find({
@@ -69,6 +70,7 @@ export class RepairsController {
     return rows.map(pub);
   }
 
+  @RequirePermission('repairs.report')
   @Post()
   async report(@Body() dto: ReportDto, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
@@ -109,8 +111,8 @@ export class RepairsController {
     });
   }
 
+  @RequirePermission('repairs.advance')
   @Post(':id/advance')
-  @Roles('admin')
   async advance(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const repair = await ctx.repairs.findOne({
@@ -178,8 +180,8 @@ export class RepairsController {
 
   /** A mistaken report gets an exit that does not drag the device out
    * of circulation. Staff only; clears the damage note it created. */
+  @RequirePermission('repairs.cancel')
   @Post(':id/cancel')
-  @Roles('admin')
   async cancel(@Param('id') id: string, @Req() req: { user: AuthUser }) {
     return this.db.withTransaction(async (ctx) => {
       const repair = await ctx.repairs.findOne({
@@ -210,8 +212,8 @@ export class RepairsController {
     });
   }
 
+  @RequirePermission('repairs.writeOff')
   @Post(':id/write-off')
-  @Roles('admin')
   async writeOff(
     @Param('id') id: string,
     @Body() dto: WriteOffDto,

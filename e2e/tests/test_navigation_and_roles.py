@@ -66,6 +66,28 @@ def test_the_admin_sees_every_manage_link(as_admin: AppShell):
         assert as_admin.has_nav_link(label), f"an admin should see {label!r}"
 
 
+@pytest.mark.smoke
+def test_the_sidebar_is_right_immediately_after_signing_in(
+    login_page, accounts, shell: AppShell
+):
+    """No reload required.
+
+    Navigation is driven by the permissions the server sends, and the sign-in
+    response is where the session starts. If it omits them, an Admin lands on
+    a tester's app until something happens to refetch — which is exactly the
+    kind of bug that looks like a flaky test rather than a missing field.
+    """
+    login_page.clear_session()
+    login_page.login(accounts["admin"]["email"], accounts["admin"]["password"])
+    shell.wait_heading("Hi,")
+
+    for label in STAFF_ONLY:
+        assert shell.has_nav_link(label), (
+            f"{label!r} was missing straight after sign-in — the login response "
+            f"is probably not carrying permissions"
+        )
+
+
 def test_tester_sidebar_hides_every_staff_page(as_tester: AppShell):
     visible = as_tester.visible_nav_labels()
 
