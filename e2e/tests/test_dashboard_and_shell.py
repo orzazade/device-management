@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from api_client import Api
-from pages import Dashboard, LoginPage, NotificationBell, ThemeToggle
+from pages import AppShell, Dashboard, LoginPage, NotificationBell, ThemeToggle
 
 pytestmark = pytest.mark.smoke
 
@@ -166,12 +166,22 @@ def test_a_new_request_notifies_the_person_holding_the_device(
 
 
 def test_marking_notifications_read_clears_the_badge(
-    as_admin, bell: NotificationBell, pending_request
+    login_page: LoginPage, shell: AppShell, bell: NotificationBell, pending_request
 ):
-    pending_request()
+    """Signed in as the holder, because they are who the request notifies.
 
-    as_admin.open("/")
-    as_admin.wait_heading("Hi,")
+    This used to run as the admin, who is told nothing about a request for a
+    device somebody else is holding — that goes to the holder alone. It
+    passed on whatever unread notifications the account had accumulated from
+    earlier tests, and then marked them read, so a run that started with a
+    clear badge failed here for a reason that had nothing to do with badges.
+    """
+    _, _, holder = pending_request()
+
+    login_page.clear_session()
+    login_page.login(holder["email"], holder["password"])
+    shell.open("/")
+    shell.wait_heading("Hi,")
     bell.driver.refresh()
     bell.find(bell.BUTTON)
 
