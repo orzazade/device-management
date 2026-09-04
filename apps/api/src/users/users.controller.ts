@@ -111,7 +111,22 @@ export class UsersController {
        WHERE holder_id IS NOT NULL AND deleted_at IS NULL GROUP BY holder_id`,
     );
     const byId = new Map(holds.map((h) => [h.holder_id, Number(h.n)]));
-    return users.map((u) => ({ ...pub(u), holds: byId.get(u.id) ?? 0 }));
+    // Which roles each person holds. One query for everyone rather than one
+    // per row — the list is the whole team.
+    const grants: { user_id: string; name: string }[] = await this.db.users().query(
+      `SELECT ur.user_id, r.name FROM user_roles ur
+       JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+       ORDER BY r.is_system DESC, r.name`,
+    );
+    const rolesById = new Map<string, string[]>();
+    for (const g of grants) {
+      rolesById.set(g.user_id, [...(rolesById.get(g.user_id) ?? []), g.name]);
+    }
+    return users.map((u) => ({
+      ...pub(u),
+      holds: byId.get(u.id) ?? 0,
+      roles: rolesById.get(u.id) ?? [],
+    }));
   }
 
   @RequirePermission('users.delete')

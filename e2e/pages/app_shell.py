@@ -17,7 +17,7 @@ from .base_page import BasePage, xq
 # destination is expected to show. "Idle devices" is the label; the page's own
 # heading differs, which is exactly the kind of mismatch a nav test should pin.
 NAV_LAB = ["Dashboard", "Devices", "Requests", "Repairs"]
-NAV_STAFF = ["Projects", "Users", "Idle devices", "Settings", "Audit log"]
+NAV_STAFF = ["Projects", "Users", "Roles", "Idle devices", "Settings", "Audit log"]
 
 
 class AppShell(BasePage):

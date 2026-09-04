@@ -152,6 +152,19 @@ export const PERMISSION_DEPENDENCIES: Record<string, string[]> = {
   // The role picker is a column in the user table.
   'users.roles.assign': ['users.view', 'roles.view'],
 
+  // Every repair action is a button on the queue screen. Granting one
+  // without the queue produces a role that can technically call the endpoint
+  // and has no way to reach it.
+  'repairs.advance': ['repairs.view'],
+  'repairs.cancel': ['repairs.view'],
+  'repairs.writeOff': ['repairs.view'],
+  // Damage is reported from the device's own page.
+  'repairs.report': ['devices.view'],
+
+  // You ask for a device from the device list, and the dialog will not submit
+  // without a project — so both are part of being able to request at all.
+  'requests.create': ['devices.view', 'projects.view'],
+
   // Export applies the filters on screen — it is the same query.
   'audit.export': ['audit.view'],
 

@@ -220,14 +220,14 @@ def test_search_filters_the_user_table(as_admin, users_page: UsersPage, accounts
     assert users_page.has_row(accounts["tester"]["email"])
 
 
-def test_changing_a_role_asks_for_confirmation_first(
+def test_an_admin_assigns_a_role_from_the_user_list(
     as_admin, users_page: UsersPage, admin_api: Api, spare_account
 ):
-    """Role changes take effect on the person's next click, so the app makes
-    the administrator acknowledge the consequence.
+    """Access is granted by ticking roles, not by picking one from a dropdown.
 
-    Assigning roles belongs to Super Admin, which is now the single
-    administrative role — so an admin signing in is already one.
+    An account can hold several, so the row shows chips and the change goes
+    through a dialog that names the consequence: their access changes on their
+    next click, without signing in again.
 
     The account is permanent and reset to Tester by the fixture, so the test
     can promote it every run without creating anyone.
@@ -237,20 +237,41 @@ def test_changing_a_role_asks_for_confirmation_first(
 
     users_page.open_users()
     users_page.search(email)
-    confirm = users_page.change_role(email, "Admin")
+    assert users_page.roles_of(email) == ["Lab Tester"]
 
-    assert "Admin" in confirm.title and name in confirm.title
-    confirm.cancel()
-    assert [u for u in admin_api.users() if u["email"] == email][0]["role"] == "tester", (
-        "cancelling the dialog must not change the role"
+    dialog = users_page.open_role_editor(email)
+    assert name in dialog.title
+    assert dialog.is_ticked("Lab Tester")
+    assert not dialog.is_ticked("Super Admin")
+
+    dialog.cancel()
+    assert admin_api.roles_of(email) == ["Lab Tester"], (
+        "cancelling the dialog must not change anything"
     )
 
     users_page.search(email)
-    confirm = users_page.change_role(email, "Admin")
-    confirm.confirm()
-    users_page.wait_for_toast("Role updated")
+    dialog = users_page.open_role_editor(email)
+    dialog.toggle("Super Admin")
+    dialog.save()
+    users_page.wait_for_toast("Roles updated")
 
-    assert [u for u in admin_api.users() if u["email"] == email][0]["role"] == "admin"
+    assert admin_api.roles_of(email) == ["Lab Tester", "Super Admin"], (
+        "both ticks should have been saved, not just the last one"
+    )
+    users_page.search(email)
+    assert users_page.roles_of(email) == ["Lab Tester", "Super Admin"]
+
+
+def test_nobody_can_change_their_own_roles(as_admin, users_page: UsersPage, accounts):
+    """The one rule that keeps "can manage users" from becoming "can do
+    anything". The API refuses it too; the row simply never offers it."""
+    users_page.open_users()
+    users_page.search(accounts["admin"]["email"])
+
+    assert users_page.has_row(accounts["admin"]["email"])
+    assert not users_page.can_edit_roles(accounts["admin"]["email"]), (
+        "an admin must not be offered a way to edit their own roles"
+    )
 
 
 @pytest.mark.rbac

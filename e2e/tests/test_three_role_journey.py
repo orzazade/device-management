@@ -187,12 +187,11 @@ def test_one_phone_through_the_admin_and_a_tester(
     users_page = UsersPage(login_page.driver, login_page.base_url)
     users_page.open_users()
     users_page.search(tester["email"])
-    role_select = (
-        users_page.row_for(tester["email"])[0],
-        users_page.row_for(tester["email"])[1] + "//select",
+    assert users_page.roles_of(tester["email"]) == ["Lab Tester"], (
+        "the row should say what the tester actually holds"
     )
-    assert users_page.is_present(role_select, timeout=5), (
-        "only an admin can change roles"
+    assert users_page.can_edit_roles(tester["email"], timeout=5), (
+        "only an admin is offered a way to change somebody's roles"
     )
 
     from pages import SettingsPage

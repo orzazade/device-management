@@ -105,6 +105,18 @@ export class TransactionalContext {
     return this.manager.getRepository(User);
   }
 
+  get permissions(): Repository<Permission> {
+    return this.manager.getRepository(Permission);
+  }
+
+  get roles(): Repository<Role> {
+    return this.manager.getRepository(Role);
+  }
+
+  get userRoles(): Repository<UserRole> {
+    return this.manager.getRepository(UserRole);
+  }
+
   get auditLogs(): Repository<AuditLog> {
     return this.manager.getRepository(AuditLog);
   }

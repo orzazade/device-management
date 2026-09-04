@@ -132,6 +132,36 @@ class Api:
             self.set_role(existing["id"], role)
         return {**existing, "role": role}
 
+    # ------------------------------------------------------------------ roles
+
+    def permission_catalogue(self) -> dict:
+        """The grouped permission tree, its dependency map and reserved keys."""
+        return self.get("/permissions")
+
+    def roles(self) -> list[dict]:
+        return self.get("/roles")
+
+    def role_by_name(self, name: str) -> dict | None:
+        return next((r for r in self.roles() if r["name"] == name), None)
+
+    def create_role(self, name: str, description: str = "") -> dict:
+        return self.post("/roles", {"name": name, "description": description})
+
+    def set_role_permissions(self, role_id: str, keys: list[str]) -> dict:
+        return self.request("PUT", f"/roles/{role_id}/permissions", json={"keys": keys})
+
+    def delete_role(self, role_id: str) -> None:
+        self.delete(f"/roles/{role_id}")
+
+    def assign_roles(self, user_id: str, role_ids: list[str]) -> dict:
+        return self.request("PUT", f"/users/{user_id}/roles", json={"roleIds": role_ids})
+
+    def roles_of(self, email: str) -> list[str]:
+        """The RBAC role names on an account, as the user list reports them."""
+        user = self.find_user_by_email(email)
+        assert user is not None, f"no account for {email}"
+        return sorted(user.get("roles") or [])
+
     def create_project(self, name: str, description: str = "") -> dict:
         return self.post("/projects", {"name": name, "description": description})
 

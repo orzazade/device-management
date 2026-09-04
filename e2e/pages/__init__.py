@@ -20,13 +20,15 @@ from .requests_page import (
     ReturnIntentConfirm,
     TimeOverrideDialog,
 )
-from .users_page import AddUserDialog, ConfirmDialog, UsersPage
+from .roles_page import NewRoleDialog, PermissionDialog, RolesPage
+from .users_page import AddUserDialog, AssignRolesDialog, ConfirmDialog, UsersPage
 
 __all__ = [
     "ADVANCE_LABELS",
     "AddDeviceDialog",
     "AddUserDialog",
     "AppShell",
+    "AssignRolesDialog",
     "AuditPage",
     "BasePage",
     "BookingCancelConfirm",
@@ -39,8 +41,10 @@ __all__ = [
     "ExtendDialog",
     "LoginPage",
     "NAV_LAB",
+    "NewRoleDialog",
     "NotificationBell",
     "NAV_STAFF",
+    "PermissionDialog",
     "ProjectDialog",
     "ProjectsPage",
     "RejectDialog",
@@ -52,6 +56,7 @@ __all__ = [
     "RequestsPage",
     "ReturnDialog",
     "ReturnIntentConfirm",
+    "RolesPage",
     "SECTION_BOOKED_AHEAD",
     "SECTION_MINE",
     "SECTION_OUT_NOW",

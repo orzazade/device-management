@@ -26,12 +26,13 @@ DESTINATIONS = {
     "Repairs": ("/repairs", "Repairs"),
     "Projects": ("/projects", "Projects"),
     "Users": ("/users", "Users"),
+    "Roles": ("/roles", "Roles"),
     "Idle devices": ("/reports", "Idle devices"),
     "Settings": ("/settings", "Settings"),
     "Audit log": ("/audit", "Audit log"),
 }
 
-STAFF_ONLY = ["Projects", "Users", "Idle devices", "Settings", "Audit log"]
+STAFF_ONLY = ["Projects", "Users", "Roles", "Idle devices", "Settings", "Audit log"]
 
 
 @pytest.mark.smoke
@@ -98,7 +99,9 @@ def test_tester_sidebar_hides_every_staff_page(as_tester: AppShell):
         assert not as_tester.has_nav_link(label, timeout=1), f"{label!r} leaked to a tester"
 
 
-@pytest.mark.parametrize("route", ["/users", "/projects", "/settings", "/reports", "/audit"])
+@pytest.mark.parametrize(
+    "route", ["/users", "/roles", "/projects", "/settings", "/reports", "/audit"]
+)
 def test_tester_typing_a_staff_url_is_sent_back_to_the_dashboard(as_tester: AppShell, route: str):
     """The API refuses these anyway; the guard keeps a tester from ever
     landing on a staff screen and seeing a flash of it."""

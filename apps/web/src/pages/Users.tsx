@@ -6,13 +6,15 @@ import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
 import { VForm, VField } from '../components/VForm';
 import { email, minLen, password, required } from '../lib/validate';
-import { useAuth, type Role } from '../lib/auth';
+import { useAuth, useCan, type Role } from '../lib/auth';
 
 interface UserRow {
   id: string;
   name: string;
   email: string;
   role: Role;
+  /** RBAC roles by name. The legacy `role` above survives only until it is dropped. */
+  roles?: string[];
   active: boolean;
   holds?: number;
   createdAt: string;
@@ -23,12 +25,14 @@ const roleLabel: Record<Role, string> = { admin: 'Admin', tester: 'Tester' };
 
 export default function Users() {
   const { user: me } = useAuth();
+  const can = useCan();
   const qc = useQueryClient();
   const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [editFor, setEditFor] = useState<UserRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<UserRow | null>(null);
-  const [roleChange, setRoleChange] = useState<{ user: UserRow; role: Role } | null>(null);
+  const [rolesFor, setRolesFor] = useState<UserRow | null>(null);
+  const [pickedRoles, setPickedRoles] = useState<Set<string>>(new Set());
   const [showDeleted, setShowDeleted] = useState(false);
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -38,12 +42,21 @@ export default function Users() {
     queryFn: () => api<UserRow[]>(showDeleted ? '/users?deleted=true' : '/users'),
   });
 
-  const changeRole = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: Role }) =>
-      api(`/users/${id}/role`, { method: 'PATCH', body: { role } }),
+  const roleList = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => api<{ id: string; name: string; description: string }[]>('/roles'),
+    enabled: can('users.roles.assign'),
+  });
+
+  const assignRoles = useMutation({
+    mutationFn: ({ id, roleIds }: { id: string; roleIds: string[] }) =>
+      api(`/users/${id}/roles`, { method: 'PUT', body: { roleIds } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
-      toast('Role updated');
+      qc.invalidateQueries({ queryKey: ['roles'] });
+      setRolesFor(null);
+      setError(null);
+      toast('Roles updated');
     },
     onError: (e) => setError(e.message),
   });
@@ -151,24 +164,36 @@ export default function Users() {
                 <td className="px-4 py-2.5 font-semibold">{u.name}</td>
                 <td className="px-4 py-2.5 font-mono text-xs">{u.email}</td>
                 <td className="px-4 py-2.5">
-                  {me?.role === 'admin' && u.id !== me.id ? (
-                    <select
-                      value={u.role}
-                      disabled={changeRole.isPending}
-                      onChange={(e) =>
-                        setRoleChange({ user: u, role: e.target.value as Role })
-                      }
-                      className="rounded-lg border border-neutral-300 px-2 py-1 disabled:opacity-50"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {roleLabel[r]}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    roleLabel[u.role]
-                  )}
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {(u.roles?.length ? u.roles : [roleLabel[u.role]]).map((name: string) => (
+                      <span
+                        key={name}
+                        data-testid="user-role-chip"
+                        className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                    {can('users.roles.assign') && u.id !== me?.id && (
+                      <button
+                        data-testid="user-edit-roles"
+                        onClick={() => {
+                          setError(null);
+                          setPickedRoles(
+                            new Set(
+                              (roleList.data ?? [])
+                                .filter((r) => (u.roles ?? []).includes(r.name))
+                                .map((r) => r.id),
+                            ),
+                          );
+                          setRolesFor(u);
+                        }}
+                        className="rounded-lg border border-neutral-300 px-2 py-0.5 text-xs font-semibold"
+                      >
+                        Change
+                      </button>
+                    )}
+                  </span>
                 </td>
                 <td className="px-4 py-2.5 tabular-nums">{u.holds ?? '—'}</td>
                 <td className="px-4 py-2.5">
@@ -295,18 +320,55 @@ export default function Users() {
         </Modal>
       )}
 
-      {roleChange && (
-        <ConfirmModal
-          title={`Make ${roleChange.user.name} a ${roleLabel[roleChange.role]}?`}
-          body={`${roleChange.user.name} goes from ${roleLabel[roleChange.user.role]} to ${roleLabel[roleChange.role]} immediately — their access changes on their next click.`}
-          confirmLabel="Yes, change the role"
-          busy={changeRole.isPending}
-          onConfirm={() => {
-            changeRole.mutate({ id: roleChange.user.id, role: roleChange.role });
-            setRoleChange(null);
-          }}
-          onClose={() => setRoleChange(null)}
-        />
+      {rolesFor && (
+        <Modal onClose={() => setRolesFor(null)}>
+          <div className="w-full max-w-md self-center rounded-2xl bg-white p-6">
+            <h2 className="mb-1 text-lg font-bold">Roles for {rolesFor.name}</h2>
+            <p className="mb-4 text-neutral-500">
+              The server applies this at once, so they do not need to sign in
+              again — their own menu catches up on their next page load.
+            </p>
+            <div className="mb-5 flex flex-col gap-2">
+              {roleList.data?.map((r) => (
+                <label key={r.id} className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    data-testid={`assign-${r.name}`}
+                    checked={pickedRoles.has(r.id)}
+                    onChange={() => {
+                      const next = new Set(pickedRoles);
+                      next.has(r.id) ? next.delete(r.id) : next.add(r.id);
+                      setPickedRoles(next);
+                    }}
+                    className="mt-0.5 h-4 w-4 flex-none"
+                  />
+                  <span>
+                    <b>{r.name}</b>
+                    <span className="block text-sm text-neutral-500">{r.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setRolesFor(null)}
+                className="rounded-lg border border-neutral-300 px-3 py-1.5 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                data-testid="assign-save"
+                onClick={() =>
+                  assignRoles.mutate({ id: rolesFor.id, roleIds: [...pickedRoles] })
+                }
+                disabled={assignRoles.isPending}
+                className="rounded-lg bg-accent px-3 py-1.5 font-semibold text-white disabled:opacity-50"
+              >
+                Save roles
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {confirmDelete && (

@@ -1,5 +1,5 @@
-"""`/users` — the admin-only account list, its Add user dialog and the
-confirmation dialogs behind role changes and deletion."""
+"""`/users` — the admin-only account list, its Add user dialog, the role
+assignment dialog and the confirmation dialog behind deletion."""
 
 from __future__ import annotations
 
@@ -52,13 +52,19 @@ class UsersPage(BasePage):
         el.send_keys(text)
         return self
 
-    def role_of(self, row_text: str) -> str:
-        """Reads the role select (admins get a dropdown, others plain text)."""
-        select = (By.XPATH, f"//table/tbody/tr[contains(., {xq(row_text)})]//select")
-        if self.is_present(select, timeout=2):
-            el = self.find(select)
-            return el.find_element(By.CSS_SELECTOR, "option[selected], option:checked").text.strip()
-        return self.find((By.XPATH, f"//table/tbody/tr[contains(., {xq(row_text)})]/td[3]")).text.strip()
+    def roles_of(self, row_text: str) -> list[str]:
+        """The role chips in one row.
+
+        An account can hold several roles now, so this returns a list. The
+        chips are read rather than a dropdown's value: the row shows what the
+        account actually holds, which a single-select could not represent.
+        """
+        locator = (
+            By.XPATH,
+            f"//table/tbody/tr[contains(., {xq(row_text)})]"
+            f"//span[@data-testid='user-role-chip']",
+        )
+        return sorted(el.text.strip() for el in self.find_all(locator))
 
     def status_of(self, row_text: str) -> str:
         locator = (
@@ -67,10 +73,23 @@ class UsersPage(BasePage):
         )
         return self.find(locator).text.strip()
 
-    def change_role(self, row_text: str, role_label: str) -> "ConfirmDialog":
-        select = (By.XPATH, f"//table/tbody/tr[contains(., {xq(row_text)})]//select")
-        self.select_by_visible_text(select, role_label)
-        return ConfirmDialog(self.driver, self.base_url).wait_open()
+    def open_role_editor(self, row_text: str) -> "AssignRolesDialog":
+        button = (
+            By.XPATH,
+            f"//table/tbody/tr[contains(., {xq(row_text)})]"
+            f"//button[@data-testid='user-edit-roles']",
+        )
+        self.click(button)
+        return AssignRolesDialog(self.driver, self.base_url).wait_open()
+
+    def can_edit_roles(self, row_text: str, timeout: int = 2) -> bool:
+        """False for your own row — nobody may change their own access."""
+        button = (
+            By.XPATH,
+            f"//table/tbody/tr[contains(., {xq(row_text)})]"
+            f"//button[@data-testid='user-edit-roles']",
+        )
+        return self.is_visible(button, timeout)
 
     def open_add_user(self) -> "AddUserDialog":
         self.click(self.ADD_BUTTON)
@@ -118,12 +137,63 @@ class ConfirmDialog(BasePage):
         self.find(self.CONFIRM)
         return self
 
+    BODY = (By.XPATH, "//div[@data-testid='modal']")
+
     @property
     def title(self) -> str:
         return self.find(self.BOX).text.strip()
+
+    @property
+    def body(self) -> str:
+        """Everything the dialog says — several of them explain a refusal
+        below the heading rather than in it."""
+        return self.find(self.BODY).text.strip()
 
     def confirm(self) -> None:
         self.click(self.CONFIRM)
 
     def cancel(self) -> None:
         self.click(self.CANCEL)
+
+
+class AssignRolesDialog(BasePage):
+    """The `Roles for <name>` dialog: one checkbox per role that exists."""
+
+    HEADING = (By.XPATH, "//h2[starts-with(normalize-space(), 'Roles for')]")
+    SAVE = (By.CSS_SELECTOR, "[data-testid='assign-save']")
+
+    def wait_open(self) -> "AssignRolesDialog":
+        self.find(self.HEADING)
+        return self
+
+    @property
+    def title(self) -> str:
+        return self.find(self.HEADING).text.strip()
+
+    @staticmethod
+    def role(name: str) -> tuple[str, str]:
+        return (By.CSS_SELECTOR, f"[data-testid='assign-{name}']")
+
+    def offered_roles(self) -> list[str]:
+        els = self.find_all((By.CSS_SELECTOR, "[data-testid^='assign-']"))
+        return sorted(
+            el.get_attribute("data-testid")[len("assign-"):]
+            for el in els
+            if el.get_attribute("data-testid") != "assign-save"
+        )
+
+    def is_ticked(self, name: str) -> bool:
+        return self.find(self.role(name)).is_selected()
+
+    def toggle(self, name: str) -> "AssignRolesDialog":
+        self._click_element(self.find(self.role(name)))
+        return self
+
+    def save(self) -> None:
+        self.click(self.SAVE)
+
+    def cancel(self) -> None:
+        self.click(self.overlay_button("Cancel"))
+
+    def is_open(self, timeout: int = 3) -> bool:
+        return self.is_visible(self.HEADING, timeout)

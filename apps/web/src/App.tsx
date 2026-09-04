@@ -14,6 +14,7 @@ import Projects from './pages/Projects';
 import Repairs from './pages/Repairs';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Roles from './pages/Roles';
 import Users from './pages/Users';
 
 function NotFound() {
@@ -70,6 +71,9 @@ export default function App() {
               </Route>
               <Route element={<RequirePermission need="users.view" />}>
                 <Route path="/users" element={<Users />} />
+              </Route>
+              <Route element={<RequirePermission need="roles.view" />}>
+                <Route path="/roles" element={<Roles />} />
               </Route>
               <Route element={<RequirePermission need="settings.view" />}>
                 <Route path="/settings" element={<Settings />} />

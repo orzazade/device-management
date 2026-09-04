@@ -62,7 +62,7 @@ export default function Layout() {
   // would hand everyone an admin page.
   const canManageProjects =
     can('projects.create') || can('projects.update') || can('projects.delete');
-  const manage = ['users.view', 'reports.idle.view', 'settings.view'];
+  const manage = ['users.view', 'roles.view', 'reports.idle.view', 'settings.view'];
   const showManage = canManageProjects || manage.some((k) => can(k));
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -190,6 +190,9 @@ export default function Layout() {
             )}
             {can('users.view') && (
               <NavLink data-testid="nav-users" to="/users" className={linkCls}>Users</NavLink>
+            )}
+            {can('roles.view') && (
+              <NavLink data-testid="nav-roles" to="/roles" className={linkCls}>Roles</NavLink>
             )}
             {can('reports.idle.view') && (
               <NavLink data-testid="nav-reports" to="/reports" className={linkCls}>Idle devices</NavLink>
