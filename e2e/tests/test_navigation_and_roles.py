@@ -89,6 +89,51 @@ def test_the_sidebar_is_right_immediately_after_signing_in(
         )
 
 
+def test_a_role_change_reaches_the_sidebar_without_signing_in_again(
+    login_page, shell: AppShell, admin_api, spare_account
+):
+    """The claim the role dialog makes, tested rather than asserted.
+
+    The server has always applied a role change immediately — the guard
+    re-reads permissions on every request. The sidebar did not: it rendered
+    from whatever the sign-in returned, so somebody promoted while they were
+    working kept a tester's navigation until they reloaded. One ordinary
+    navigation should now be enough.
+    """
+    account = spare_account("latecomer", role="tester")
+
+    login_page.clear_session()
+    login_page.login(account["email"], account["password"])
+    shell.wait_heading("Hi,")
+    assert not shell.has_nav_link("Users", timeout=2), "a tester starts without staff links"
+
+    # Promoted by somebody else, while they sit on the page.
+    admin_api.assign_roles(
+        account["id"],
+        [
+            admin_api.role_by_name("Lab Tester")["id"],
+            admin_api.role_by_name("Super Admin")["id"],
+        ],
+    )
+
+    # No reload, no re-login — just going somewhere, the way anyone would.
+    shell.go_to("Devices")
+    shell.wait_heading("Devices")
+
+    assert shell.has_nav_link("Users", timeout=10), (
+        "the sidebar should catch up on the next navigation, without a reload"
+    )
+    assert shell.has_nav_link("Roles", timeout=5)
+
+    # And the other direction: taking it away puts the sidebar back.
+    admin_api.assign_roles(account["id"], [admin_api.role_by_name("Lab Tester")["id"]])
+    shell.go_to("Requests")
+    shell.wait_heading("Requests")
+    assert not shell.has_nav_link("Users", timeout=10), (
+        "revoking a role has to reach the sidebar too — that is the direction that matters"
+    )
+
+
 def test_tester_sidebar_hides_every_staff_page(as_tester: AppShell):
     visible = as_tester.visible_nav_labels()
 

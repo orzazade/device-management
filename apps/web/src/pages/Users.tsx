@@ -328,8 +328,8 @@ export default function Users() {
           <div className="w-full max-w-md self-center rounded-2xl bg-white p-6">
             <h2 className="mb-1 text-lg font-bold">Roles for {rolesFor.name}</h2>
             <p className="mb-4 text-neutral-500">
-              The server applies this at once, so they do not need to sign in
-              again — their own menu catches up on their next page load.
+              Their access changes on their next click — they do not need to sign
+              in again.
             </p>
             <div className="mb-5 flex flex-col gap-2">
               {roleList.data?.map((r) => (

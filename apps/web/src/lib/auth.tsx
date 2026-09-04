@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, SESSION_EXPIRED_EVENT, api, tokenStore } from './api';
 import { queryClient } from './queryClient';
@@ -23,6 +31,8 @@ interface AuthState {
   /** The last session ended because the server rejected it (expired /
    * deactivated) — the login screen explains that. */
   sessionExpired: boolean;
+  /** Re-read this account's roles and permissions from the server, quietly. */
+  refreshSession: () => void;
   /** true right after logging in with a factory-default password. */
   mustChangePassword: boolean;
   clearMustChange: () => void;
@@ -44,6 +54,25 @@ export const useCan = () => {
   return (key: string) => !!user?.permissions?.includes(key);
 };
 
+/**
+ * Is this the same session, as far as the UI is concerned?
+ *
+ * Compared field by field rather than by reference, because `/auth/me`
+ * returns a fresh object every time and swapping it in would re-render the
+ * whole tree on every navigation even when nothing about the person changed.
+ */
+function sameSession(a: Me | null, b: Me): boolean {
+  if (!a) return false;
+  const list = (xs: string[]) => [...xs].sort().join('\u0000');
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.email === b.email &&
+    list(a.roles) === list(b.roles) &&
+    list(a.permissions) === list(b.permissions)
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     if (!tokenStore.get()) {
@@ -59,6 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     setSessionCheckFailed(false);
+    // Shares the in-flight guard, so mounting does not fetch the session
+    // twice: this check and <SessionRefresh/> both fire on first render.
+    inFlight.current = true;
     api<Me>('/auth/me')
       .then(setUser)
       .catch((e) => {
@@ -70,18 +103,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSessionCheckFailed(true);
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        inFlight.current = false;
+        setLoading(false);
+      });
   }, [sessionAttempt]);
 
   // The ONE place a session gets dropped. api() and the /auth/me check both
   // end up here; the router hop happens in <SessionExpiryRedirect/>.
-  const invalidateSession = (reason: 'expired' | 'logout' = 'expired') => {
+  const invalidateSession = useCallback((reason: 'expired' | 'logout' = 'expired') => {
     tokenStore.clear();
     setUser(null);
     setMustChangePassword(false);
     setSessionExpired(reason === 'expired');
     queryClient.clear();
-  };
+  }, []);
+
+  /**
+   * Re-read the session in the background.
+   *
+   * The guard already resolves permissions from the role tables on every
+   * request, so the SERVER acts on a role change immediately. The sidebar did
+   * not: it renders from whatever `/auth/me` returned at sign-in, so somebody
+   * promoted an hour ago still saw a tester's navigation until they reloaded.
+   *
+   * Three things this must not do. It must not touch `loading` — that would
+   * put the two-second brand splash in front of every navigation. It must not
+   * sign anybody out on a server blip; only a real auth verdict does that,
+   * same rule as the check on mount. And it must not replace `user` with an
+   * identical object, or every navigation would re-render the whole app for
+   * nothing.
+   */
+  const refreshSession = useCallback(() => {
+    // Only one at a time. A time-based throttle was tempting and wrong: it
+    // makes the delay before a REVOKED permission disappears depend on how
+    // fast somebody happens to be clicking, and that is the direction where
+    // being late actually matters.
+    if (!tokenStore.get() || inFlight.current) return;
+    inFlight.current = true;
+    api<Me>('/auth/me')
+      .then((fresh) => setUser((prev) => (sameSession(prev, fresh) ? prev : fresh)))
+      .catch((e) => {
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+          invalidateSession();
+        }
+        // Anything else is a connection problem, and the person is already
+        // signed in and working. The next navigation tries again.
+      })
+      .finally(() => {
+        inFlight.current = false;
+      });
+  }, [invalidateSession]);
   useEffect(() => {
     const onExpired = () => invalidateSession('expired');
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
@@ -110,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionCheckFailed,
         sessionExpired,
         retrySession: () => setSessionAttempt((n) => n + 1),
+        refreshSession,
         mustChangePassword,
         clearMustChange: () => setMustChangePassword(false),
         login,
@@ -135,5 +208,40 @@ export function SessionExpiryRedirect() {
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, [nav, loc.pathname, loc.search]);
+  return null;
+}
+
+/**
+ * Keeps the signed-in session current while somebody is using the app.
+ *
+ * Mounted inside the router, because AuthProvider is above it and cannot see
+ * navigation. Every route change re-reads the session, and so does returning
+ * to a tab that was left open — the two moments when what somebody is allowed
+ * to do may have changed without them doing anything.
+ *
+ * The request is cheap and throttled, and it never blocks rendering: the page
+ * paints from the session already in hand, and updates only if the answer
+ * actually differs.
+ */
+export function SessionRefresh() {
+  const { pathname } = useLocation();
+  const { refreshSession } = useAuth();
+
+  useEffect(() => {
+    refreshSession();
+  }, [pathname, refreshSession]);
+
+  useEffect(() => {
+    const onWake = () => {
+      if (document.visibilityState === 'visible') refreshSession();
+    };
+    window.addEventListener('focus', onWake);
+    document.addEventListener('visibilitychange', onWake);
+    return () => {
+      window.removeEventListener('focus', onWake);
+      document.removeEventListener('visibilitychange', onWake);
+    };
+  }, [refreshSession]);
+
   return null;
 }
