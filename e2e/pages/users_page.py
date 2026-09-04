@@ -101,7 +101,7 @@ class AddUserDialog(BasePage):
     NAME = (By.CSS_SELECTOR, "input[name='name']")
     EMAIL = (By.CSS_SELECTOR, "input[name='email']")
     PASSWORD = (By.CSS_SELECTOR, "input[name='password']")
-    ROLE = (By.CSS_SELECTOR, "select[name='role']")
+    ROLE = (By.CSS_SELECTOR, "select[data-testid='create-role']")
     CREATE = (By.XPATH, "//button[normalize-space()='Create']")
     CANCEL = (By.XPATH, "//button[normalize-space()='Cancel']")
 
@@ -109,12 +109,28 @@ class AddUserDialog(BasePage):
         self.find(self.HEADING)
         return self
 
-    def fill(self, name: str, email: str, password: str, role_label: str = "Tester") -> "AddUserDialog":
+    def fill(
+        self,
+        name: str,
+        email: str,
+        password: str,
+        role_label: str = "Lab Tester",
+    ) -> "AddUserDialog":
+        """Fill the dialog. `role_label` names a real role, not a legacy tier.
+
+        The picker only appears for somebody who may assign roles; everyone
+        else creates accounts on the baseline role, which is what the default
+        here selects.
+        """
         self.type(self.NAME, name)
         self.type(self.EMAIL, email)
         self.type(self.PASSWORD, password)
-        self.select_by_visible_text(self.ROLE, role_label)
+        if self.is_present(self.ROLE, timeout=2):
+            self.select_by_visible_text(self.ROLE, role_label)
         return self
+
+    def role_options(self) -> list[str]:
+        return [o.text.strip() for o in self.find_all((By.CSS_SELECTOR, "select[data-testid='create-role'] option"))]
 
     def create(self) -> None:
         self.click(self.CREATE)

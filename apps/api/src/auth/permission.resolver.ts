@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { AppDbContext } from '../db/app-db-context';
 
@@ -11,15 +11,12 @@ import { AppDbContext } from '../db/app-db-context';
  * rules are where role systems stop being possible to reason about, and
  * nothing in this product needs one.
  *
- * Step 2 note: this runs on every request but nothing acts on the result yet.
- * The guard still enforces `users.role`; the resolver's job for now is to be
- * compared against that, so any disagreement surfaces as a log line while it
- * is still harmless.
+ * This is the only answer to "what may this person do?" — the guard reads it
+ * on every request, so a role change takes effect on the next click rather
+ * than when a token expires.
  */
 @Injectable()
 export class PermissionResolver {
-  private readonly log = new Logger('permissions');
-
   constructor(private readonly db: AppDbContext) {}
 
   /**
@@ -48,31 +45,22 @@ export class PermissionResolver {
   }
 
   /**
-   * Compare what the permission model would allow against what the legacy
-   * role check actually allowed, and complain when they differ.
+   * The names of the roles somebody holds.
    *
-   * This is the whole point of step 2. Switching enforcement blind would mean
-   * discovering a mis-mapped endpoint in production, as a 403 for somebody
-   * doing their job. Running both and logging the gap turns that into a log
-   * line on a developer's machine, and "no warnings across a full suite run"
-   * becomes the gate for step 3.
+   * Shown in the header and the user list, where a person needs to recognise
+   * their own access. Permissions answer "may I?", names answer "who am I
+   * here?" — and a list of forty keys is not an answer to the second.
    */
-  report(opts: {
-    route: string;
-    userId: string;
-    role: string;
-    legacyAllowed: boolean;
-    required?: string[];
-    held: Set<string>;
-  }): void {
-    const { route, userId, role, legacyAllowed, required, held } = opts;
-    if (!required?.length) return;
-    const modelAllows = required.every((key) => held.has(key));
-    if (modelAllows === legacyAllowed) return;
-    this.log.warn(
-      `MISMATCH ${route} — role '${role}' ${legacyAllowed ? 'allows' : 'denies'} but ` +
-        `permissions ${modelAllows ? 'allow' : 'deny'} ` +
-        `(needs ${required.join(', ')}; user ${userId} holds ${held.size} permissions)`,
-    );
+  async roleNamesForUser(userId: string, manager?: EntityManager): Promise<string[]> {
+    const rows: { name: string }[] = await this.db
+      .userRoles(manager)
+      .createQueryBuilder('ur')
+      .innerJoin('roles', 'r', 'r.id = ur.role_id AND r.deleted_at IS NULL')
+      .where('ur.user_id = :userId', { userId })
+      .select('r.name', 'name')
+      .orderBy('r.is_system', 'DESC')
+      .addOrderBy('r.name')
+      .getRawMany();
+    return rows.map((r) => r.name);
   }
 }

@@ -45,8 +45,8 @@ export class ProjectsController {
     @Query('deleted') deleted?: string,
     @Query('kind') kind?: string,
   ) {
-    if (deleted === 'true' && req.user.role !== 'admin') {
-      throw new ForbiddenException('Only staff can list deleted projects');
+    if (deleted === 'true' && !req.user.permissions.has('projects.viewDeleted')) {
+      throw new ForbiddenException('You cannot list deleted projects');
     }
     const kinds = kind === 'all' ? ['project', 'squad'] : [kind === 'squad' ? 'squad' : 'project'];
     if (deleted === 'true') {

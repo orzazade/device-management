@@ -14,6 +14,11 @@ from __future__ import annotations
 import requests
 
 
+# The suite's own shorthand for the two built-in roles. Tests say "admin" or
+# "tester" because that is what they mean; the API only knows role ids.
+ROLE_NAMES = {"admin": "Super Admin", "tester": "Lab Tester"}
+
+
 class ApiError(AssertionError):
     """Raised when a seeding call fails — that is a broken fixture, not a bug."""
 
@@ -82,7 +87,15 @@ class Api:
     # ------------------------------------------------------------------ seeds
 
     def create_user(self, name: str, email: str, password: str, role: str) -> dict:
-        return self.post("/users", {"name": name, "email": email, "password": password, "role": role})
+        return self.post(
+            "/users",
+            {
+                "name": name,
+                "email": email,
+                "password": password,
+                "roleIds": [self._role_id(role)],
+            },
+        )
 
     def find_user_by_email(self, email: str) -> dict | None:
         for u in self.users():
@@ -94,7 +107,19 @@ class Api:
         return self.request("PATCH", f"/users/{user_id}", json=fields)
 
     def set_role(self, user_id: str, role: str) -> dict:
-        return self.request("PATCH", f"/users/{user_id}/role", json={"role": role})
+        """Put an account on exactly one of the two built-in roles.
+
+        The suite still speaks in "admin"/"tester" because that is what a test
+        means when it arranges a fixture. The API no longer has a notion of
+        either — there is one way to change access now, and it takes role ids.
+        """
+        return self.assign_roles(user_id, [self._role_id(role)])
+
+    def _role_id(self, role: str) -> str:
+        name = ROLE_NAMES.get(role, role)
+        found = self.role_by_name(name)
+        assert found is not None, f"no role called {name!r} — has the seed run?"
+        return found["id"]
 
     def deleted_users(self) -> list[dict]:
         return self.get("/users?deleted=true")
@@ -128,9 +153,9 @@ class Api:
         if existing is None:
             return self.create_user(name, email, password, role)
         self.update_user(existing["id"], newPassword=password, active=True)
-        if existing["role"] != role:
+        if sorted(existing.get("roles") or []) != [ROLE_NAMES[role]]:
             self.set_role(existing["id"], role)
-        return {**existing, "role": role}
+        return {**existing, "role": role, "roles": [ROLE_NAMES[role]]}
 
     # ------------------------------------------------------------------ roles
 

@@ -16,18 +16,19 @@ import { CommandBus } from '@nestjs/cqrs';
 import { In } from 'typeorm';
 import { writeAudit } from '../audit/audit';
 import {
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsEmail,
-  IsIn,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
 import { AuthUser, PermissionChange, RequirePermission } from '../auth/auth.guard';
+import { assertNotTheLastSuperAdmin, holdsSuperAdmin } from '../auth/super-admins';
 import { AppDbContext } from '../db/app-db-context';
-import { Role, ROLES, User } from '../entities/user.entity';
+import { User } from '../entities/user.entity';
 import {
-  ChangeUserRoleCommand,
   CreateUserCommand,
   UpdateUserCommand,
 } from './users.commands';
@@ -40,17 +41,16 @@ class CreateUserDto {
   @IsEmail()
   email: string;
 
-  @IsIn(ROLES)
-  role: Role;
-
   @IsString()
   @MinLength(8)
   password: string;
-}
 
-class ChangeRoleDto {
-  @IsIn(ROLES)
-  role: Role;
+  /** Omitted means the baseline role, which is what most accounts want. */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  roleIds?: string[];
 }
 
 class UpdateUserDto {
@@ -77,7 +77,6 @@ const pub = (u: User) => ({
   id: u.id,
   name: u.name,
   email: u.email,
-  role: u.role,
   active: u.active,
   createdAt: u.createdAt,
 });
@@ -136,10 +135,11 @@ export class UsersController {
       if (id === req.user.sub) throw new ConflictException('You cannot delete yourself');
       const user = await ctx.users.findOne({ where: { id } });
       if (!user) throw new NotFoundException('User not found');
-      if (user.role === 'admin') {
-        const admins = await ctx.users.count({ where: { role: 'admin', active: true } });
-        if (admins <= 1) throw new ConflictException('Cannot delete the last Admin');
-      }
+      await assertNotTheLastSuperAdmin(
+        ctx.manager,
+        user.id,
+        'Cannot delete the last Super Admin',
+      );
       const holds = await ctx.devices.count({ where: { holderId: id } });
       if (holds > 0) {
         throw new ConflictException(`User still holds ${holds} device(s) — take them back first`);
@@ -187,10 +187,15 @@ export class UsersController {
   @RequirePermission('users.create')
   @Post()
   async create(@Body() dto: CreateUserDto, @Req() req: { user: AuthUser }) {
-    // A manager must not be able to mint accounts at or above their own
-    // power — only an Admin creates Managers or Admins.
-    if (dto.role !== 'tester' && req.user.role !== 'admin') {
-      throw new ForbiddenException('Only an Admin can create Manager or Admin accounts');
+    // Creating an account is not a way to hand out access. Without this,
+    // `users.create` alone would let somebody mint a Super Admin and then
+    // sign in as it — an escalation path around every rule in the role
+    // editor. Choosing roles is `users.roles.assign`; creating an account on
+    // the baseline role is not.
+    if (dto.roleIds?.length && !req.user.permissions.has('users.roles.assign')) {
+      throw new ForbiddenException(
+        'Choosing roles for a new account needs permission to assign roles',
+      );
     }
     const user: User = await this.bus.execute(new CreateUserCommand(actor(req), dto));
     return pub(user);
@@ -203,41 +208,24 @@ export class UsersController {
     @Body() dto: UpdateUserDto,
     @Req() req: { user: AuthUser },
   ) {
-    // Deactivating, resetting passwords or changing the email someone
-    // signs in with is the Admin's call alone — refuse loudly.
-    if (
-      (dto.active !== undefined || dto.newPassword || dto.email !== undefined) &&
-      req.user.role !== 'admin'
-    ) {
-      throw new ForbiddenException(
-        'Only an Admin can deactivate users, reset passwords or change emails',
-      );
-    }
-    // A manager must not edit anyone at or above their own rank.
-    if (req.user.role !== 'admin') {
-      const target = await this.db.users().findOne({ where: { id } });
-      if (target && target.role !== 'tester' && target.id !== req.user.sub) {
-        throw new ForbiddenException('Only an Admin can edit Manager or Admin accounts');
+    // Editing an account must not be a way to become somebody more powerful.
+    //
+    // `users.update` covers resetting a password and changing the email
+    // somebody signs in with, so a role holding it could take over a Super
+    // Admin's account and inherit everything that role can do — including
+    // the access control this whole model keeps out of custom roles. The
+    // rule is therefore about the TARGET, not the verb: you may not edit a
+    // Super Admin unless you are one.
+    //
+    // Editing yourself is always allowed; otherwise the last Super Admin
+    // could not change their own password.
+    if (id !== req.user.sub && (await holdsSuperAdmin(this.db.users().manager, id))) {
+      if (!(await holdsSuperAdmin(this.db.users().manager, req.user.sub))) {
+        throw new ForbiddenException('Only a Super Admin can edit a Super Admin account');
       }
     }
     const user: User = await this.bus.execute(new UpdateUserCommand(actor(req), id, dto));
     return pub(user);
   }
 
-  @Patch(':id/role')
-  @RequirePermission('users.roles.assign')
-  @PermissionChange(
-    'Role assignment moves to Super Admin at step 3 — ordinary Admins lose it, ' +
-      'which is what keeps "can manage users" from becoming "can do anything".',
-  )
-  async changeRole(
-    @Param('id') id: string,
-    @Body() dto: ChangeRoleDto,
-    @Req() req: { user: AuthUser },
-  ) {
-    const user: User = await this.bus.execute(
-      new ChangeUserRoleCommand(actor(req), id, dto.role),
-    );
-    return pub(user);
-  }
 }

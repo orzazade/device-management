@@ -32,7 +32,9 @@ async function bootstrap() {
       .getRepository(User)
       .createQueryBuilder('u')
       .addSelect('u.passwordHash')
-      .where(`u.role = 'admin' AND u.active = true`)
+      .innerJoin('user_roles', 'ur', 'ur.user_id = u.id')
+      .innerJoin('roles', 'r', "r.id = ur.role_id AND r.deleted_at IS NULL AND r.name = 'Super Admin'")
+      .where('u.active = true')
       .getMany();
     for (const a of admins) {
       if (bcrypt.compareSync('admin123', a.passwordHash)) {

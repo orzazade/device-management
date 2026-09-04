@@ -30,7 +30,8 @@ export class ReportsController {
       SELECT COUNT(*)::int AS n FROM repairs
       WHERE state IN ('reported','repair_requested','in_repair')
     `);
-    const staff = req.user.role === 'admin';
+    // The lab-wide overdue list is exactly what `reports.viewAll` names.
+    const staff = req.user.permissions.has('reports.viewAll');
     let overdue: unknown[] = [];
     if (staff) {
       overdue = (

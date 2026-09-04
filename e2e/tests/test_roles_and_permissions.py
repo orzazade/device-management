@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from api_client import Api
+from api_client import Api, ApiError
 from pages import PermissionDialog, RepairsPage, RolesPage, UsersPage
 
 pytestmark = pytest.mark.rbac
@@ -234,6 +234,85 @@ def test_access_control_is_never_offered_to_a_custom_role(new_role):
     assert "Super Admin only" in editor.module_label("Access control"), (
         "greyed-out boxes with no explanation read as a bug, not as a rule"
     )
+
+
+# ------------------------------------------------- escalation through users
+
+
+def test_creating_an_account_is_not_a_way_to_hand_out_access(
+    new_role, roles_page: RolesPage, admin_api: Api, api_url, run_id: str, role_names
+):
+    """`users.create` must not be able to mint a Super Admin.
+
+    Otherwise the cheapest escalation in the system is: create an account
+    holding everything, then sign in as it. That routes around every rule the
+    role editor enforces, so the refusal lives in the API, not the dialog.
+    """
+    name, editor = new_role("Recruiter")
+    editor.tick("users.create")
+    editor.save()
+    roles_page.wait_for_toast("Permissions saved")
+
+    recruiter = admin_api.create_user(
+        f"Recruiter {run_id}", f"{run_id}.recruiter@devicedesk.local", "Recruit2026x", "tester"
+    )
+    admin_api.assign_roles(recruiter["id"], [admin_api.role_by_name(name)["id"]])
+
+    theirs = Api(api_url)
+    theirs.login(f"{run_id}.recruiter@devicedesk.local", "Recruit2026x")
+    super_admin = admin_api.role_by_name(SUPER_ADMIN)
+
+    with pytest.raises(ApiError, match="403"):
+        theirs.post(
+            "/users",
+            {
+                "name": f"Puppet {run_id}",
+                "email": f"{run_id}.puppet@devicedesk.local",
+                "password": "Puppet2026x",
+                "roleIds": [super_admin["id"]],
+            },
+        )
+
+    # The baseline account they ARE allowed to create still works.
+    made = theirs.post(
+        "/users",
+        {
+            "name": f"Newbie {run_id}",
+            "email": f"{run_id}.newbie@devicedesk.local",
+            "password": "Newbie2026x",
+        },
+    )
+    assert admin_api.roles_of(f"{run_id}.newbie@devicedesk.local") == [LAB_TESTER]
+    admin_api.delete(f"/users/{made['id']}")
+    admin_api.delete(f"/users/{recruiter['id']}")
+
+
+def test_editing_a_super_admin_needs_to_be_one(
+    new_role, roles_page: RolesPage, admin_api: Api, api_url, accounts, run_id: str
+):
+    """`users.update` covers password resets, so without this rule a role
+    that can edit people could take over a Super Admin's account and inherit
+    everything it holds."""
+    name, editor = new_role("Editor of people")
+    editor.tick("users.update")
+    editor.save()
+    roles_page.wait_for_toast("Permissions saved")
+
+    clerk = admin_api.create_user(
+        f"Clerk {run_id}", f"{run_id}.clerk@devicedesk.local", "Clerk2026x", "tester"
+    )
+    admin_api.assign_roles(clerk["id"], [admin_api.role_by_name(name)["id"]])
+
+    theirs = Api(api_url)
+    theirs.login(f"{run_id}.clerk@devicedesk.local", "Clerk2026x")
+
+    admin_id = admin_api.find_user_by_email(accounts["admin"]["email"])["id"]
+    with pytest.raises(ApiError, match="403"):
+        theirs.request("PATCH", f"/users/{admin_id}", json={"newPassword": "Hijack2026x"})
+
+    # They can still do the job the role is for.
+    theirs.request("PATCH", f"/users/{clerk['id']}", json={"name": f"Clerk {run_id} renamed"})
+    admin_api.delete(f"/users/{clerk['id']}")
 
 
 # ------------------------------------------------------------ the round trip

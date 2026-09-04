@@ -161,7 +161,7 @@ def test_admin_creates_a_tester_account(
 
     users_page.open_users()
     dialog = users_page.open_add_user()
-    dialog.fill(name, email, "Onboard2026x", role_label="Tester")
+    dialog.fill(name, email, "Onboard2026x", role_label="Lab Tester")
     dialog.create()
 
     users_page.wait_for_toast("User created")
@@ -170,7 +170,9 @@ def test_admin_creates_a_tester_account(
 
     stored = [u for u in admin_api.users() if u["email"] == email]
     assert stored, "the account was not persisted"
-    assert stored[0]["role"] == "tester"
+    assert stored[0]["roles"] == ["Lab Tester"], (
+        "a new account starts on the baseline role, not on nothing"
+    )
     assert stored[0]["name"] == name
 
     # This test has to create a real account — that is its subject. Remove it

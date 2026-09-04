@@ -84,8 +84,16 @@ class ReturnDto {
 }
 
 const actor = (req: { user: AuthUser }) => ({ id: req.user.sub, name: req.user.name });
-/** The desk is the Admin, and only the Admin. */
-const staff = (u: AuthUser) => u.role === 'admin';
+/**
+ * Each desk power now names the permission it actually needs.
+ *
+ * A single `staff()` predicate meant one answer to five different questions —
+ * listing everyone's requests, moving somebody's dates, checking a device in,
+ * calling a request off, and raising one for another person. They are
+ * separate capabilities in the catalogue, so a role granted only one of them
+ * should get only that one.
+ */
+const can = (u: AuthUser, key: string) => u.permissions.has(key);
 
 const pub = (r: DeviceRequest) => ({
   id: r.id,
@@ -123,7 +131,9 @@ export class RequestsController {
   @Post()
   async create(@Body() dto: CreateRequestDto, @Req() req: { user: AuthUser }) {
     const requesterId =
-      dto.onBehalfOfId && staff(req.user) ? dto.onBehalfOfId : req.user.sub;
+      dto.onBehalfOfId && can(req.user, 'requests.viewAll')
+        ? dto.onBehalfOfId
+        : req.user.sub;
     if (requesterId !== req.user.sub) {
       const target = await this.db.users().findOne({ where: { id: requesterId, active: true } });
       if (!target) {
@@ -160,7 +170,7 @@ export class RequestsController {
       .leftJoinAndSelect('r.project', 'project')
       .orderBy('r.createdAt', 'DESC');
     // "all" is staff-only; everyone else always sees just their own.
-    if (scope !== 'all' || !staff(req.user)) {
+    if (scope !== 'all' || !can(req.user, 'requests.viewAll')) {
       qb.andWhere('(r.requesterId = :me OR r.createdById = :me)', { me: req.user.sub });
     }
     if (state) qb.andWhere('r.state = :state', { state });
@@ -183,7 +193,7 @@ export class RequestsController {
 
   @Post(':id/approve')
   async approve(@Param('id') id: string, @Req() req: { user: AuthUser }) {
-    await this.bus.execute(new DecideRequestCommand(actor(req), id, 'approved', req.user.role));
+    await this.bus.execute(new DecideRequestCommand(actor(req), id, 'approved', can(req.user, 'requests.decideAny')));
     return this.reload(id);
   }
 
@@ -194,7 +204,7 @@ export class RequestsController {
     @Req() req: { user: AuthUser },
   ) {
     await this.bus.execute(
-      new DecideRequestCommand(actor(req), id, 'rejected', req.user.role, dto.note),
+      new DecideRequestCommand(actor(req), id, 'rejected', can(req.user, 'requests.decideAny'), dto.note),
     );
     return this.reload(id);
   }
@@ -207,7 +217,7 @@ export class RequestsController {
     @Body() dto: TimeDto,
     @Req() req: { user: AuthUser },
   ) {
-    if (!staff(req.user)) {
+    if (!can(req.user, 'requests.reschedule')) {
       const r = await this.db.requests().findOne({ where: { id } });
       const ownOpenLoan =
         r && r.requesterId === req.user.sub && ['active', 'overdue'].includes(r.state);
@@ -229,7 +239,7 @@ export class RequestsController {
     @Req() req: { user: AuthUser },
   ) {
     await this.bus.execute(
-      new ReturnRequestCommand(actor(req), id, req.user.sub, staff(req.user), dto),
+      new ReturnRequestCommand(actor(req), id, req.user.sub, can(req.user, 'requests.checkin'), dto),
     );
     return this.reload(id);
   }
@@ -290,7 +300,7 @@ export class RequestsController {
     @Req() req: { user: AuthUser },
   ) {
     await this.bus.execute(
-      new CancelRequestCommand(actor(req), id, req.user.sub, staff(req.user), dto?.note),
+      new CancelRequestCommand(actor(req), id, req.user.sub, can(req.user, 'requests.cancelAny'), dto?.note),
     );
     return this.reload(id);
   }

@@ -32,7 +32,6 @@ import {
 } from './requests/requests.commands';
 import { RequestsController } from './requests/requests.controller';
 import {
-  ChangeUserRoleHandler,
   CreateUserHandler,
   UpdateUserHandler,
 } from './users/users.commands';
@@ -68,8 +67,7 @@ import { UsersController } from './users/users.controller';
     { provide: IDENTITY_PROVIDER, useClass: LocalIdentityProvider },
     { provide: APP_GUARD, useClass: AuthGuard },
     CreateUserHandler,
-    ChangeUserRoleHandler,
-    UpdateUserHandler,
+      UpdateUserHandler,
     CreateDeviceHandler,
     UpdateDeviceHandler,
     ImportService,

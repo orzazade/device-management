@@ -137,7 +137,7 @@ export class DevicesController {
       .leftJoinAndSelect('d.squad', 'squad')
       .orderBy('d.brand')
       .addOrderBy('d.model');
-    const staffUser = req.user.role === 'admin';
+    const staffUser = req.user.permissions.has('devices.viewDeleted');
     if (status && status !== 'deleted' && !(DEVICE_STATUSES as readonly string[]).includes(status)) {
       throw new BadRequestException(`Unknown status "${status}"`);
     }

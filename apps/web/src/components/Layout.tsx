@@ -41,10 +41,14 @@ function Badge({ n }: { n: number | undefined }) {
   );
 }
 
-const roleLabel: Record<string, string> = {
-  admin: 'Admin',
-  tester: 'Tester',
-};
+/**
+ * What to call somebody's access in the header.
+ *
+ * An account can hold several roles, so this joins them rather than picking
+ * one — showing only the first would quietly hide the half of their access
+ * that explains why they can see a screen.
+ */
+const roleLabel = (roles: string[]) => (roles.length ? roles.join(' · ') : 'No role');
 
 export default function Layout() {
   const { user, loading, logout, mustChangePassword, clearMustChange, sessionCheckFailed, retrySession, sessionExpired } =
@@ -259,7 +263,7 @@ export default function Layout() {
                   {user.name}
                 </span>
                 <span className="block text-left text-[11px] leading-3 text-neutral-500">
-                  {roleLabel[user.role] ?? user.role}
+                  {roleLabel(user.roles)}
                 </span>
               </span>
             </button>
@@ -269,7 +273,7 @@ export default function Layout() {
                   <b>{user.name}</b>
                   <div className="text-xs text-neutral-500">{user.email}</div>
                   <div className="mt-1 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">
-                    {roleLabel[user.role] ?? user.role}
+                    {roleLabel(user.roles)}
                   </div>
                 </div>
                 <button

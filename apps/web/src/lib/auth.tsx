@@ -3,12 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, SESSION_EXPIRED_EVENT, api, tokenStore } from './api';
 import { queryClient } from './queryClient';
 
-export type Role = 'admin' | 'tester';
 export interface Me {
   id: string;
   name: string;
   email: string;
-  role: Role;
+  /** Role names, for recognising your own access. Never for deciding it. */
+  roles: string[];
   /** Effective permission keys, resolved by the server for this account. */
   permissions: string[];
 }

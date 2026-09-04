@@ -265,7 +265,7 @@ export class DecideRequestCommand {
     readonly actor: Actor,
     readonly requestId: string,
     readonly decision: 'approved' | 'rejected',
-    readonly actorRole?: string,
+    readonly canDecideAny = false,
     readonly note?: string,
   ) {}
 }
@@ -274,7 +274,7 @@ export class DecideRequestCommand {
 export class DecideRequestHandler implements ICommandHandler<DecideRequestCommand> {
   constructor(private readonly db: AppDbContext) {}
 
-  async execute({ actor, requestId, decision, actorRole, note }: DecideRequestCommand): Promise<DeviceRequest> {
+  async execute({ actor, requestId, decision, canDecideAny, note }: DecideRequestCommand): Promise<DeviceRequest> {
     return this.db.withTransaction(async (ctx) => {
       const request = await loadRequest(ctx, requestId);
       const selfRequest =
@@ -287,7 +287,7 @@ export class DecideRequestHandler implements ICommandHandler<DecideRequestComman
       // the company — but an Admin overriding a peer is recorded as exactly
       // that, not disguised as the holder's own decision.
       const holderId = request.device?.holderId ?? null;
-      const isAdmin = actorRole === 'admin';
+      const isAdmin = canDecideAny;
       const isHolder = holderId !== null && actor.id === holderId;
       if (!isHolder && !isAdmin) {
         throw new ForbiddenException(

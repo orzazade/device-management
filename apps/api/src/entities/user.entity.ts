@@ -6,11 +6,13 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-/** Two roles only. The lab runs on peers lending to peers: whoever holds a
- * device decides who gets it next, so there is no middle approver tier. */
-export type Role = 'admin' | 'tester';
-export const ROLES: Role[] = ['admin', 'tester'];
-
+/**
+ * An account is identity and nothing else.
+ *
+ * What somebody may do lives in `user_roles` -> `roles` -> `permissions`.
+ * This entity used to carry a `role` column as well, which meant two answers
+ * to the same question and no rule about which one won.
+ */
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -24,9 +26,6 @@ export class User {
 
   @Column({ select: false })
   passwordHash: string;
-
-  @Column({ type: 'varchar' })
-  role: Role;
 
   @Column({ default: true })
   active: boolean;

@@ -4,12 +4,20 @@ import * as bcrypt from 'bcryptjs';
 import { In } from 'typeorm';
 import { Actor, writeAudit } from '../audit/audit';
 import { AppDbContext } from '../db/app-db-context';
-import { Role, User } from '../entities/user.entity';
+import { SYSTEM_ROLES } from '../auth/permissions';
+import { assertNotTheLastSuperAdmin } from '../auth/super-admins';
+import { User } from '../entities/user.entity';
 
 export class CreateUserCommand {
   constructor(
     readonly actor: Actor,
-    readonly data: { name: string; email: string; role: Role; password: string },
+    readonly data: {
+      name: string;
+      email: string;
+      password: string;
+      /** Roles to grant. Empty means the baseline role alone. */
+      roleIds?: string[];
+    },
   ) {}
 }
 
@@ -25,25 +33,32 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
       const user = await ctx.users.save({
         name: data.name,
         email,
-        role: data.role,
         passwordHash: bcrypt.hashSync(data.password, 10),
       });
-      // Grant the matching role straight away. An account created with no
-      // role would hold no permissions at all — a person who can sign in and
-      // then find every screen empty, which reads as a broken app rather than
-      // as a deliberate restriction.
-      const target = data.role === 'admin' ? 'Super Admin' : 'Lab Tester';
-      await ctx.manager.query(
-        `INSERT INTO user_roles (user_id, role_id, granted_by_id)
-         SELECT $1, r.id, $2 FROM roles r WHERE r.name = $3
-         ON CONFLICT DO NOTHING`,
-        [user.id, actor.id, target],
-      );
+      // Always grant something. An account created with no role holds no
+      // permissions at all — a person who can sign in and then find every
+      // screen empty, which reads as a broken app rather than as a
+      // deliberate restriction.
+      const roles = data.roleIds?.length
+        ? await ctx.roles.find({ where: { id: In(data.roleIds) } })
+        : await ctx.roles.find({ where: { name: SYSTEM_ROLES.labTester.name } });
+      if (!roles.length) throw new NotFoundException('That role no longer exists');
+      for (const role of roles) {
+        await ctx.userRoles.save({
+          userId: user.id,
+          roleId: role.id,
+          grantedById: actor.id,
+        });
+      }
       await writeAudit(ctx.manager, actor, {
         entityType: 'user',
         entityId: user.id,
         action: 'created',
-        newValue: { name: user.name, email: user.email, role: user.role, rbacRole: target },
+        newValue: {
+          name: user.name,
+          email: user.email,
+          roles: roles.map((r) => r.name).sort(),
+        },
       });
       return user;
     });
@@ -92,14 +107,11 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
         if (data.active === false) {
           // Same guards as delete — a deactivated account cannot sign in,
           // so it must not silently strand devices or open requests.
-          if (user.role === 'admin') {
-            const activeAdmins = await ctx.users.count({
-              where: { role: 'admin', active: true },
-            });
-            if (activeAdmins <= 1) {
-              throw new ConflictException('Cannot deactivate the last active Admin');
-            }
-          }
+          await assertNotTheLastSuperAdmin(
+            ctx.manager,
+            user.id,
+            'Cannot deactivate the last active Super Admin',
+          );
           const holds = await ctx.devices.count({ where: { holderId: user.id } });
           if (holds > 0) {
             throw new ConflictException(
@@ -140,62 +152,3 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
   }
 }
 
-export class ChangeUserRoleCommand {
-  constructor(
-    readonly actor: Actor,
-    readonly userId: string,
-    readonly role: Role,
-  ) {}
-}
-
-@CommandHandler(ChangeUserRoleCommand)
-export class ChangeUserRoleHandler implements ICommandHandler<ChangeUserRoleCommand> {
-  constructor(private readonly db: AppDbContext) {}
-
-  async execute({ actor, userId, role }: ChangeUserRoleCommand): Promise<User> {
-    return this.db.withTransaction(async (ctx) => {
-      const user = await ctx.users.findOne({ where: { id: userId } });
-      if (!user) throw new NotFoundException('User not found');
-      const old = user.role;
-      if (old === role) return user;
-      if (old === 'admin') {
-        const otherAdmins = await ctx.users.count({
-          where: { role: 'admin', active: true },
-        });
-        if (otherAdmins <= 1) {
-          throw new ConflictException('Cannot demote the last active Admin');
-        }
-      }
-      user.role = role;
-      await ctx.users.save(user);
-
-      // Keep the permission model in step with the legacy column. Until the
-      // role editor ships, this endpoint is the only thing that changes what
-      // somebody can do, so letting the two drift would mean permissions
-      // going stale the moment anyone is promoted.
-      const target = role === 'admin' ? 'Super Admin' : 'Lab Tester';
-      await ctx.manager.query(
-        `DELETE FROM user_roles ur
-         USING roles r
-         WHERE ur.role_id = r.id AND ur.user_id = $1
-           AND r.name IN ('Super Admin', 'Lab Tester')`,
-        [user.id],
-      );
-      await ctx.manager.query(
-        `INSERT INTO user_roles (user_id, role_id, granted_by_id)
-         SELECT $1, r.id, $2 FROM roles r WHERE r.name = $3
-         ON CONFLICT DO NOTHING`,
-        [user.id, actor.id, target],
-      );
-
-      await writeAudit(ctx.manager, actor, {
-        entityType: 'user',
-        entityId: user.id,
-        action: 'role_changed',
-        oldValue: { role: old },
-        newValue: { role, rbacRole: target },
-      });
-      return user;
-    });
-  }
-}

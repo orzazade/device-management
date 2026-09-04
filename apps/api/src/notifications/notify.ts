@@ -1,4 +1,5 @@
 import { EntityManager, In } from 'typeorm';
+import { superAdminIds } from '../auth/super-admins';
 import { config } from '../config';
 import { EmailOutbox, Notification, NotificationRule } from '../entities/notification.entity';
 import { User } from '../entities/user.entity';
@@ -49,10 +50,12 @@ export async function notify(
   }
 }
 
-/** Active Admin user ids — the desk, and the audience for lab events. */
+/**
+ * Active Super Admin ids — the desk, and the audience for lab events.
+ *
+ * Kept as a named export because seven call sites read as "tell the desk";
+ * the answer now comes from the role tables rather than a column copy.
+ */
 export async function staffIds(manager: EntityManager): Promise<string[]> {
-  const staff = await manager
-    .getRepository(User)
-    .find({ where: { role: 'admin', active: true } });
-  return staff.map((s) => s.id);
+  return superAdminIds(manager);
 }

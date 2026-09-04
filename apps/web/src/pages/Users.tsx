@@ -6,22 +6,21 @@ import { api } from '../lib/api';
 import ConfirmModal from '../components/ConfirmModal';
 import { VForm, VField } from '../components/VForm';
 import { email, minLen, password, required } from '../lib/validate';
-import { useAuth, useCan, type Role } from '../lib/auth';
+import { useAuth, useCan } from '../lib/auth';
+
+/** What a new account gets when nobody chooses otherwise. */
+const BASELINE_ROLE = 'Lab Tester';
 
 interface UserRow {
   id: string;
   name: string;
   email: string;
-  role: Role;
-  /** RBAC roles by name. The legacy `role` above survives only until it is dropped. */
+  /** The roles this account holds, by name. */
   roles?: string[];
   active: boolean;
   holds?: number;
   createdAt: string;
 }
-
-const ROLES: Role[] = ['admin', 'tester'];
-const roleLabel: Record<Role, string> = { admin: 'Admin', tester: 'Tester' };
 
 export default function Users() {
   const { user: me } = useAuth();
@@ -98,8 +97,12 @@ export default function Users() {
   });
 
   const create = useMutation({
-    mutationFn: (body: { name: string; email: string; role: Role; password: string }) =>
-      api('/users', { method: 'POST', body }),
+    mutationFn: (body: {
+      name: string;
+      email: string;
+      password: string;
+      roleIds?: string[];
+    }) => api('/users', { method: 'POST', body }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowCreate(false);
@@ -165,7 +168,7 @@ export default function Users() {
                 <td className="px-4 py-2.5 font-mono text-xs">{u.email}</td>
                 <td className="px-4 py-2.5">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    {(u.roles?.length ? u.roles : [roleLabel[u.role]]).map((name: string) => (
+                    {(u.roles?.length ? u.roles : ['No role']).map((name: string) => (
                       <span
                         key={name}
                         data-testid="user-role-chip"
@@ -213,7 +216,7 @@ export default function Users() {
                 </td>
                 <td className="px-4 py-2.5">
                   {showDeleted ? (
-                    me?.role === 'admin' && (
+                    can('users.restore') && (
                       <button
                         onClick={() => restore.mutate(u.id)}
                         disabled={restore.isPending}
@@ -247,10 +250,10 @@ export default function Users() {
                 id: editFor.id,
                 name: String(f.get('name')),
                 email: String(f.get('email')),
-                ...(me?.role === 'admin' && editFor.id !== me.id
+                ...(can('users.update') && editFor.id !== me?.id
                   ? { active: f.get('active') === 'on' }
                   : {}),
-                ...(me?.role === 'admin' && f.get('newPassword')
+                ...(can('users.update') && f.get('newPassword')
                   ? { newPassword: String(f.get('newPassword')) }
                   : {}),
               });
@@ -272,7 +275,7 @@ export default function Users() {
               defaultValue={editFor.email}
               rules={[required('Email is required'), email()]}
             />
-            {me?.role === 'admin' && (
+            {can('users.update') && (
               <>
                 <VField
                   name="newPassword"
@@ -281,7 +284,7 @@ export default function Users() {
                   className="mb-3"
                   rules={[password()]}
                 />
-                {editFor.id !== me.id && (
+                {editFor.id !== me?.id && (
                   <label className="mb-3 flex items-center gap-2.5">
                     <input type="checkbox" name="active" defaultChecked={editFor.active} />
                     <span>
@@ -292,7 +295,7 @@ export default function Users() {
               </>
             )}
             <div className="mt-4 flex items-center gap-2">
-              {me?.role === 'admin' && editFor.id !== me.id && (
+              {can('users.delete') && editFor.id !== me?.id && (
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(editFor)}
@@ -386,11 +389,14 @@ export default function Users() {
           <VForm
             className="w-full max-w-md rounded-2xl bg-white p-6"
             onValidSubmit={(f) => {
+              const picked = String(f.get('roleId') ?? '');
               create.mutate({
                 name: String(f.get('name')),
                 email: String(f.get('email')),
-                role: String(f.get('role')) as Role,
                 password: String(f.get('password')),
+                // Left empty the server grants the baseline role, which is
+                // what somebody without permission to assign roles gets.
+                ...(picked ? { roleIds: [picked] } : {}),
               });
             }}
           >
@@ -401,16 +407,33 @@ export default function Users() {
               rules={[required('Email is required'), email()]} placeholder="name@company.com" />
             <VField name="password" label="Password" type="password" className="mb-3"
               rules={[required('Password is required'), password()]} />
-            <label className="mb-4 block">
-              <span className="mb-1 block text-xs font-semibold text-neutral-500">Role</span>
-              <select name="role" defaultValue="tester" className="w-full rounded-lg border border-neutral-300 px-3 py-2">
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {roleLabel[r]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {can('users.roles.assign') ? (
+              <label className="mb-4 block">
+                <span className="mb-1 block text-xs font-semibold text-neutral-500">Role</span>
+                <select
+                  name="roleId"
+                  data-testid="create-role"
+                  defaultValue=""
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2"
+                >
+                  {/* The empty value is the baseline role, named rather than
+                      blank so the default does not look like a missing choice. */}
+                  <option value="">{BASELINE_ROLE}</option>
+                  {(roleList.data ?? [])
+                    .filter((r) => r.name !== BASELINE_ROLE)
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            ) : (
+              <p className="mb-4 text-sm text-neutral-500">
+                They start as {BASELINE_ROLE}. Changing that needs permission to
+                assign roles.
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 type="button"

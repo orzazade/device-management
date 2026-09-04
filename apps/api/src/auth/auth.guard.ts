@@ -9,7 +9,6 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { AppDbContext } from '../db/app-db-context';
-import { Role } from '../entities/user.entity';
 import { PermissionResolver } from './permission.resolver';
 
 /**
@@ -24,24 +23,16 @@ export interface TokenClaims {
   sub: string;
   name: string;
   email: string;
-  role: Role;
 }
 
-/** The caller, as handlers see them: claims plus freshly resolved permissions. */
+/** The caller, as handlers see them: identity plus freshly resolved permissions. */
 export interface AuthUser extends TokenClaims {
-  /** Effective permissions, resolved per request. Not enforced yet (step 2). */
+  /** Effective permissions, resolved from the role tables on every request. */
   permissions: Set<string>;
 }
 
 export const PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
-
-export const ROLES_KEY = 'roles';
-/**
- * @deprecated Nothing uses this any more — permissions decide. It survives
- * only so step 5 can remove it together with the users.role column it reads.
- */
-export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
 
 export const PERMISSIONS_KEY = 'permissions';
 /**
@@ -101,7 +92,7 @@ export class AuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
-    // The token only proves identity. Role and active-ness come from the DB
+    // The token only proves identity. Permissions and active-ness come from the DB
     // on every request, so deactivating/demoting someone takes effect NOW,
     // not when their 12h token expires. (find() skips soft-deleted users.)
     const dbUser = await this.db.users().findOne({ where: { id: claims.sub } });
@@ -115,13 +106,10 @@ export class AuthGuard implements CanActivate {
       sub: dbUser.id,
       name: dbUser.name,
       email: dbUser.email,
-      role: dbUser.role,
       permissions: held,
     };
     req.user = user;
 
-    // Permissions decide. @Roles is gone from the routes; the decorator
-    // survives only until step 5 removes the legacy column with it.
     const required = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
       ctx.getHandler(),
       ctx.getClass(),

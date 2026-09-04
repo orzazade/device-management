@@ -100,7 +100,6 @@ export class AuthController {
       sub: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
     };
     return {
       token: await this.jwt.signAsync(payload),
@@ -108,7 +107,7 @@ export class AuthController {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        roles: await this.perms.roleNamesForUser(user.id),
         // The frontend seeds its session straight from this object. Leaving
         // permissions out meant a signed-in Admin saw a tester's app until a
         // reload happened to call /auth/me.
@@ -149,11 +148,17 @@ export class AuthController {
   }
 
   @Get('me')
-  me(@Req() req: { user: AuthUser }) {
-    const { sub, name, email, role, permissions } = req.user;
+  async me(@Req() req: { user: AuthUser }) {
+    const { sub, name, email, permissions } = req.user;
     // The frontend gets the permission list so it can stop showing doors that
     // will not open. It is not a security boundary — the guard has already
     // decided this request, and will decide every other one.
-    return { id: sub, name, email, role, permissions: [...permissions] };
+    return {
+      id: sub,
+      name,
+      email,
+      roles: await this.perms.roleNamesForUser(sub),
+      permissions: [...permissions],
+    };
   }
 }

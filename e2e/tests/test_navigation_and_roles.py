@@ -131,4 +131,6 @@ def test_legacy_bookmarks_redirect_into_the_merged_requests_page(as_admin: AppSh
 
 def test_the_signed_in_user_is_named_in_the_header(as_tester: AppShell, accounts):
     assert as_tester.signed_in_name() == accounts["tester"]["name"]
-    assert as_tester.signed_in_role() == "Tester"
+    assert as_tester.signed_in_role() == "Lab Tester", (
+        "the header should name the role they actually hold"
+    )

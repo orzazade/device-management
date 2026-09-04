@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard, AuthUser } from './auth.guard';
 
-const user = { sub: 'u1', name: 'Test', email: 't@x', role: 'tester' as const };
+const user = { sub: 'u1', name: 'Test', email: 't@x' };
 
 function makeCtx(headers: Record<string, string>, req: any = {}) {
   Object.assign(req, { headers });
@@ -18,13 +18,11 @@ function makeGuard(opts: {
   isPublic?: boolean;
   roles?: string[];
   valid?: boolean;
-  dbUser?: { id: string; name: string; email: string; role: string; active: boolean } | null;
-  /** Permissions the caller holds, for the step-2 comparison. */
+  dbUser?: { id: string; name: string; email: string; active: boolean } | null;
+  /** Permissions the caller holds. */
   held?: string[];
   /** Permissions the route will require once enforcement switches. */
   required?: string[];
-  /** Collects mismatch reports so a test can assert on them. */
-  reports?: any[];
 }) {
   const reflector = {
     getAllAndOverride: (key: string) => {
@@ -42,12 +40,11 @@ function makeGuard(opts: {
   } as any;
   const dbUser =
     opts.dbUser === undefined
-      ? { id: user.sub, name: user.name, email: user.email, role: user.role, active: true }
+      ? { id: user.sub, name: user.name, email: user.email, active: true }
       : opts.dbUser;
   const db = { users: () => ({ findOne: async () => dbUser }) } as any;
   const perms = {
     forUser: async () => new Set(opts.held ?? []),
-    report: (r: any) => opts.reports?.push(r),
   } as any;
   return new AuthGuard(jwt, reflector, db, perms);
 }
@@ -91,7 +88,7 @@ describe('AuthGuard', () => {
 
   it('rejects a token whose user was deactivated', async () => {
     const g = makeGuard({
-      dbUser: { id: 'u1', name: 'Test', email: 't@x', role: 'tester', active: false },
+      dbUser: { id: 'u1', name: 'Test', email: 't@x', active: false },
     });
     await expect(g.canActivate(makeCtx({ authorization: 'Bearer x' }))).rejects.toThrow(
       UnauthorizedException,
@@ -105,14 +102,20 @@ describe('AuthGuard', () => {
     );
   });
 
-  it('uses the CURRENT role from the DB, not the token claim', async () => {
-    // token says tester; DB says the user was promoted to manager
-    const g = makeGuard({
-      roles: ['manager'],
-      dbUser: { id: 'u1', name: 'Test', email: 't@x', role: 'manager', active: true },
-    });
-    const ctx = makeCtx({ authorization: 'Bearer x' });
-    await expect(g.canActivate(ctx)).resolves.toBe(true);
-    expect(ctx.req.user.role).toBe('manager');
+  it('answers from the database, so revoking access does not wait for expiry', async () => {
+    // This used to check that a promotion in the DB beat a stale role claim.
+    // The token no longer carries authority at all, so the same property is
+    // now about the other direction, which is the one that matters: a token
+    // minted while somebody could do something must stop working the moment
+    // the database says they cannot.
+    const stillAllowed = makeGuard({ held: ['devices.delete'], required: ['devices.delete'] });
+    await expect(stillAllowed.canActivate(makeCtx({ authorization: 'Bearer x' }))).resolves.toBe(
+      true,
+    );
+
+    const revoked = makeGuard({ held: [], required: ['devices.delete'] });
+    await expect(revoked.canActivate(makeCtx({ authorization: 'Bearer x' }))).rejects.toThrow(
+      ForbiddenException,
+    );
   });
 });

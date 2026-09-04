@@ -336,13 +336,6 @@ export class RolesController {
           grantedById: req.user.sub,
         });
       }
-      // Keep the legacy column in step. Until step 5 removes it, two paths
-      // can change what somebody may do — this one and PATCH /users/:id/role
-      // — and letting them disagree would mean the answer depended on which
-      // screen you happened to use.
-      const isAdmin = roles.some((r) => r.name === SYSTEM_ROLES.superAdmin.name);
-      await ctx.users.update(id, { role: isAdmin ? 'admin' : 'tester' });
-
       const names = roles.map((r) => r.name).sort();
       if (had.size !== roles.length || roles.some((r) => !had.has(r.id))) {
         // Recorded against the USER, not the role: "how did this account get
