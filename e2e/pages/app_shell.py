@@ -154,15 +154,25 @@ class Dashboard(BasePage):
         return self
 
     def stat(self, label: str, timeout: int = 10) -> int:
-        """The number above one of the counter tiles."""
+        """The number above one of the counter tiles, once it is really there.
+
+        A tile still showing "…" is not an answer, so this waits it out
+        rather than failing on it. Reading one eagerly is how a baseline gets
+        taken before the query lands, which then makes the delta measured
+        against it meaningless.
+        """
         locator = (
             By.XPATH,
             f"//div[normalize-space()={xq(label)}]/preceding-sibling::div[1]",
         )
-        raw = self.find(locator, timeout).text.strip()
-        if raw in {"…", ""}:
-            raise AssertionError(f"the {label!r} tile is still loading")
-        return int(raw)
+        deadline = time.time() + timeout
+        raw = ""
+        while time.time() < deadline:
+            raw = self.find(locator, timeout).text.strip()
+            if raw not in {"…", ""}:
+                return int(raw)
+            time.sleep(0.2)
+        raise AssertionError(f"the {label!r} tile was still loading after {timeout}s")
 
     def wait_for_stat(self, label: str, expected: int, timeout: int = 20) -> None:
         deadline = time.time() + timeout

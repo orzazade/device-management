@@ -78,7 +78,10 @@ export default function Dashboard() {
         <Link to="/devices" className="text-inherit no-underline">
           <Stat k={stats.data?.availableNow ?? '…'} label="Devices available now" />
         </Link>
-        <Stat k={mine.length} label="In my hands" />
+        {/* Every other tile shows "…" until its query lands. This one
+            counted an empty list as a real zero, so somebody holding three
+            devices was told they held none for as long as the request took. */}
+        <Stat k={devices.isLoading ? '…' : mine.length} label="In my hands" />
         {can('requests.viewAll') && (
           <Link to="/requests" className="text-inherit no-underline">
             <Stat k={pending.data?.length ?? '…'} label="Waiting for approval" />
@@ -126,7 +129,13 @@ export default function Dashboard() {
                 <Chip status={d.status} />
               </Link>
             ))}
-            {mine.length === 0 && <p className="p-6 text-neutral-400">Nothing checked out.</p>}
+            {devices.isLoading ? (
+              <p className="p-6 text-neutral-400">loading…</p>
+            ) : (
+              mine.length === 0 && (
+                <p className="p-6 text-neutral-400">Nothing checked out.</p>
+              )
+            )}
           </div>
         </div>
       </div>
