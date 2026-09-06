@@ -36,6 +36,7 @@ import { RbacTables1726300000000 } from '../migrations/1726300000000-rbac-tables
 import { DropAdministratorRole1726400000000 } from '../migrations/1726400000000-drop-administrator-role';
 import { BackfillMissingRoles1726500000000 } from '../migrations/1726500000000-backfill-missing-roles';
 import { DropUsersRole1726600000000 } from '../migrations/1726600000000-drop-users-role';
+import { SeedWorkingAdmins1726700000000 } from '../migrations/1726700000000-seed-working-admins';
 
 // camelCase in code, snake_case in the database — enforced globally here,
 // never hand-written in entities.
@@ -80,6 +81,7 @@ export const dataSourceOptions: DataSourceOptions = {
     DropAdministratorRole1726400000000,
     BackfillMissingRoles1726500000000,
     DropUsersRole1726600000000,
+    SeedWorkingAdmins1726700000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

@@ -17,10 +17,12 @@ Design notes worth knowing before adding tests:
   suites get slow and flaky. Seeding is a fixture concern; the browser is
   reserved for the behaviour actually under test.
 
-* **The seeded admin is never disturbed.** `admin@devicedesk.local` still has
-  the factory password, which forces a password-change dialog on every UI
-  sign-in. Tests therefore drive a run-scoped admin created over the API, and
-  exercise the forced-change flow on a throwaway account instead.
+* **The suite bootstraps as qa.admin.** `admin@devicedesk.local` was retired
+  by migration (its factory password made it useless for automation anyway).
+  `qa.admin@devicedesk.local` is now seeded as a Super Admin with a known,
+  non-default password, so the suite signs in as it directly to mint the
+  run's accounts. The forced-change dialog is exercised on a throwaway
+  account created with the factory default instead.
 """
 
 from __future__ import annotations
@@ -49,7 +51,10 @@ ADMIN_PASSWORD = "E2eAdmin2026"
 TESTER_PASSWORD = "E2eTester2026"
 DEFAULT_PASSWORD = "admin123"  # the app's factory default, on purpose
 
-SEED_ADMIN_EMAIL = "admin@devicedesk.local"
+# The account the suite bootstraps through — seeded by migration as a Super
+# Admin with this exact password, so it exists on any database the suite runs
+# against without the suite having to create it first.
+ROOT_EMAIL = "qa.admin@devicedesk.local"
 
 
 # --------------------------------------------------------------------- options
@@ -156,13 +161,13 @@ def fresh_session(driver, base_url):
 
 @pytest.fixture(scope="session")
 def root_api(api_url) -> Api:
-    """Signed in as the seeded admin — used only to mint the run's accounts."""
+    """Signed in as qa.admin — used only to mint the run's accounts."""
     api = Api(api_url)
     try:
-        api.login(SEED_ADMIN_EMAIL, DEFAULT_PASSWORD)
+        api.login(ROOT_EMAIL, ADMIN_PASSWORD)
     except Exception as exc:  # pragma: no cover - fixture guard
         pytest.exit(
-            f"Cannot reach the API at {api_url} as {SEED_ADMIN_EMAIL}.\n"
+            f"Cannot reach the API at {api_url} as {ROOT_EMAIL}.\n"
             f"Start the stack first (see e2e/README.md). Underlying error: {exc}",
             returncode=3,
         )
