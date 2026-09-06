@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../components/Toasts';
 import { useState } from 'react';
 import { api } from '../lib/api';
-import { useAuth } from '../lib/auth';
 
 interface Rule {
   event: string;
@@ -39,15 +38,10 @@ interface OutboxData {
 }
 
 export default function Settings() {
-  const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
 
-  const settings = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => api<{ approvalMode: string }>('/settings'),
-  });
   const rules = useQuery({
     queryKey: ['notification-rules'],
     queryFn: () => api<Rule[]>('/notification-rules'),

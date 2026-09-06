@@ -12,13 +12,12 @@ import { VForm, VField } from '../components/VForm';
 import { imei, required, serial } from '../lib/validate';
 import { useToast } from '../components/Toasts';
 import { api } from '../lib/api';
-import { useAuth, useCan } from '../lib/auth';
+import { useCan } from '../lib/auth';
 import type { DeviceRow, ProjectRow } from '../lib/types';
 
 const isFlag = (v: string) => /^(yes|no|true|false)$/i.test(v);
 
 export default function Devices() {
-  const { user } = useAuth();
   const can = useCan();
   const nav = useNavigate();
   const qc = useQueryClient();

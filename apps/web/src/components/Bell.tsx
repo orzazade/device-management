@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { useAuth, useCan } from '../lib/auth';
+import { useCan } from '../lib/auth';
 import { useClickOutside } from '../lib/useClickOutside';
 
 interface NotifRow {
@@ -26,7 +26,6 @@ function timeAgo(iso: string): string {
 }
 
 export default function Bell() {
-  const { user } = useAuth();
   const can = useCan();
   const qc = useQueryClient();
   const nav = useNavigate();

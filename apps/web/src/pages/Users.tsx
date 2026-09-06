@@ -340,7 +340,8 @@ export default function Users() {
                     checked={pickedRoles.has(r.id)}
                     onChange={() => {
                       const next = new Set(pickedRoles);
-                      next.has(r.id) ? next.delete(r.id) : next.add(r.id);
+                      if (next.has(r.id)) next.delete(r.id);
+                      else next.add(r.id);
                       setPickedRoles(next);
                     }}
                     className="mt-0.5 h-4 w-4 flex-none"

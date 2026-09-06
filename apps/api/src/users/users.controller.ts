@@ -24,7 +24,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-import { AuthUser, PermissionChange, RequirePermission } from '../auth/auth.guard';
+import { AuthUser, RequirePermission } from '../auth/auth.guard';
 import { assertNotTheLastSuperAdmin, holdsSuperAdmin } from '../auth/super-admins';
 import { AppDbContext } from '../db/app-db-context';
 import { User } from '../entities/user.entity';

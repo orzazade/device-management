@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -10,7 +9,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional } from 'class-validator';
 import { IsNull } from 'typeorm';
 import { writeAudit } from '../audit/audit';
 import { AuthUser, RequirePermission } from '../auth/auth.guard';

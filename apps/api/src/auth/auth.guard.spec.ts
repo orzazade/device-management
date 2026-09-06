@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { AuthGuard, AuthUser } from './auth.guard';
+import { AuthGuard } from './auth.guard';
 
 const user = { sub: 'u1', name: 'Test', email: 't@x' };
 
@@ -48,9 +48,6 @@ function makeGuard(opts: {
   } as any;
   return new AuthGuard(jwt, reflector, db, perms);
 }
-
-const g0 = (guard: AuthGuard) =>
-  guard.canActivate(makeCtx({ authorization: 'Bearer x' }));
 
 describe('AuthGuard', () => {
   it('lets @Public routes through with no token', async () => {

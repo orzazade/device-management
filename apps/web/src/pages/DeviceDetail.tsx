@@ -11,7 +11,7 @@ import { specsToPairs } from '../lib/specs';
 import Chip from '../components/Chip';
 import DeviceEditModal from '../components/DeviceEditModal';
 import RequestModal from '../components/RequestModal';
-import { useAuth, useCan } from '../lib/auth';
+import { useCan } from '../lib/auth';
 import { ApiError, api } from '../lib/api';
 import type { AuditRow, DeviceRow } from '../lib/types';
 
@@ -23,7 +23,6 @@ export default function DeviceDetail() {
     setTabParams(t === 'specs' ? {} : { tab: t }, { replace: true });
   const [showRequest, setShowRequest] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
-  const { user } = useAuth();
   const can = useCan();
   const device = useQuery({
     queryKey: ['device', id],

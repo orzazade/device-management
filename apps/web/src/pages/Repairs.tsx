@@ -7,7 +7,7 @@ import Modal from '../components/Modal';
 import { VForm, VField } from '../components/VForm';
 import { minLen, required } from '../lib/validate';
 import { api } from '../lib/api';
-import { useAuth, useCan } from '../lib/auth';
+import { useCan } from '../lib/auth';
 
 interface RepairRow {
   id: string;
@@ -19,7 +19,6 @@ interface RepairRow {
 }
 
 export default function Repairs() {
-  const { user } = useAuth();
   const can = useCan();
   // The actions column exists only if there is at least one action in it.
   const canAct = can('repairs.advance') || can('repairs.cancel') || can('repairs.writeOff');
