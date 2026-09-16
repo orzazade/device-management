@@ -1,17 +1,134 @@
+# Two ways to run this locally:
+#
+#   docker compose up -d                  datastores only — the daily loop.
+#                                         Run the apps on the host with
+#                                         `make dev-api` / `make dev-web`.
+#
+#   docker compose --profile full up -d   the whole system in containers,
+#                                         built from the production images,
+#                                         reachable on http://localhost:8088
+#
+# The datastores keep their shifted host ports (5433/6380) so they never
+# collide with a Postgres or Redis already running as a local service.
+# Inside the compose network the services talk on the standard ports.
+
 services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_USER: devmgmt
-      POSTGRES_PASSWORD: devmgmt
-      POSTGRES_DB: devmgmt
+      # Interpolated once here and again into the api's DATABASE_URL below, so
+      # the two can never drift apart.
+      POSTGRES_USER: ${POSTGRES_USER:-devmgmt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devmgmt}
+      POSTGRES_DB: ${POSTGRES_DB:-devmgmt}
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The api waits on this: migrations run at boot, and a half-open
+      # Postgres would fail them instead of retrying.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devmgmt} -d ${POSTGRES_DB:-devmgmt}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   redis:
     image: redis:7
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: device-mgmt-api:local
+    # List form, not a map, and that matters. A bare `- NAME` entry is passed
+    # through only when it is actually set (in .env or the shell) and is left
+    # UNDEFINED otherwise — whereas `NAME: ${NAME:-}` would hand the container
+    # an empty string. The API reads its options with `??`, and '' is not
+    # nullish, so an empty string silently defeats the code's own default.
+    # For QA_ADMIN_PASSWORD that means seeding a Super Admin with a blank
+    # password. Pass through; never default to empty.
+    environment:
+      # --- pinned: topology, not configuration -------------------------------
+      # Service names, not localhost: inside this network Postgres and Redis
+      # listen on their standard ports, not the shifted host ones. Deliberately
+      # NOT taken from .env — env.example points DATABASE_URL at localhost:5433,
+      # which is right for a host API and wrong here. Letting .env reach in
+      # would break the stack in a way that looks like a code fault.
+      - DATABASE_URL=postgres://${POSTGRES_USER:-devmgmt}:${POSTGRES_PASSWORD:-devmgmt}@db:5432/${POSTGRES_DB:-devmgmt}
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=production
+      # PORT is pinned by omission: the proxy upstream and the healthcheck both
+      # assume 8080, so an override could only break them.
+
+      # --- set here because the code's default is wrong for a container ------
+      # Production mode refuses to boot without a secret. A fixed local value
+      # keeps sessions alive across restarts; override it to test rotation.
+      - JWT_SECRET=${JWT_SECRET:-local-compose-secret-not-for-production}
+      # The code defaults to :5173 (Vite). Email deeplinks have to point at the
+      # proxy — the only origin serving both the app and the API.
+      - APP_URL=${APP_URL:-http://localhost:${WEB_PORT:-8088}}
+
+      # --- passthrough: set in .env to override, else the API's own default --
+      # Listed rather than given values here so the application stays the one
+      # place those defaults are written down.
+      - JWT_TTL           # default 12h
+      - TZ_APP            # default Asia/Baku — cron zone for the due-soon scan
+      - SMTP_URL          # unset = mails queue in the outbox, nothing is sent
+      - SMTP_FROM         # default DeviceDesk <devicedesk@localhost>
+      # Read by the seed migration, so they only bite on a database that has
+      # not run it yet: set them before the first `make full`, or `make db-reset`.
+      - QA_ADMIN_PASSWORD
+      - QA_TESTER_PASSWORD
+      - SEED_ADMIN_PASSWORD
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # The same endpoint DEPLOY.md documents — it probes DB and Redis, so a
+      # healthy api here means the whole backend is genuinely wired up.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  web:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: device-mgmt-web:local
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  proxy:
+    profiles: ["full"]
+    image: nginx:1.27-alpine
+    ports:
+      # 8088, not 8080: leaves the host port free for `make dev-api`, so the
+      # containerised stack and a host API can run at the same time.
+      - "${WEB_PORT:-8088}:80"
+    volumes:
+      - ./deploy/compose-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
 volumes:
   pgdata:
