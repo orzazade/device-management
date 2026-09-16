@@ -1,0 +1,15 @@
+# Keep the build context small. The Dockerfiles copy only the manifests,
+# apps/{api,web} and deploy/nginx.conf, and install/build inside the image —
+# nothing below is ever needed, and shipping it slows every build.
+.git
+.github
+**/node_modules
+**/dist
+**/.logs
+e2e/reports
+docs
+*.md
+!README.md
+.env
+.env.*
+firebase-debug.log
